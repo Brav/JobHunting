@@ -59,6 +59,10 @@ def _unique_postings(postings: list[JobPosting]) -> list[JobPosting]:
     return list(by_key.values())
 
 
+def _is_newer(posting: JobPosting, job: Job) -> bool:
+    return posting.posted_at is not None and (job.posted_at is None or posting.posted_at > job.posted_at)
+
+
 def record_results(session: Session, run_id: int, listing_id: int,
                    postings: list[JobPosting], now: datetime) -> ListingResult:
     """Record one listing's results. A job is new only the first time any listing finds it."""
@@ -72,6 +76,10 @@ def record_results(session: Session, run_id: int, listing_id: int,
             job.url, job.posted_at, job.match_key = posting.url, posting.posted_at, key
         elif job is None:
             job = session.exec(select(Job).where(Job.match_key == key).order_by(Job.id)).first()
+            if job is not None and _is_newer(posting, job):
+                # A newer repost of the same job: follow it, so the link and description stay live.
+                job.external_id, job.url, job.posted_at = posting.external_id, posting.url, posting.posted_at
+                job.description = job.description_fetched_at = None
             if job is None:
                 job = Job(external_id=posting.external_id, match_key=key, first_seen_at=now,
                           title=posting.title, company=posting.company, location=posting.location,

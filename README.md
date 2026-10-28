@@ -14,7 +14,7 @@ Design: `docs/superpowers/specs/2026-10-28-linkedin-job-tracker-design.md`
 ## Run it (Docker)
 
 ```bash
-cp .env.example .env    # then set JOBHUNT_CV_FILE to your CV's path
+cp .env.example .env    # then set JOBHUNT_CV_DIR and JOBHUNT_CV_NAME to your CV
 mkdir -p data
 docker compose up -d --build
 ```
@@ -39,12 +39,16 @@ After changing the code: `docker compose up -d --build`
 Every job has a **CV prompt** button. It opens a page with a prompt containing tailoring rules, the job's description
 (fetched from LinkedIn the first time) and the text of your CV. Press **Copy prompt**, open Claude.ai and paste it.
 
-Your original CV is never modified: it is mounted into the container read-only, and the app only reads it.
-Set its location in `.env`:
+Your original CV is never modified: its folder is mounted into the container read-only, and the app only reads
+the file. Set its location in `.env`:
 
 ```
-JOBHUNT_CV_FILE=/home/you/Documents/CV.pdf
+JOBHUNT_CV_DIR=/home/you/Documents/Job Hunting
+JOBHUNT_CV_NAME=CV.pdf
 ```
+
+Replacing the CV with a newer version (same name) takes effect immediately; if the file is missing, the CV prompt
+page says where it looked, and the searches keep running.
 
 ## Develop
 
@@ -76,7 +80,7 @@ docker compose up -d --build
 
 ## Configuration
 
-Environment variables (set them in `docker-compose.yml`, except `JOBHUNT_CV_FILE` which goes in `.env`):
+Environment variables (set them in `docker-compose.yml`, except `JOBHUNT_CV_DIR` and `JOBHUNT_CV_NAME`, which go in `.env`):
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -85,5 +89,6 @@ Environment variables (set them in `docker-compose.yml`, except `JOBHUNT_CV_FILE
 | `JOBHUNT_RUN_EVERY_HOURS` | `4` | Hours between runs; must divide 24 |
 | `JOBHUNT_DB_PATH` | `/app/data/jobhunt.db` | SQLite file |
 | `JOBHUNT_RESULTS_PER_LISTING` | `100` | Max jobs fetched per listing per run |
-| `JOBHUNT_CV_PATH` | `/app/cv/original.pdf` | The CV inside the container |
-| `JOBHUNT_CV_FILE` | — | Your CV on this computer (in `.env`; mounted read-only) |
+| `JOBHUNT_CV_PATH` | `/app/cv/<JOBHUNT_CV_NAME>` | The CV inside the container (set by compose) |
+| `JOBHUNT_CV_DIR` | — | Folder holding your CV on this computer (in `.env`; mounted read-only) |
+| `JOBHUNT_CV_NAME` | — | The CV's file name in that folder (in `.env`) |

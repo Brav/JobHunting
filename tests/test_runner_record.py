@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlmodel import select
 
@@ -106,3 +106,28 @@ def test_refresh_keeps_status_and_first_seen(session_factory):
         record_results(s, r2, a, [p("1", title="Senior Engineer")], NOW + timedelta(days=1))
         job = s.exec(select(Job)).one()
     assert (job.title, job.status, job.first_seen_at) == ("Senior Engineer", "applied", NOW)
+
+
+def test_newer_repost_takes_over_link_and_date(session_factory):
+    a = add_listing(session_factory, "A")
+    r1, r2 = add_run(session_factory, NOW), add_run(session_factory, NOW + timedelta(days=1))
+    with session_factory() as s:
+        record_results(s, r1, a, [p("1", title="PHP Developer", posted_at=date(2026, 9, 1))], NOW)
+        job = s.exec(select(Job)).one()
+        job.description = "old posting text"
+        s.add(job)
+        s.commit()
+        repost = p("7", title="PHP Developer", posted_at=date(2026, 10, 27))
+        assert record_results(s, r2, a, [repost], NOW + timedelta(days=1)) == ListingResult(1, 0)
+        job = s.exec(select(Job)).one()
+    assert (job.external_id, job.url, job.posted_at, job.description) == (
+        "7", "https://www.linkedin.com/jobs/view/7", date(2026, 10, 27), None)
+
+
+def test_same_day_repost_keeps_first_link(session_factory):
+    a = add_listing(session_factory, "A")
+    r1, r2 = add_run(session_factory, NOW), add_run(session_factory, NOW + timedelta(days=1))
+    with session_factory() as s:
+        record_results(s, r1, a, [p("1", title="PHP Developer", posted_at=date(2026, 10, 27))], NOW)
+        record_results(s, r2, a, [p("7", title="PHP Developer", posted_at=date(2026, 10, 27))], NOW + timedelta(days=1))
+        assert s.exec(select(Job)).one().external_id == "1"

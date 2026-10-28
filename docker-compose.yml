@@ -10,10 +10,14 @@ services:
       - type: bind
         source: ./data
         target: /app/data
-      # The original CV, read-only: the container can't change it.
+      # The CV's folder, read-only: the container can't change the CV. A folder (not the file) so a replaced
+      # CV is picked up at once, and a missing folder doesn't stop the container (and the searches) from starting.
       - type: bind
-        source: ${JOBHUNT_CV_FILE:?Set JOBHUNT_CV_FILE in .env}
-        target: /app/cv/original.pdf
+        source: ${JOBHUNT_CV_DIR:?Set JOBHUNT_CV_DIR in .env}
+        target: /app/cv
         read_only: true
+        bind:
+          create_host_path: true
     environment:
       TZ: Europe/Belgrade
+      JOBHUNT_CV_PATH: /app/cv/${JOBHUNT_CV_NAME:?Set JOBHUNT_CV_NAME in .env}
