@@ -13,6 +13,17 @@
     <button class="btn small" type="submit">Add step</button>
     {% if pane.step_error %}<p class="error" role="alert">{{ pane.step_error }}</p>{% endif %}
   </form>
+  <form class="sent-form" hx-post="/jobs/{{ job.id }}/sent" hx-target="#job-pane" hx-swap="innerHTML" hx-encoding="multipart/form-data">
+    <span class="muted small">What I sent</span>
+    <select name="applied_via" aria-label="Applied via"><option value="">Applied via…</option>
+      {% for value, label in channels.items() %}<option value="{{ value }}"{% if job.applied_via == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    <input type="text" name="sent_cv" value="{{ job.sent_cv or '' }}" maxlength="200" placeholder="CV, e.g. tailored for {{ job.company }}" aria-label="Which CV">
+    <label class="check"><input type="checkbox" name="sent_tailored" value="1"{% if job.sent_tailored %} checked{% endif %}> Tailored</label>
+    <label class="check"><input type="checkbox" name="sent_cover_letter" value="1"{% if job.sent_cover_letter %} checked{% endif %}> Cover letter</label>
+    <input type="file" name="file" accept=".pdf,.docx,.doc,.odt,.txt,.md" aria-label="Copy of the CV you sent">
+    {% if job.sent_file %}<a class="small" href="/jobs/{{ job.id }}/sent-file">File sent</a>{% endif %}
+    <button class="btn small" type="submit">Save</button>
+  </form>
   {% if pane.steps %}
   <ol class="timeline">
     {% for step in pane.steps %}

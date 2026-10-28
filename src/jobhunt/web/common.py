@@ -10,7 +10,7 @@ from markdown_it import MarkdownIt
 from markupsafe import Markup
 from sqlmodel import Session
 
-from jobhunt.applications import STAGE_LABELS, STAGES, stage_kind
+from jobhunt.applications import CHANNELS, STAGE_LABELS, STAGES, stage_kind
 from jobhunt.blocks import HIDE_REASONS, SCOPES
 from jobhunt.eligibility import VERDICT_LABELS, VERDICT_SYMBOLS, VERDICTS, effective
 from jobhunt import salary
@@ -93,7 +93,7 @@ templates.env.filters.update(tags=job_tags, stage_kind=stage_kind,
 templates.env.globals.update(status_labels=STATUS_LABELS, workplace_labels=WORKPLACE_LABELS, stages=STAGES,
                              stage_labels=STAGE_LABELS, verdicts=VERDICTS,
                              verdict_labels=VERDICT_LABELS, verdict_symbols=VERDICT_SYMBOLS,
-                             hide_reasons=HIDE_REASONS, rule_scopes=SCOPES)
+                             hide_reasons=HIDE_REASONS, rule_scopes=SCOPES, channels=CHANNELS)
 
 
 def is_htmx(request: Request) -> bool:

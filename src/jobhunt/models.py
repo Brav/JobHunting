@@ -73,6 +73,12 @@ class Job(SQLModel, table=True):
     salary_min_eur: int | None = None  # jobhunt.salary: yearly, in euros
     salary_max_eur: int | None = Field(default=None, index=True)
     salary_text: str | None = None  # as written in the job
+    # What the user sent and how (jobhunt.applications.CHANNELS); the file is a copy under data/sent/<job id>/
+    applied_via: str | None = None
+    sent_cv: str | None = None
+    sent_tailored: bool | None = None
+    sent_cover_letter: bool | None = None
+    sent_file: str | None = None  # relative to the data directory
 
 
 class Run(SQLModel, table=True):

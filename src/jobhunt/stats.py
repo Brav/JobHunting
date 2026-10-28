@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 from sqlmodel import Session, select
 
-from jobhunt.applications import END_STAGES, INTERVIEW_STAGES, PIPELINE, REPLY_STAGES, STALE_DAYS
+from jobhunt.applications import CHANNELS, END_STAGES, INTERVIEW_STAGES, PIPELINE, REPLY_STAGES, STALE_DAYS
 from jobhunt.language import language_name
 from jobhunt.models import ApplicationStep, Job, Listing, Match
 from jobhunt.timeutil import local_date
@@ -186,6 +186,11 @@ def breakdowns(apps: list[Application]) -> dict[str, list[BreakdownRow]]:
         "Workplace": lambda a: [WORKPLACE_LABELS.get(a.job.workplace, "Unknown")],
         "Language": lambda a: [language_name(a.job.language) if a.job.language else "Unknown"],
         "Seniority": lambda a: [a.job.seniority or "Unknown"],
+        "Channel": lambda a: [CHANNELS.get(a.job.applied_via, "Not recorded")],
+        "CV": lambda a: ["Not recorded" if a.job.sent_tailored is None else "Tailored" if a.job.sent_tailored
+                         else "Original"],
+        "Cover letter": lambda a: ["Not recorded" if a.job.sent_cover_letter is None
+                                   else "With cover letter" if a.job.sent_cover_letter else "Without"],
     }
     result = {}
     for name, labels_of in keys.items():

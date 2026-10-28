@@ -18,6 +18,8 @@ REPLY_STAGES = frozenset(STAGES) - {"applied", "withdrawn", "no_response"}
 STAGE_LABELS = {"applied": "Applied", "hr_interview": "HR interview", "technical_interview": "Technical interview",
                 "final_interview": "Final interview", "offer": "Offer", "rejected": "Rejected",
                 "withdrawn": "Withdrawn", "no_response": "No response"}
+CHANNELS = {"easy_apply": "Easy Apply", "company_site": "Company site", "referral": "Referral", "email": "Email",
+            "recruiter": "Recruiter", "other": "Other"}
 STALE_DAYS = 14
 NOTE_MAX = 500
 UNDO_WINDOW = timedelta(minutes=10)  # an automatic Applied step this new is removed when the job leaves Applied

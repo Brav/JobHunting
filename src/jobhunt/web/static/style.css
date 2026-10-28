@@ -276,3 +276,5 @@ form.inline { display: inline; }
 .scam-mark { color: var(--danger); }
 .item-pay { color: var(--success); }
 .salary-from { width: 9.5em; }
+.sent-form { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; margin-top: var(--s2); }
+.sent-form input[type="text"] { flex: 1 1 160px; min-width: 0; }

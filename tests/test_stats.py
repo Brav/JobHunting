@@ -126,7 +126,7 @@ def test_breakdowns(session_factory):
     application(sf, "3", ("applied", D(3)), ("offer", D(9)))
     b = breakdowns(apps(sf))
     rows = {k: [(r.label, r.applied, r.replied, r.interviews, r.offers) for r in v] for k, v in b.items()}
-    assert list(rows) == ["Listing", "Workplace", "Language", "Seniority"]
+    assert list(rows) == ["Listing", "Workplace", "Language", "Seniority", "Channel", "CV", "Cover letter"]
     assert rows["Listing"] == [("laravel remote", 2, 2, 2, 1), ("php remote", 2, 2, 1, 0)]
     assert rows["Workplace"] == [("Hybrid", 1, 1, 1, 1), ("Remote", 1, 1, 1, 0), ("Unknown", 1, 1, 0, 0)]
     assert rows["Language"] == [("English", 2, 2, 1, 1), ("German", 1, 1, 1, 0)]

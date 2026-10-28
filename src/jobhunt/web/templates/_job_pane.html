@@ -30,6 +30,7 @@
     {% endif %}
     <a class="btn" data-action="cv" href="/jobs/{{ job.id }}/cv-prompt" target="_blank" rel="noopener">{{ icon("file-text") }} CV prompt {{ key("C") }}</a>
     <a class="btn" data-action="linkedin" href="{{ job.url }}" target="_blank" rel="noopener">{{ icon("external-link") }} LinkedIn {{ key("O") }}</a>
+    {% if job.apply_url %}<a class="btn" href="{{ job.apply_url }}" target="_blank" rel="noopener noreferrer">{{ icon("external-link") }} Apply on company site</a>{% endif %}
     <button class="btn ghost" type="button" hx-post="/jobs/{{ job.id }}/{{ 'unblock' if pane.company_blocked else 'block' }}-company"
             hx-target="#job-pane" hx-swap="innerHTML">{{ "Unblock company" if pane.company_blocked else "Block company" }}</button>
   </div>
