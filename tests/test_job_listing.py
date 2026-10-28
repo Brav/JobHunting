@@ -5,12 +5,13 @@ import pytest
 
 from fakes import FakeTranslator, add_listing, add_run, job_id, make_posting as p
 from jobhunt.actions import delete_listing
-from jobhunt.job_listing import (clear_translation_errors, download_listing, translate_description,
+from jobhunt.job_listing import (clear_service_translation_errors, download_listing, translate_description,
                                  translate_title)
 from jobhunt.models import Job
 from jobhunt.runner import record_results
-from jobhunt.sources.base import JobPage, SourceBlocked, SourceError
-from jobhunt.translate import NO_KEY_MESSAGE, TranslationError, TranslationQuotaExceeded
+from jobhunt.sources.base import JobPage, SourceBlocked, SourceError, SourceUnavailable
+from jobhunt.translate import (BAD_KEY_MESSAGE, NO_KEY_MESSAGE, TranslationError, TranslationQuotaExceeded,
+                               TranslationUnavailable)
 
 NOW = datetime(2026, 10, 28, 9, 0)
 GERMAN = "Wir suchen einen erfahrenen PHP-Entwickler für unser Team in Berlin. Sie arbeiten mit Symfony."
@@ -39,20 +40,21 @@ def test_download_listing_stores_page_and_language(session_factory):
 
 
 def test_download_listing_failures(session_factory):
-    a, b = seed(session_factory, "One", "Two")
+    a, b, c = seed(session_factory, "One", "Two", "Three")
 
-    def gone(eid):
-        raise SourceError("job page not available on LinkedIn")
-
-    def blocked(eid):
-        raise SourceBlocked("rate limited by LinkedIn")
+    def fail(error):
+        def fetch(eid):
+            raise error
+        return fetch
 
     with pytest.raises(SourceError):
-        download_listing(session_factory, a, gone, NOW)
+        download_listing(session_factory, a, fail(SourceError("job page not available on LinkedIn")), NOW)
     with pytest.raises(SourceBlocked):
-        download_listing(session_factory, b, blocked, NOW)
+        download_listing(session_factory, b, fail(SourceBlocked("rate limited by LinkedIn")), NOW)
+    with pytest.raises(SourceUnavailable):
+        download_listing(session_factory, c, fail(SourceUnavailable("LinkedIn returned status 502")), NOW)
     assert job(session_factory, a).description_error == "job page not available on LinkedIn"
-    assert job(session_factory, b).description_error is None
+    assert job(session_factory, b).description_error is None and job(session_factory, c).description_error is None
 
 
 def test_download_listing_for_deleted_job(session_factory):
@@ -72,30 +74,43 @@ def test_translate_title_only_for_non_english_once(session_factory):
     download_listing(session_factory, de, lambda eid: JobPage(GERMAN, []), NOW)
     download_listing(session_factory, en, lambda eid: JobPage(ENGLISH, []), NOW)
     translator = FakeTranslator()
-    for jid in (de, en, unknown, de):
-        translate_title(session_factory, jid, translator)
+    assert [translate_title(session_factory, jid, translator) for jid in (de, en, unknown, de)] == [
+        True, False, False, False]
     assert translator.calls == [("Backend-Entwickler", "de")]
     assert job(session_factory, de).title_en == "EN:Backend-Entwickler"
 
 
-def test_translate_title_errors(session_factory):
-    a, b = seed(session_factory, "Entwickler A", "Entwickler B")
-    for jid in (a, b):
+def test_translate_title_stores_only_text_errors(session_factory):
+    a, b, c = seed(session_factory, "Entwickler A", "Entwickler B", "Entwickler C")
+    for jid in (a, b, c):
         download_listing(session_factory, jid, lambda eid: JobPage(GERMAN, []), NOW)
-    translate_title(session_factory, a, FakeTranslator(fail=TranslationError(NO_KEY_MESSAGE)))
+    assert translate_title(session_factory, a, FakeTranslator(fail=TranslationError("DeepL can't translate German"))) is False
+    with pytest.raises(TranslationUnavailable):
+        translate_title(session_factory, b, FakeTranslator(fail=TranslationUnavailable(BAD_KEY_MESSAGE)))
     with pytest.raises(TranslationQuotaExceeded):
-        translate_title(session_factory, b, FakeTranslator(fail=TranslationQuotaExceeded("quota")))
-    assert job(session_factory, a).translation_error == NO_KEY_MESSAGE
-    assert job(session_factory, b).translation_error is None
-    assert clear_translation_errors(session_factory, NO_KEY_MESSAGE) == 1
-    assert job(session_factory, a).translation_error is None
+        translate_title(session_factory, c, FakeTranslator(fail=TranslationQuotaExceeded("quota")))
+    assert job(session_factory, a).translation_error == "DeepL can't translate German"
+    assert job(session_factory, b).translation_error is None and job(session_factory, c).translation_error is None
 
 
 def test_translate_description(session_factory):
-    a, b = seed(session_factory, "Entwickler A", "Entwickler B")
-    for jid in (a, b):
+    a, b, c = seed(session_factory, "Entwickler A", "Entwickler B", "Entwickler C")
+    for jid in (a, b, c):
         download_listing(session_factory, jid, lambda eid: JobPage(GERMAN, []), NOW)
-    translate_description(session_factory, a, FakeTranslator())
-    translate_description(session_factory, b, FakeTranslator(fail=TranslationQuotaExceeded("used up")))
+    assert translate_description(session_factory, a, FakeTranslator()) is None
+    assert translate_description(session_factory, b, FakeTranslator(fail=TranslationQuotaExceeded("used up"))) == "used up"
+    assert translate_description(session_factory, c, FakeTranslator(fail=TranslationError("DeepL can't translate German"))) == "DeepL can't translate German"
     assert job(session_factory, a).description_en == f"EN:{GERMAN}"
-    assert (job(session_factory, b).description_en, job(session_factory, b).translation_error) == (None, "used up")
+    assert (job(session_factory, b).description_en, job(session_factory, b).translation_error) == (None, None)
+    assert job(session_factory, c).translation_error == "DeepL can't translate German"
+
+
+def test_clear_service_translation_errors(session_factory):
+    a, b = seed(session_factory, "One", "Two")
+    with session_factory() as s:
+        s.get(Job, a).translation_error = NO_KEY_MESSAGE
+        s.get(Job, b).translation_error = "DeepL can't translate Serbian/Croatian"
+        s.commit()
+    assert clear_service_translation_errors(session_factory) == 1
+    assert (job(session_factory, a).translation_error, job(session_factory, b).translation_error) == (
+        None, "DeepL can't translate Serbian/Croatian")

@@ -4,7 +4,7 @@ import deepl
 import pytest
 
 from jobhunt.translate import (BAD_KEY_MESSAGE, NO_KEY_MESSAGE, QUOTA_MESSAGE, DeepLTranslator, NoTranslator,
-                               TranslationError, TranslationQuotaExceeded)
+                               TranslationError, TranslationQuotaExceeded, TranslationUnavailable)
 
 
 class FakeClient:
@@ -31,17 +31,19 @@ def test_deepl_translates_supported_language():
 
 def test_deepl_unsupported_language_makes_no_request():
     client = FakeClient()
-    with pytest.raises(TranslationError, match="DeepL can't translate Serbian/Croatian"):
+    with pytest.raises(TranslationError, match="DeepL can't translate Serbian/Croatian") as exc:
         DeepLTranslator("k:fx", client=client).translate("Тражимо", "sr")
+    assert not isinstance(exc.value, TranslationUnavailable)
     assert client.calls == []
 
 
 def test_deepl_quota_and_other_errors():
     quota = DeepLTranslator("k:fx", client=FakeClient(fail=deepl.QuotaExceededException("quota")))
-    with pytest.raises(TranslationQuotaExceeded, match=QUOTA_MESSAGE):
+    with pytest.raises(TranslationQuotaExceeded, match=QUOTA_MESSAGE) as exc:
         quota.translate("Hallo", "de")
+    assert isinstance(exc.value, TranslationUnavailable)
     other = DeepLTranslator("k:fx", client=FakeClient(fail=deepl.DeepLException("boom")))
-    with pytest.raises(TranslationError, match="DeepL error: boom"):
+    with pytest.raises(TranslationUnavailable, match="DeepL error: boom"):
         other.translate("Hallo", "de")
 
 
@@ -49,10 +51,11 @@ def test_deepl_bad_key():
     bad = DeepLTranslator("k:fx", client=FakeClient(fail_lookup=deepl.AuthorizationException("forbidden")))
     with pytest.raises(TranslationError, match="DeepL rejected the key") as exc:
         bad.translate("Hallo", "de")
-    assert str(exc.value) == BAD_KEY_MESSAGE and not isinstance(exc.value, TranslationQuotaExceeded)
+    assert str(exc.value) == BAD_KEY_MESSAGE and isinstance(exc.value, TranslationUnavailable)
+    assert not isinstance(exc.value, TranslationQuotaExceeded)
 
 
 def test_no_translator():
-    with pytest.raises(TranslationError, match="Add a DeepL key"):
+    with pytest.raises(TranslationUnavailable, match="Add a DeepL key"):
         NoTranslator().translate("Hallo", "de")
     assert NO_KEY_MESSAGE.startswith("Add a DeepL key")

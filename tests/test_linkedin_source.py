@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 import requests
 
-from jobhunt.sources.base import JobPage, JobPosting, SourceBlocked, SourceError
+from jobhunt.sources.base import JobPage, JobPosting, SourceBlocked, SourceError, SourceUnavailable
 from jobhunt.sources.linkedin import LinkedInSource, fetch_job_page, km_to_miles, postings_from_frame
 
 COLUMNS = ["id", "site", "job_url", "title", "company", "location", "date_posted"]
@@ -135,3 +135,21 @@ def test_fetch_job_page_parses_details():
 
 def test_fetch_job_page_without_details():
     assert fetch_job_page("123", get=lambda url, **kw: page()).details == []
+
+
+@pytest.mark.parametrize("url", ["https://www.linkedin.com/authwall?trk=x", "https://www.linkedin.com/signup/cold-join",
+                                 "https://www.linkedin.com/login?session_redirect=y", "https://www.linkedin.com/uas/login"])
+def test_sign_in_redirect_is_a_block(url):
+    with pytest.raises(SourceBlocked):
+        fetch_job_page("123", get=lambda u, **kw: page(url=url))
+
+
+def test_server_and_network_errors_are_temporary():
+    with pytest.raises(SourceUnavailable, match="status 502"):
+        fetch_job_page("123", get=lambda u, **kw: page(status=502))
+
+    def get(url, **kw):
+        raise requests.Timeout("read timed out")
+
+    with pytest.raises(SourceUnavailable, match="timed out"):
+        fetch_job_page("123", get=get)

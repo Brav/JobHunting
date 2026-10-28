@@ -22,11 +22,11 @@ def _job(s: Session, job_id: int) -> Job:
 
 
 @router.get("/jobs/{job_id}/cv-prompt", response_class=HTMLResponse)
-def cv_prompt(request: Request, job_id: int):
+def cv_prompt(request: Request, job_id: int, error: str = ""):
     with session(request) as s:
         job = _job(s, job_id)
-    description_error = None
-    if not job.description:
+    description_error = error or None  # set when Try again just failed; don't send a second request
+    if not job.description and not error:
         try:
             download_listing(request.app.state.session_factory, job_id, request.app.state.fetch_page, utcnow())
         except SourceError as e:

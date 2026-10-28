@@ -5,8 +5,8 @@ from fastapi.testclient import TestClient
 from fakes import FakeClock, FakeSource, FakeTranslator, add_listing, job_id, make_posting as p
 from jobhunt.models import Job
 from jobhunt.runner import run_daily
-from jobhunt.sources.base import JobPage, SourceError
-from jobhunt.translate import TranslationError
+from jobhunt.sources.base import JobPage, SourceBlocked, SourceError
+from jobhunt.translate import TranslationError, TranslationUnavailable
 
 GERMAN = "Wir suchen einen erfahrenen PHP-Entwickler für unser Team in Berlin. Sie arbeiten mit Symfony."
 
@@ -118,3 +118,24 @@ def test_identical_translated_title_is_not_repeated(app_factory):
         page = c.get(f"/jobs/{jid}").text
         row_page = c.get("/jobs").text
     assert "Original title" not in page and 'title="Senior Full-Stack Developer (m/w/d)"' not in row_page
+
+
+def test_failed_try_again_sends_one_request(app_factory):
+    pages = Pages(SourceBlocked("rate limited by LinkedIn"))
+    app = app_factory(fetch_page=pages)
+    jid = seed_job(app)
+    with TestClient(app) as c:
+        c.get(f"/jobs/{jid}")
+        page = c.post(f"/jobs/{jid}/description", data={"next": f"/jobs/{jid}"}).text
+    assert len(pages.calls) == 2 and "load the job listing: rate limited by LinkedIn" in page
+
+
+def test_unavailable_translation_is_shown_but_not_stored(app_factory):
+    app = app_factory(fetch_page=Pages(JobPage(GERMAN, [])),
+                      translator=FakeTranslator(fail=TranslationUnavailable("DeepL error: timeout")))
+    jid = seed_job(app, title="Backend-Entwickler")
+    with TestClient(app) as c:
+        page = c.get(f"/jobs/{jid}").text
+    assert "DeepL error: timeout" in page and GERMAN in page
+    with app.state.session_factory() as s:
+        assert s.get(Job, jid).translation_error is None

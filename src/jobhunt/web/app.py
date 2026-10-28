@@ -12,9 +12,9 @@ from fastapi.staticfiles import StaticFiles
 from jobhunt.config import Settings
 from jobhunt.db import init_db, make_engine, make_session_factory
 from jobhunt.scheduler import RunCoordinator
-from jobhunt.job_listing import clear_translation_errors
+from jobhunt.job_listing import clear_service_translation_errors
 from jobhunt.sources.base import JobPage, JobSource
-from jobhunt.translate import NO_KEY_MESSAGE, DeepLTranslator, NoTranslator, Translator
+from jobhunt.translate import DeepLTranslator, NoTranslator, Translator
 from jobhunt.web import cv, job, listings, report, tracker
 from jobhunt.web.common import render
 
@@ -32,8 +32,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
         from jobhunt.sources.linkedin import fetch_job_page as fetch_page
     if translator is None:
         translator = DeepLTranslator(settings.deepl_auth_key) if settings.deepl_auth_key else NoTranslator()
-    if isinstance(translator, DeepLTranslator):
-        clear_translation_errors(session_factory, NO_KEY_MESSAGE)  # a key was added since those failed
+    clear_service_translation_errors(session_factory)  # stored by older versions; retried from now on
     coordinator = RunCoordinator(session_factory, source, settings, sleep=sleep, fetch_page=fetch_page,
                                  translator=translator)
 

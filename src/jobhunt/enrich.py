@@ -11,9 +11,9 @@ from sqlmodel import select
 
 from jobhunt.job_listing import download_listing, translate_title
 from jobhunt.models import Job
-from jobhunt.sources.base import JobPage, SourceBlocked, SourceError
+from jobhunt.sources.base import JobPage, SourceBlocked, SourceError, SourceUnavailable
 from jobhunt.timeutil import utcnow
-from jobhunt.translate import TranslationQuotaExceeded, Translator
+from jobhunt.translate import TranslationQuotaExceeded, TranslationUnavailable, Translator
 
 ENRICH_EVERY_MINUTES = 5
 ENRICH_BATCH = 15
@@ -57,6 +57,8 @@ def enrich_pending(session_factory, fetch_page: Callable[[str], JobPage], transl
         except SourceBlocked:
             result.blocked = True
             break
+        except SourceUnavailable:
+            break  # network or LinkedIn trouble: the next pass tries again
         except SourceError:
             result.failed += 1
             continue
@@ -68,9 +70,10 @@ def enrich_pending(session_factory, fetch_page: Callable[[str], JobPage], transl
                                                        Job.title_en.is_(None), Job.translation_error.is_(None))).all()
         for job_id in untranslated:
             try:
-                translate_title(session_factory, job_id, translator)
+                result.titles += translate_title(session_factory, job_id, translator)
             except TranslationQuotaExceeded:
                 result.quota_exceeded = True
                 break
-            result.titles += 1
+            except TranslationUnavailable:
+                break  # no key, bad key or DeepL down: the next pass tries again
     return result

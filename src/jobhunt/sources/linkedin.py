@@ -12,10 +12,11 @@ import requests
 from bs4 import BeautifulSoup
 from markdownify import markdownify
 
-from jobhunt.sources.base import JobPage, JobPosting, SourceBlocked, SourceError
+from jobhunt.sources.base import JobPage, JobPosting, SourceBlocked, SourceError, SourceUnavailable
 
 BLOCKED_MESSAGE = "rate limited by LinkedIn"
 BLOCKED_STATUSES = (403, 429, 999)  # 999 is LinkedIn's anti-bot response
+SIGN_IN_PATHS = ("/authwall", "/signup", "/login", "/uas/", "/checkpoint")  # LinkedIn's soft block
 
 logger = logging.getLogger(__name__)
 
@@ -111,12 +112,17 @@ def fetch_job_page(external_id: str, get: Callable[..., Any] | None = None) -> J
     try:
         response = get(f"https://www.linkedin.com/jobs/view/{external_id}", headers=_PAGE_HEADERS, timeout=15)
     except requests.RequestException as e:
-        raise SourceError(f"LinkedIn request failed: {e}") from e
+        raise SourceUnavailable(f"LinkedIn request failed: {e}") from e
     if response.status_code in BLOCKED_STATUSES:
         raise SourceBlocked(BLOCKED_MESSAGE)
+    if response.status_code >= 500:
+        raise SourceUnavailable(f"LinkedIn returned status {response.status_code}")
     if response.status_code != 200:
         raise SourceError(f"LinkedIn returned status {response.status_code}")
-    if not urlparse(response.url).path.startswith("/jobs/view/"):
+    path = urlparse(response.url).path
+    if path.startswith(SIGN_IN_PATHS):
+        raise SourceBlocked(BLOCKED_MESSAGE)
+    if not path.startswith("/jobs/view/"):
         raise SourceError("job page not available on LinkedIn")
     soup = BeautifulSoup(response.text, "html.parser")
     element = soup.find("div", class_="show-more-less-html__markup")

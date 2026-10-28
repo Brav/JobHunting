@@ -30,6 +30,10 @@ class SourceBlocked(SourceError):
     """The job board rate-limited or blocked the request."""
 
 
+class SourceUnavailable(SourceError):
+    """A temporary failure (network, server error) that says nothing about the job itself."""
+
+
 class JobSource(Protocol):
     def search(self, keywords: str, location: str, radius_km: int,
                window_hours: int, limit: int) -> list[JobPosting]: ...

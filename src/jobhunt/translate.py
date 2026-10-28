@@ -12,10 +12,14 @@ BAD_KEY_MESSAGE = "DeepL rejected the key — check DEEPL_AUTH_KEY in .env"
 
 
 class TranslationError(Exception):
-    """The text could not be translated; the message says why."""
+    """This text can't be translated (e.g. an unsupported language); worth remembering per job."""
 
 
-class TranslationQuotaExceeded(TranslationError):
+class TranslationUnavailable(TranslationError):
+    """The service can't translate right now (no key, bad key, network, DeepL error); not about the text."""
+
+
+class TranslationQuotaExceeded(TranslationUnavailable):
     """The monthly translation allowance is used up."""
 
 
@@ -25,7 +29,7 @@ class Translator(Protocol):
 
 class NoTranslator:
     def translate(self, text: str, language: str) -> str:
-        raise TranslationError(NO_KEY_MESSAGE)
+        raise TranslationUnavailable(NO_KEY_MESSAGE)
 
 
 class DeepLTranslator:
@@ -39,9 +43,9 @@ class DeepLTranslator:
         except deepl.QuotaExceededException as e:
             raise TranslationQuotaExceeded(QUOTA_MESSAGE) from e
         except deepl.AuthorizationException as e:
-            raise TranslationError(BAD_KEY_MESSAGE) from e
+            raise TranslationUnavailable(BAD_KEY_MESSAGE) from e
         except deepl.DeepLException as e:
-            raise TranslationError(f"DeepL error: {e}") from e
+            raise TranslationUnavailable(f"DeepL error: {e}") from e
 
     def _supports(self, language: str) -> bool:
         if self._sources is None:
