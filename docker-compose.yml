@@ -21,3 +21,4 @@ services:
     environment:
       TZ: Europe/Belgrade
       JOBHUNT_CV_PATH: /app/cv/${JOBHUNT_CV_NAME:?Set JOBHUNT_CV_NAME in .env}
+      DEEPL_AUTH_KEY: ${DEEPL_AUTH_KEY:-}

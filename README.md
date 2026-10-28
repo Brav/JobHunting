@@ -34,6 +34,29 @@ After changing the code: `docker compose up -d --build`
   once, under the listing that found it first, on the day it was first found.
 - Editing a listing's keywords, location or radius makes its next run look back 7 days again.
 
+## Job pages and translation
+
+Click a job's title to open its page in the app: the whole LinkedIn listing (details box and full description),
+your status buttons, **CV prompt** and **Open on LinkedIn**.
+
+- Listings are downloaded in the background: every 5 minutes, up to 15 jobs, about 15 seconds apart, paused while
+  a search runs. If LinkedIn blocks a download, the app waits 30 minutes.
+- Each listing's language is detected on this computer. Non-English jobs show a tag such as `German`
+  (Serbian, Croatian and Bosnian show as `Serbian/Croatian`).
+- With a DeepL key, non-English titles are translated in the background and descriptions when you open the job
+  (with **Show original**). That keeps you within DeepL's free 500,000 characters a month.
+
+To enable translation, create a free DeepL API account (https://www.deepl.com/pro-api), copy the key into `.env`,
+then restart:
+
+```
+DEEPL_AUTH_KEY=your-key:fx
+```
+
+```bash
+docker compose up -d
+```
+
 ## Tailor your CV
 
 Every job has a **CV prompt** button. It opens a page with a prompt containing tailoring rules, the job's description
@@ -80,7 +103,7 @@ docker compose up -d --build
 
 ## Configuration
 
-Environment variables (set them in `docker-compose.yml`, except `JOBHUNT_CV_DIR` and `JOBHUNT_CV_NAME`, which go in `.env`):
+Environment variables (set them in `docker-compose.yml`, except `JOBHUNT_CV_DIR`, `JOBHUNT_CV_NAME` and `DEEPL_AUTH_KEY`, which go in `.env`):
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -92,3 +115,4 @@ Environment variables (set them in `docker-compose.yml`, except `JOBHUNT_CV_DIR`
 | `JOBHUNT_CV_PATH` | `/app/cv/<JOBHUNT_CV_NAME>` | The CV inside the container (set by compose) |
 | `JOBHUNT_CV_DIR` | — | Folder holding your CV on this computer (in `.env`; mounted read-only) |
 | `JOBHUNT_CV_NAME` | — | The CV's file name in that folder (in `.env`) |
+| `DEEPL_AUTH_KEY` | empty | DeepL API key (in `.env`); empty means no translation |

@@ -104,3 +104,17 @@ def test_status_buttons_on_job_page_return_the_actions_block(app_factory):
         assert 'hx-target="#job-actions"' in c.get(f"/jobs/{jid}").text
         r = c.post(f"/jobs/{jid}/status", params={"view": "page"}, data={"status": "hidden"})
     assert r.status_code == 200 and 'id="job-actions"' in r.text and "Reset" in r.text
+
+
+def test_identical_translated_title_is_not_repeated(app_factory):
+    app = app_factory()
+    jid = seed_job(app, title="Senior Full-Stack Developer (m/w/d)")
+    with app.state.session_factory() as s:
+        job = s.get(Job, jid)
+        job.language, job.title_en, job.description = "de", "Senior Full-Stack Developer (m/w/d)", "Text."
+        s.add(job)
+        s.commit()
+    with TestClient(app) as c:
+        page = c.get(f"/jobs/{jid}").text
+        row_page = c.get("/jobs").text
+    assert "Original title" not in page and 'title="Senior Full-Stack Developer (m/w/d)"' not in row_page

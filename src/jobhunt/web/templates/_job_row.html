@@ -1,5 +1,5 @@
 <tr id="job-{{ job.id }}">
-  <td><a href="/jobs/{{ job.id }}"{% if job.title_en %} title="{{ job.title }}"{% endif %}>{{ job.title_en or job.title }}</a>{% if job.language and job.language != "en" %} <span class="lang">{{ job.language | language_name }}</span>{% endif %}</td>
+  <td><a href="/jobs/{{ job.id }}"{% if job.title_en and job.title_en != job.title %} title="{{ job.title }}"{% endif %}>{{ job.title_en or job.title }}</a>{% if job.language and job.language != "en" %} <span class="lang">{{ job.language | language_name }}</span>{% endif %}</td>
   <td>{{ job.company }}</td>
   <td>{{ job.location }}</td>
   <td>{{ job.posted_at | days_ago(today) }}</td>

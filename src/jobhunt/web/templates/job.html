@@ -2,7 +2,7 @@
 {% block title %}{{ job.title_en or job.title }}{% endblock %}
 {% block content %}
 <h1>{{ job.title_en or job.title }}{% if job.language and job.language != "en" %} <span class="lang">{{ job.language | language_name }}</span>{% endif %}</h1>
-{% if job.title_en %}<p class="muted">Original title: {{ job.title }}</p>{% endif %}
+{% if job.title_en and job.title_en != job.title %}<p class="muted">Original title: {{ job.title }}</p>{% endif %}
 <p>{{ job.company }} · {{ job.location }} · posted {{ job.posted_at | days_ago(today) }}</p>
 {% include "_job_actions.html" %}
 {% if download_error %}
