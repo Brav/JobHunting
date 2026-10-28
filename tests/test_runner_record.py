@@ -6,6 +6,7 @@ from fakes import add_listing, add_run, job_id, make_posting as p
 from jobhunt.actions import delete_listing
 from jobhunt.models import Job, Match, RunListing
 from jobhunt.runner import ListingResult, last_success_at, record_results, window_hours
+from jobhunt.sources.base import JobPosting
 
 NOW = datetime(2026, 10, 28, 9, 0)  # 10:00 in Belgrade
 
@@ -155,3 +156,12 @@ def test_first_of_repeated_postings_wins(session_factory):
     with session_factory() as s:
         record_results(s, r, a, [p("1", title="PHP Dev"), p("2", title="PHP Dev"), p("1", title="PHP Dev")], NOW)
         assert s.exec(select(Job)).one().external_id == "1"
+
+
+def test_jobs_without_a_company_are_not_matched_by_title(session_factory):
+    a = add_listing(session_factory, "A")
+    r1, r2 = add_run(session_factory, NOW), add_run(session_factory, NOW + timedelta(days=1))
+    no_company = [JobPosting(eid, "PHP Developer", "", "Belgrade", f"u{eid}", None) for eid in ("1", "2", "3")]
+    with session_factory() as s:
+        assert record_results(s, r1, a, no_company[:2], NOW) == ListingResult(found=2, new=2)
+        assert record_results(s, r2, a, no_company[2:], NOW + timedelta(days=1)) == ListingResult(found=1, new=1)

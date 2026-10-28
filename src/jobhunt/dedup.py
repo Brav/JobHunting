@@ -11,3 +11,8 @@ def _norm(text: str) -> str:
 
 def match_key(title: str, company: str) -> str:
     return f"{_norm(title)}|{_norm(company)}"
+
+
+def is_matchable(key: str) -> bool:
+    """False when the company is empty: the title alone would merge different employers' jobs."""
+    return not key.endswith("|")

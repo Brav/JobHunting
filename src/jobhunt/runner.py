@@ -12,7 +12,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from jobhunt.dedup import match_key
+from jobhunt.dedup import is_matchable, match_key
 from jobhunt.models import Job, Listing, Match, Run, RunListing
 from jobhunt.sources.base import JobPosting, JobSource, SourceError
 from jobhunt.timeutil import utcnow
@@ -58,7 +58,8 @@ def _unique_postings(postings: list[JobPosting]) -> list[JobPosting]:
     for posting in postings:
         if posting.external_id not in ids:
             ids.add(posting.external_id)
-            by_key.setdefault(match_key(posting.title, posting.company), posting)
+            key = match_key(posting.title, posting.company)
+            by_key.setdefault(key if is_matchable(key) else posting.external_id, posting)  # IDs have no "|"
     return list(by_key.values())
 
 
@@ -77,17 +78,17 @@ def record_results(session: Session, run_id: int, listing_id: int,
         if job is not None and job.id not in matched:
             job.title, job.company, job.location = posting.title, posting.company, posting.location
             job.url, job.posted_at, job.match_key = posting.url, posting.posted_at, key
-        elif job is None:
+        elif job is None and is_matchable(key):
             job = session.exec(select(Job).where(Job.match_key == key).order_by(Job.id)).first()
             if job is not None and _is_newer(posting, job):
                 # A newer repost of the same job: follow it, so the link and description stay live.
                 job.external_id, job.url, job.posted_at = posting.external_id, posting.url, posting.posted_at
                 job.description = job.description_fetched_at = job.details = job.description_error = None
                 job.description_en = job.translation_error = None  # language and title_en stay: same title
-            if job is None:
-                job = Job(external_id=posting.external_id, match_key=key, first_seen_at=now,
-                          title=posting.title, company=posting.company, location=posting.location,
-                          url=posting.url, posted_at=posting.posted_at)
+        if job is None:
+            job = Job(external_id=posting.external_id, match_key=key, first_seen_at=now,
+                      title=posting.title, company=posting.company, location=posting.location,
+                      url=posting.url, posted_at=posting.posted_at)
         # New means first found now; a job kept after its listing was deleted has lost its matches but isn't new.
         is_new = job.id is None
         session.add(job)
