@@ -77,5 +77,5 @@ class Match(SQLModel, table=True):
 
     run_id: int = Field(foreign_key="runs.id", primary_key=True)
     listing_id: int = Field(foreign_key="listings.id", primary_key=True)
-    job_id: int = Field(foreign_key="jobs.id", primary_key=True)
+    job_id: int = Field(foreign_key="jobs.id", primary_key=True, index=True)
     is_new: bool

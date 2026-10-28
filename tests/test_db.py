@@ -53,3 +53,14 @@ def test_init_db_backfills_match_keys(engine, session_factory):
     init_db(engine)
     with session_factory() as s:
         assert s.exec(select(Job)).one().match_key == "php dev|acme"
+
+
+def test_init_db_indexes_matches_by_job(tmp_path):
+    engine = make_engine(tmp_path / "old.db")
+    with engine.begin() as c:  # a database created before the index existed
+        c.exec_driver_sql("CREATE TABLE matches (run_id INTEGER NOT NULL, listing_id INTEGER NOT NULL, "
+                          "job_id INTEGER NOT NULL, is_new BOOLEAN NOT NULL, "
+                          "PRIMARY KEY (run_id, listing_id, job_id))")
+    init_db(engine)
+    with engine.connect() as c:
+        assert "ix_matches_job_id" in {row[1] for row in c.exec_driver_sql("PRAGMA index_list(matches)")}

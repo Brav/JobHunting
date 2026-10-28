@@ -49,6 +49,7 @@ def init_db(engine: Engine) -> None:
     _add_missing_columns(engine)
     with engine.begin() as conn:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_jobs_match_key ON jobs (match_key)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_matches_job_id ON matches (job_id)")
     with Session(engine) as session:
         for job in session.exec(select(Job).where(Job.match_key.is_(None))):
             job.match_key = match_key(job.title, job.company)
