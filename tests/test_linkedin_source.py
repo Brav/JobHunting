@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 import requests
 
-from jobhunt.sources.base import JobPosting, SourceBlocked, SourceError
-from jobhunt.sources.linkedin import LinkedInSource, fetch_description, km_to_miles, postings_from_frame
+from jobhunt.sources.base import JobPage, JobPosting, SourceBlocked, SourceError
+from jobhunt.sources.linkedin import LinkedInSource, fetch_job_page, km_to_miles, postings_from_frame
 
 COLUMNS = ["id", "site", "job_url", "title", "company", "location", "date_posted"]
 GOOD = {"id": "li-4012345678", "site": "linkedin",
@@ -84,38 +84,54 @@ def page(status=200, url="https://www.linkedin.com/jobs/view/123", text=JOB_HTML
     return SimpleNamespace(status_code=status, url=url, text=text)
 
 
-def test_fetch_description_returns_markdown():
+def test_fetch_job_page_returns_markdown():
     urls = []
 
     def get(url, **kw):
         urls.append(url)
         return page()
 
-    text = fetch_description("123", get=get)
+    text = fetch_job_page("123", get=get).description
     assert urls == ["https://www.linkedin.com/jobs/view/123"]
     assert "Build **PHP** APIs." in text and "Laravel" in text and "<p>" not in text
 
 
-@pytest.mark.parametrize("status", [403, 429])
-def test_fetch_description_blocked(status):
+@pytest.mark.parametrize("status", [403, 429, 999])
+def test_fetch_job_page_blocked(status):
     with pytest.raises(SourceBlocked, match="rate limited by LinkedIn"):
-        fetch_description("123", get=lambda url, **kw: page(status=status))
+        fetch_job_page("123", get=lambda url, **kw: page(status=status))
 
 
 @pytest.mark.parametrize("response, message", [
     (page(status=404), "status 404"),
     (page(url="https://www.linkedin.com/jobs/search?x=1"), "not available"),
     (page(text="<html></html>"), "no description"),
+    (page(text='<div class="show-more-less-html__markup">  </div>'), "no description"),
 ])
-def test_fetch_description_errors(response, message):
+def test_fetch_job_page_errors(response, message):
     with pytest.raises(SourceError, match=message) as exc:
-        fetch_description("123", get=lambda url, **kw: response)
+        fetch_job_page("123", get=lambda url, **kw: response)
     assert not isinstance(exc.value, SourceBlocked)
 
 
-def test_fetch_description_network_error():
+def test_fetch_job_page_network_error():
     def get(url, **kw):
         raise requests.ConnectionError("connection reset")
 
     with pytest.raises(SourceError, match="connection reset"):
-        fetch_description("123", get=get)
+        fetch_job_page("123", get=get)
+
+
+DETAILS = ('<ul class="description__job-criteria-list"><li><h3> Seniority level </h3><span> Mid-Senior level </span></li>'
+           '<li><h3>Employment type</h3><span>Full-time</span></li><li><h3>Broken</h3></li></ul>')
+
+
+def test_fetch_job_page_parses_details():
+    result = fetch_job_page("123", get=lambda url, **kw: page(text=JOB_HTML.replace("</body>", DETAILS + "</body>")))
+    assert isinstance(result, JobPage)
+    assert "Build **PHP** APIs." in result.description
+    assert result.details == [("Seniority level", "Mid-Senior level"), ("Employment type", "Full-time")]
+
+
+def test_fetch_job_page_without_details():
+    assert fetch_job_page("123", get=lambda url, **kw: page()).details == []

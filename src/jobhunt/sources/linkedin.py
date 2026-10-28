@@ -12,9 +12,10 @@ import requests
 from bs4 import BeautifulSoup
 from markdownify import markdownify
 
-from jobhunt.sources.base import JobPosting, SourceBlocked, SourceError
+from jobhunt.sources.base import JobPage, JobPosting, SourceBlocked, SourceError
 
 BLOCKED_MESSAGE = "rate limited by LinkedIn"
+BLOCKED_STATUSES = (403, 429, 999)  # 999 is LinkedIn's anti-bot response
 
 logger = logging.getLogger(__name__)
 
@@ -104,20 +105,31 @@ class LinkedInSource:
         return postings_from_frame(df)
 
 
-def fetch_description(external_id: str, get: Callable[..., Any] | None = None) -> str:
-    """The job's description from its public LinkedIn page, as Markdown (one request)."""
+def fetch_job_page(external_id: str, get: Callable[..., Any] | None = None) -> JobPage:
+    """The job's public LinkedIn page: description as Markdown plus the details box (one request)."""
     get = get or requests.get
     try:
         response = get(f"https://www.linkedin.com/jobs/view/{external_id}", headers=_PAGE_HEADERS, timeout=15)
     except requests.RequestException as e:
         raise SourceError(f"LinkedIn request failed: {e}") from e
-    if response.status_code in (403, 429):
+    if response.status_code in BLOCKED_STATUSES:
         raise SourceBlocked(BLOCKED_MESSAGE)
     if response.status_code != 200:
         raise SourceError(f"LinkedIn returned status {response.status_code}")
     if not urlparse(response.url).path.startswith("/jobs/view/"):
         raise SourceError("job page not available on LinkedIn")
-    element = BeautifulSoup(response.text, "html.parser").find("div", class_="show-more-less-html__markup")
-    if element is None:
+    soup = BeautifulSoup(response.text, "html.parser")
+    element = soup.find("div", class_="show-more-less-html__markup")
+    description = _BLANK_LINES.sub("\n\n", markdownify(str(element))).strip() if element else ""
+    if not description:
         raise SourceError("no description on the job page")
-    return _BLANK_LINES.sub("\n\n", markdownify(str(element))).strip()
+    details = []
+    for item in soup.select("ul.description__job-criteria-list > li"):
+        label, value = item.find("h3"), item.find("span")
+        if label and value:
+            details.append((label.get_text(strip=True), value.get_text(strip=True)))
+    return JobPage(description=description, details=details)
+
+
+def fetch_description(external_id: str, get: Callable[..., Any] | None = None) -> str:
+    return fetch_job_page(external_id, get).description

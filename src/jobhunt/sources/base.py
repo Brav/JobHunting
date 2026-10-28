@@ -15,6 +15,13 @@ class JobPosting:
     posted_at: date | None
 
 
+@dataclass(frozen=True)
+class JobPage:
+    """A job's own page: the description (Markdown) and LinkedIn's details box as (label, value) pairs."""
+    description: str
+    details: list[tuple[str, str]]
+
+
 class SourceError(Exception):
     """The search failed (network, parsing, unexpected response)."""
 
