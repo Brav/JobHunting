@@ -9,6 +9,8 @@
     · {{ age(job)[1] | lower }}{% if pane.found_by %} · found by {{ pane.found_by | join(", ") }}{% endif %}</p>
   {% if pane.signals.line %}<p class="pane-signals muted small">{{ pane.signals.line[:1] | upper }}{{ pane.signals.line[1:] }}</p>{% endif %}
   {% if pane.signals.closed_at %}<p class="notice error-notice">No longer accepting applications (seen {{ pane.signals.closed_at | local_dt(tz) }})</p>{% endif %}
+  {% if pane.scam %}<div class="notice error-notice" role="alert"><strong>Scam warning signs</strong>
+    <ul>{% for f in pane.scam %}<li>{{ f.text }} <q>{{ f.quote }}</q></li>{% endfor %}</ul></div>{% endif %}
   {% if job.blocked_by %}<p class="notice">Hidden by your rules: {{ job.blocked_by }}</p>{% endif %}
   {% if pane.signals.ghost %}<p class="notice">Likely ghost job: {{ pane.signals.reasons | join(" · ") }}</p>{% endif %}
   {% include "_eligibility.html" %}

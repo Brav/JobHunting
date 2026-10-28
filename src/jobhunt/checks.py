@@ -10,7 +10,7 @@ from datetime import date
 
 from sqlmodel import Session, or_, select
 
-from jobhunt import blocks, eligibility, signals
+from jobhunt import blocks, eligibility, scam, signals
 from jobhunt.models import Job, Sighting
 from jobhunt.preferences import Preferences, load_preferences
 from jobhunt.timeutil import utcnow
@@ -39,6 +39,8 @@ def refresh(session: Session, job: Job, ctx: CheckContext) -> None:
     score, reasons = signals.ghost(job, sightings, ctx.today)
     job.ghost_risk, job.ghost_reasons = score, json.dumps(reasons, ensure_ascii=False)
     job.blocked_by = blocks.blocked_reason(job, ctx.blocked, ctx.rules)
+    flags = scam.scam_flags(job)
+    job.scam_flags = json.dumps(flags, ensure_ascii=False) if flags else None
 
 
 def refresh_job(session_factory, job_id: int) -> None:

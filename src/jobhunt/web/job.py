@@ -68,7 +68,8 @@ def prepare_job(request: Request, job_id: int, error: str = "", fetch: bool = Tr
     return {"job": job, "details": json.loads(job.details) if job.details else [], "download_error": download_error,
             "translation_error": (reason or job.translation_error) if untranslated else None,
             "found_by": found_by, "standalone": False, "steps": steps, "stage_default": next_stage(job.stage),
-            "step_error": "", "signals": _signals(job), "company_blocked": company_blocked, "eligibility": {
+            "step_error": "", "signals": _signals(job), "company_blocked": company_blocked,
+            "scam": json.loads(job.scam_flags) if job.scam_flags else [], "eligibility": {
                 "verdict": effective(job), "override": job.eligibility_override,
                 "reasons": json.loads(job.eligibility_reasons) if job.eligibility_reasons else []}}
 
