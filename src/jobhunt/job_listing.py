@@ -12,9 +12,10 @@ from jobhunt.sources.base import JobPage, SourceBlocked, SourceError, SourceUnav
 from jobhunt.translate import TranslationError, TranslationUnavailable, Translator
 
 
-def _update(session_factory, job_id: int, **values) -> None:
+def _update(session_factory, job_id: int, *conditions, **values) -> None:
+    """Update the job, but only while `conditions` hold: a search may repost or retitle it meanwhile."""
     with session_factory() as s:
-        s.exec(update(Job).where(Job.id == job_id).values(**values))
+        s.exec(update(Job).where(Job.id == job_id, *conditions).values(**values))
         s.commit()
 
 
@@ -25,15 +26,16 @@ def download_listing(session_factory, job_id: int, fetch_page: Callable[[str], J
         if job is None:
             return
         external_id = job.external_id
+    same_posting = Job.external_id == external_id
     try:
         page = fetch_page(external_id)
     except (SourceBlocked, SourceUnavailable):
         raise  # LinkedIn or the network, not this job: try again later
     except SourceError as e:
-        _update(session_factory, job_id, description_error=str(e))
+        _update(session_factory, job_id, same_posting, description_error=str(e))
         raise
-    # A job deleted meanwhile simply updates no row.
-    _update(session_factory, job_id, description=page.description, details=json.dumps(page.details),
+    # A job deleted or reposted meanwhile simply updates no row.
+    _update(session_factory, job_id, same_posting, description=page.description, details=json.dumps(page.details),
             description_fetched_at=now, language=detect_language(page.description), description_error=None)
 
 
@@ -53,9 +55,9 @@ def translate_title(session_factory, job_id: int, translator: Translator) -> boo
     except TranslationUnavailable:
         raise
     except TranslationError as e:
-        _update(session_factory, job_id, translation_error=str(e))
+        _update(session_factory, job_id, Job.title == title, translation_error=str(e))
         return False
-    _update(session_factory, job_id, title_en=title_en, translation_error=None)
+    _update(session_factory, job_id, Job.title == title, title_en=title_en, translation_error=None)
     return True
 
 
@@ -71,9 +73,10 @@ def translate_description(session_factory, job_id: int, translator: Translator) 
     except TranslationUnavailable as e:
         return str(e)
     except TranslationError as e:
-        _update(session_factory, job_id, translation_error=str(e))
+        _update(session_factory, job_id, Job.description == description, translation_error=str(e))
         return str(e)
-    _update(session_factory, job_id, description_en=description_en, translation_error=None)
+    _update(session_factory, job_id, Job.description == description, description_en=description_en,
+            translation_error=None)
     return None
 
 

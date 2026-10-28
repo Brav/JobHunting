@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import date, datetime
 
 import pytest
 
@@ -114,3 +114,59 @@ def test_clear_service_translation_errors(session_factory):
     assert clear_service_translation_errors(session_factory) == 1
     assert (job(session_factory, a).translation_error, job(session_factory, b).translation_error) == (
         None, "DeepL can't translate Serbian/Croatian")
+
+
+def repost(sf, external_id: str, title: str) -> None:
+    """What a search does when it finds a newer repost (or a retitled posting) of a job."""
+    with sf() as s:
+        record_results(s, add_run(sf, NOW), 1, [p(external_id, title=title, posted_at=date(2026, 10, 27))], NOW)
+
+
+def test_download_listing_drops_a_page_reposted_meanwhile(session_factory):
+    [jid] = seed(session_factory, "PHP Developer")
+
+    def fetch_during_repost(eid):
+        repost(session_factory, "9", "PHP Developer")
+        return JobPage(ENGLISH, [])
+
+    download_listing(session_factory, jid, fetch_during_repost, NOW)
+    j = job(session_factory, jid)
+    assert (j.external_id, j.description, j.language) == ("9", None, None)
+
+
+def test_download_listing_drops_an_error_about_a_posting_reposted_meanwhile(session_factory):
+    [jid] = seed(session_factory, "PHP Developer")
+
+    def fail_during_repost(eid):
+        repost(session_factory, "9", "PHP Developer")
+        raise SourceError("job page not available on LinkedIn")
+
+    with pytest.raises(SourceError):
+        download_listing(session_factory, jid, fail_during_repost, NOW)
+    assert job(session_factory, jid).description_error is None
+
+
+def test_translate_description_drops_a_translation_of_replaced_text(session_factory):
+    [jid] = seed(session_factory, "Entwickler")
+    download_listing(session_factory, jid, lambda eid: JobPage(GERMAN, []), NOW)
+
+    class ReplacingTranslator(FakeTranslator):
+        def translate(self, text, language):
+            download_listing(session_factory, jid, lambda eid: JobPage(GERMAN + " Neu.", []), NOW)
+            return super().translate(text, language)
+
+    assert translate_description(session_factory, jid, ReplacingTranslator()) is None
+    assert job(session_factory, jid).description_en is None
+
+
+def test_translate_title_drops_a_translation_of_a_replaced_title(session_factory):
+    [jid] = seed(session_factory, "Entwickler")
+    download_listing(session_factory, jid, lambda eid: JobPage(GERMAN, []), NOW)
+
+    class RetitlingTranslator(FakeTranslator):
+        def translate(self, text, language):
+            repost(session_factory, "1", "Senior Entwickler")
+            return super().translate(text, language)
+
+    translate_title(session_factory, jid, RetitlingTranslator())
+    assert job(session_factory, jid).title_en is None
