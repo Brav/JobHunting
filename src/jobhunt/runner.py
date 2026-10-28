@@ -69,7 +69,10 @@ def _is_newer(posting: JobPosting, job: Job) -> bool:
 
 def record_results(session: Session, run_id: int, listing_id: int,
                    postings: list[JobPosting], now: datetime) -> ListingResult:
-    """Record one listing's results. A job is new only the first time any listing finds it."""
+    """Record one listing's results: jobs, matches and its run_listings row, in one transaction.
+
+    A job is new only the first time any listing finds it.
+    """
     matched: set[int] = set()
     new = 0
     for posting in _unique_postings(postings):
@@ -100,20 +103,20 @@ def record_results(session: Session, run_id: int, listing_id: int,
         matched.add(job.id)
         session.add(Match(run_id=run_id, listing_id=listing_id, job_id=job.id, is_new=is_new))
         new += is_new
+    result = ListingResult(found=len(matched), new=new)
+    _add_attempt(session, run_id, listing_id, result=result)
     session.commit()
-    return ListingResult(found=len(matched), new=new)
+    return result
 
 
-def _save_attempt(session_factory, run_id: int, listing_id: int,
-                  result: ListingResult | None = None, error: str | None = None) -> None:
-    with session_factory() as s:
-        row = s.get(RunListing, (run_id, listing_id)) or RunListing(run_id=run_id, listing_id=listing_id)
-        row.attempts += 1
-        row.error = error
-        if result is not None:
-            row.found, row.new = result.found, result.new
-        s.add(row)
-        s.commit()
+def _add_attempt(session: Session, run_id: int, listing_id: int,
+                 result: ListingResult | None = None, error: str | None = None) -> None:
+    row = session.get(RunListing, (run_id, listing_id)) or RunListing(run_id=run_id, listing_id=listing_id)
+    row.attempts += 1
+    row.error = error
+    if result is not None:
+        row.found, row.new = result.found, result.new
+    session.add(row)
 
 
 def _attempt(session_factory, source: JobSource, run_id: int, listing: Listing,
@@ -130,11 +133,12 @@ def _attempt(session_factory, source: JobSource, run_id: int, listing: Listing,
                                      radius_km=current.radius_km, window_hours=window, limit=limit)
         except SourceError as e:
             logger.warning("listing %r failed: %s", current.name, e)
-            _save_attempt(session_factory, run_id, current.id, error=str(e))
+            with session_factory() as s:
+                _add_attempt(s, run_id, current.id, error=str(e))
+                s.commit()
             return "failed"
         with session_factory() as s:
             result = record_results(s, run_id, current.id, postings, clock())
-        _save_attempt(session_factory, run_id, current.id, result=result)
     except IntegrityError:
         # The listing was deleted while it was being searched; foreign keys stop orphan rows.
         logger.info("listing %r was deleted during its search; skipping", current.name)

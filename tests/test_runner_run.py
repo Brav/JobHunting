@@ -1,6 +1,7 @@
 import random
 from datetime import datetime, timedelta
 
+from sqlalchemy import event
 from sqlmodel import select
 
 from fakes import FakeClock, FakeSource, add_listing, make_posting as p
@@ -147,3 +148,21 @@ def test_listing_deleted_during_its_search_leaves_no_rows(session_factory):
     assert rows(session_factory, run_id) == {}
     with session_factory() as s:
         assert s.exec(select(Match)).all() == [] and s.exec(select(Job)).all() == []
+
+
+def test_matches_are_saved_only_with_the_listing_attempt(session_factory):
+    add_listing(session_factory, "A", keywords="python")
+
+    def factory():
+        session = session_factory()
+
+        @event.listens_for(session, "before_flush")
+        def fail_attempt(s, _context, _instances):
+            if any(isinstance(row, RunListing) for row in s.new | s.dirty):
+                raise RuntimeError("disk I/O error")
+
+        return session
+
+    run_id, _ = go(factory, FakeSource({"python": [[p("1")]]}))
+    with session_factory() as s:
+        assert (s.get(Run, run_id).status, s.exec(select(Match)).all(), s.exec(select(Job)).all()) == ("failed", [], [])
