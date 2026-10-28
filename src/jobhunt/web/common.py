@@ -14,6 +14,7 @@ from jobhunt.applications import STAGE_LABELS, STAGES, stage_kind
 from jobhunt.language import language_name
 from jobhunt.reports import run_summary
 from jobhunt.timeutil import local_date, to_local, utcnow
+from jobhunt.workplace import WORKPLACE_LABELS
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
@@ -52,7 +53,6 @@ templates.env.filters.update(local_dt=local_dt, when=when, days_ago=days_ago, ma
 
 
 STATUS_LABELS = {"new": "New", "interested": "Saved", "applied": "Applied", "hidden": "Hidden"}
-WORKPLACE_LABELS = {"remote": "Remote", "hybrid": "Hybrid", "on-site": "On-site"}
 
 
 def job_tags(job) -> list[tuple[str, str]]:

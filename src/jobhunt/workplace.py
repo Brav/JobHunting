@@ -4,6 +4,7 @@ import json
 import re
 
 WORKPLACES = ("remote", "hybrid", "on-site")
+WORKPLACE_LABELS = {"remote": "Remote", "hybrid": "Hybrid", "on-site": "On-site"}
 
 
 def _words(*phrases: str) -> re.Pattern:
