@@ -6,6 +6,7 @@
     {% elif summary.run is none %}
       No runs yet.
     {% elif summary.run.status == "failed" and summary.run.error %}
+      {{ summary.run.started_at | when(tz, today) }} ({{ summary.run.trigger }}) —
       <span class="error">Run failed: {{ summary.run.error }}</span>
     {% else %}
       {{ summary.run.started_at | when(tz, today) }} ({{ summary.run.trigger }}) — {{ summary.ok }} of {{ summary.total }} listings OK

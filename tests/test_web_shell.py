@@ -1,8 +1,8 @@
-from datetime import date
+from datetime import date, datetime
 
 from fastapi.testclient import TestClient
 
-from fakes import FakeSource, add_listing, make_posting as p, wait_until
+from fakes import FakeSource, add_listing, add_run, make_posting as p, wait_until
 from jobhunt.sources.base import SourceBlocked
 from jobhunt.web.common import days_ago
 
@@ -61,3 +61,11 @@ def test_status_poll_refreshes_the_page_when_the_run_has_finished(app_factory):
         finally:
             app.state.coordinator._lock.release()
         assert client.get("/runs/status").headers.get("HX-Refresh") == "true"
+
+
+def test_status_bar_shows_when_a_run_crashed(app_factory):
+    app = app_factory()
+    add_run(app.state.session_factory, datetime(2026, 10, 27, 9, 0), status="failed", error="OperationalError: disk full")
+    with TestClient(app) as client:
+        text = client.get("/runs/status").text
+    assert "2026-10-27 10:00 (manual)" in text and "Run failed: OperationalError: disk full" in text
