@@ -27,6 +27,7 @@ class ReportSection:
     listing: Listing
     jobs: list[Job]
     error: str | None
+    found: int  # jobs the listing's latest search of the day found
 
 
 @dataclass
@@ -79,7 +80,7 @@ def report_for_date(session: Session, day: date, tz: ZoneInfo) -> list[ReportSec
         jobs_by_listing[listing_id].append(job)
     listings = session.exec(select(Listing).where(Listing.id.in_(latest)).order_by(Listing.id)).all()
     return [ReportSection(listing=listing, jobs=sorted(jobs_by_listing[listing.id], key=_report_order),
-                          error=latest[listing.id].error)
+                          error=latest[listing.id].error, found=latest[listing.id].found)
             for listing in listings]
 
 

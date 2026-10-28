@@ -58,3 +58,12 @@ def test_report_jump_without_a_date_goes_home(app_factory):
         for day in ("", "not-a-date"):
             r = c.get("/report", params={"day": day}, follow_redirects=False)
             assert (r.status_code, r.headers["location"]) == (303, "/")
+
+
+def test_report_shows_when_a_search_hit_the_limit(app_factory):
+    app = app_factory()
+    add_listing(app.state.session_factory, "Python BG", keywords="python")
+    add_listing(app.state.session_factory, "Go BG", keywords="go")
+    seed(app, datetime(2026, 10, 28, 9, 0), {"python": [[p(str(i)) for i in range(100)]], "go": [[p("x")]]})
+    with TestClient(app) as c:
+        assert c.get("/report/2026-10-28").text.count("hit the limit of 100 jobs") == 1

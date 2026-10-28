@@ -6,7 +6,9 @@
   <td>
     {% if not row.last %}<span class="muted">not run yet</span>
     {% elif row.last.error %}<span class="error">{{ row.last.error }}</span>
-    {% else %}found {{ row.last.found }} · new {{ row.last.new }}{% endif %}
+    {% else %}found {{ row.last.found }} · new {{ row.last.new }}
+      {% if row.last.found >= results_cap %}<span class="hint" title="Some jobs may be missing: narrow the search to see them all">· hit the limit of {{ results_cap }} jobs</span>{% endif %}
+    {% endif %}
   </td>
   <td>
     <button class="{{ 'current' if row.listing.active }}" hx-post="/listings/{{ row.listing.id }}/toggle"

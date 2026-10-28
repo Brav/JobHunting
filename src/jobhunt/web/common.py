@@ -60,5 +60,6 @@ def render(request: Request, name: str, status_code: int = 200, **ctx):
     with session(request) as s:
         summary = run_summary(s)
     base = {"tz": tz, "today": local_date(utcnow(), tz), "summary": summary,
-            "running": coordinator.is_running, "next_run": coordinator.next_run_at()}
+            "running": coordinator.is_running, "next_run": coordinator.next_run_at(),
+            "results_cap": request.app.state.settings.results_per_listing}
     return templates.TemplateResponse(request, name, {**base, **ctx}, status_code=status_code)

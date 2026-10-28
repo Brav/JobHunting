@@ -69,3 +69,13 @@ def test_editing_search_fields_restarts_window(app_factory):
         assert listings(app)[0].search_changed_at is None
         c.post(f"/listings/{lid}", data={**FORM, "name": "Renamed", "radius_km": "100"})
         assert listings(app)[0].search_changed_at is not None
+
+
+def test_listing_shows_when_its_search_hit_the_limit(app_factory):
+    app = app_factory(FakeSource({"python": [[p(str(i)) for i in range(100)]], "go": [[p("x")]]}))
+    add_listing(app.state.session_factory, "Python BG", keywords="python")
+    add_listing(app.state.session_factory, "Go BG", keywords="go")
+    with TestClient(app) as c:
+        app.state.coordinator.run_blocking("manual")
+        page = c.get("/listings").text
+    assert page.count("hit the limit of 100 jobs") == 1

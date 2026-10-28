@@ -19,6 +19,7 @@
   {% for section in sections %}
     <h2>{{ section.listing.name }} <span class="muted">· {{ section.jobs | length }} new</span></h2>
     {% if section.error %}<p class="error">Search failed: {{ section.error }}</p>{% endif %}
+    {% if section.found >= results_cap %}<p class="hint">This search hit the limit of {{ results_cap }} jobs, so some may be missing. Narrow it to see them all.</p>{% endif %}
     {% if section.jobs %}
     <table>
       {% include "_job_table_head.html" %}
