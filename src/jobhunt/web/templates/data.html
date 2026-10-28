@@ -4,7 +4,10 @@
 <p><a href="/settings">‹ Settings</a></p>
 <h1>Backups and export</h1>
 <p class="muted">A backup is made every night at 03:30 and when the app starts after a day without one; the newest 14 are kept in <code>data/backups</code>.
-To restore one, stop the app and run <code>python -m jobhunt.backup restore data/backups/&lt;file&gt;</code>.</p>
+To restore one, run these in the project folder; the current database is kept next to it as <code>jobhunt.db.before-restore-…</code>:</p>
+<pre class="commands">docker compose stop
+docker compose run --rm jobhunt /app/.venv/bin/python -m jobhunt.backup restore data/backups/&lt;file&gt;
+docker compose start</pre>
 {% if made %}<p class="notice" role="status">Backed up to {{ made }}</p>{% endif %}
 <div class="actions-row">
   <form method="post" action="/data/backup"><button class="btn primary" type="submit">Back up now</button></form>

@@ -82,3 +82,28 @@ def test_data_page_and_downloads(app_factory):
         assert c.get("/data/jobs.csv").text.startswith("id,title,")
         assert c.get("/data/export.zip").headers["content-type"] == "application/zip"
         assert 'href="/data"' in c.get("/settings").text
+
+
+def test_restore_refuses_while_the_app_runs(app_factory, tmp_path):
+    import pytest
+
+    app = app_factory()
+    other, _ = database(tmp_path / "other", "9")
+    with TestClient(app) as c:
+        c.get("/data")  # the app is up, its connections idle
+        with pytest.raises(RuntimeError, match="docker compose stop"):
+            restore(app.state.settings.db_path, other, now=NOW)
+    junk = tmp_path / "notes.txt"
+    junk.write_text("not a database")
+    db, _ = database(tmp_path / "mine", "1")
+    for engine in ENGINES:
+        engine.dispose()
+    with pytest.raises(ValueError, match="isn't a job tracker backup"):
+        restore(db, junk, now=NOW)
+    assert count_jobs(db) == 1
+
+
+def test_data_page_explains_restoring(app_factory):
+    with TestClient(app_factory()) as c:
+        page = c.get("/data").text
+    assert "docker compose stop" in page and "/app/.venv/bin/python -m jobhunt.backup restore" in page

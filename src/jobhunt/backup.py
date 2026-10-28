@@ -1,10 +1,12 @@
 """Backups and exports of the database.
 
 Backups are SQLite online copies in <data>/backups, the newest 14 kept. Restoring replaces the data, so it is a command
-(python -m jobhunt.backup restore <file>), not a button.
+(python -m jobhunt.backup restore <file>), not a button, and it refuses while the app runs: the app holds a lock on
+<database>.app-lock for as long as it is up.
 """
 
 import csv
+import fcntl
 import io
 import os
 import shutil
@@ -95,7 +97,47 @@ def export_zip(db_path: Path, session: Session, now: datetime) -> bytes:
     return buffer.getvalue()
 
 
+def _lock_path(db_path: Path) -> Path:
+    return db_path.with_name(db_path.name + ".app-lock")
+
+
+def hold_app_lock(db_path: Path):
+    """Taken by the app at start and kept until it stops, so a restore can tell it is running; None if already held."""
+    handle = open(_lock_path(db_path), "a")
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return None
+    return handle
+
+
+def _app_running(db_path: Path) -> bool:
+    if not _lock_path(db_path).exists():
+        return False
+    with open(_lock_path(db_path), "a") as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return True
+        fcntl.flock(handle, fcntl.LOCK_UN)
+    return False
+
+
+def _is_backup(path: Path) -> bool:
+    try:
+        with open(path, "rb") as f:
+            if f.read(16) != b"SQLite format 3\x00":
+                return False
+        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as conn:
+            return conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone() is not None
+    except (OSError, sqlite3.Error):
+        return False
+
+
 def _in_use(db_path: Path) -> bool:
+    if _app_running(db_path):
+        return True
     try:
         conn = sqlite3.connect(db_path, timeout=0)
         try:
@@ -110,6 +152,8 @@ def _in_use(db_path: Path) -> bool:
 
 def restore(db_path: Path, backup_file: Path, *, now: datetime, force: bool = False) -> Path:
     """Replace the database with a backup; the current one is kept next to it. Returns where it was kept."""
+    if not _is_backup(backup_file):
+        raise ValueError(f"{backup_file} isn't a job tracker backup")
     if not force and _in_use(db_path):
         raise RuntimeError("The database is in use. Stop the app first (docker compose stop), or pass --force.")
     aside = db_path.with_name(f"{db_path.name}.before-restore-{now:%Y%m%d-%H%M%S}")

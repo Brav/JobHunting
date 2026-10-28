@@ -73,6 +73,21 @@ JOBHUNT_CV_NAME=CV.pdf
 Replacing the CV with a newer version (same name) takes effect immediately; if the file is missing, the CV prompt
 page says where it looked, and the searches keep running.
 
+## Backups and restore
+
+The app copies its database to `data/backups` every night at 03:30 and when it starts after a day without one, keeping
+the newest 14; **Settings → Backups and export** makes one now and downloads everything as a zip or CSV.
+
+To restore a backup (the current database is kept next to it as `jobhunt.db.before-restore-…`):
+
+```bash
+docker compose stop
+docker compose run --rm jobhunt /app/.venv/bin/python -m jobhunt.backup restore data/backups/<file>
+docker compose start
+```
+
+The restore refuses while the app is running.
+
 ## Use with Claude Desktop
 
 The tracker is also an MCP server, so Claude can search your jobs and update applications in a chat ("which saved

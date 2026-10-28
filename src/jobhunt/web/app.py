@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from jobhunt.backup import ensure_recent_backup
+from jobhunt.backup import ensure_recent_backup, hold_app_lock
 from jobhunt.config import Settings
 from jobhunt.db import init_db, make_engine, make_session_factory
 from jobhunt.scheduler import RunCoordinator
@@ -89,9 +89,12 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
             yield
         finally:
             coordinator.shutdown()
+            if _app.state.app_lock is not None:
+                _app.state.app_lock.close()
 
     app = FastAPI(title="Job tracker", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.settings = settings
+    app.state.app_lock = hold_app_lock(settings.db_path)  # a restore refuses while this is held
     app.state.session_factory = session_factory
     app.state.coordinator = coordinator
     app.state.source = source
