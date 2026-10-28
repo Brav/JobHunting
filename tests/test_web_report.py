@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 
 from fastapi.testclient import TestClient
+from sqlmodel import update
 
 from fakes import FakeClock, FakeSource, add_listing, job_id, make_posting as p
 from jobhunt.models import Job
@@ -96,3 +97,17 @@ def test_status_change_returns_pane_row_and_previous(app_factory):
     assert trigger == {"jobId": jid, "status": "hidden", "previous": "new", "label": "Hidden"}
     assert f'id="job-item-{jid}"' in r.text and 'hx-swap-oob="outerHTML"' in r.text
     assert 'data-action="reset"' in r.text and "Django &#34;Dev&#34; &lt;b&gt;" in r.text
+
+
+def test_report_hides_not_eligible_jobs(app_factory):
+    app = app_factory()
+    with TestClient(app) as c:
+        two_days(app)
+        with app.state.session_factory() as s:
+            s.exec(update(Job).where(Job.external_id == "3").values(eligibility="not_eligible"))
+            s.commit()
+        html = c.get("/report/2026-10-28").text
+        assert "Flask Dev" not in html and "Django Dev" in html
+        assert "1 not eligible hidden · Show" in html
+        shown = c.get("/report/2026-10-28?eligibility=eligible&eligibility=relocate&eligibility=check&eligibility=not_eligible").text
+        assert "Flask Dev" in shown

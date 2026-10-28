@@ -21,6 +21,7 @@
     <input type="date" name="day" value="{{ day.isoformat() }}" aria-label="Go to day" onchange="this.form.submit()">
   </form>
   <span class="spacer"></span>
+  {% include "_hidden_ineligible.html" %}
   <a class="chip{% if unseen %} on{% endif %}" href="/report/{{ day.isoformat() }}?{{ filters.query() }}{% if not unseen %}{{ '&' if filters.query() }}unseen=1{% endif %}">{{ unseen_n }} unseen</a>
   <a class="btn" href="{{ focus_url }}">{{ icon("zap") }} Focus mode {{ key("F") }}</a>
 </div>

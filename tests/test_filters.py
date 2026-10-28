@@ -6,8 +6,8 @@ from starlette.datastructures import QueryParams
 
 from fakes import FakeClock, FakeSource, add_listing, job_id, make_posting as p
 from jobhunt.actions import mark_seen
-from jobhunt.filters import (JobFilters, company_names, filter_options, filtered_jobs, report_jobs, report_tabs,
-                             tab_counts, unseen_count)
+from jobhunt.filters import (JobFilters, company_names, filter_options, filtered_jobs, hidden_ineligible_count,
+                             ordered_ids, report_jobs, report_tabs, tab_counts, unseen_count)
 from jobhunt.models import Job
 from jobhunt.runner import run_daily
 from jobhunt.sources.base import SourceBlocked
@@ -177,3 +177,22 @@ def test_cursor_paging_for_each_sort(session_factory):
                 seen += [j.external_id for j in page]
                 cursor = page[-1].id
         assert seen == everything, sort
+
+
+def test_not_eligible_new_jobs_hidden_by_default(session_factory):
+    sf = session_factory
+    seed(sf, [p("1"), p("2"), p("3"), p("4")])
+    set_job(sf, "1", eligibility="not_eligible")
+    set_job(sf, "2", eligibility="not_eligible", status="applied")
+    set_job(sf, "3", eligibility="eligible", eligibility_override="not_eligible")
+    set_job(sf, "4", eligibility="not_eligible", eligibility_override="eligible")
+    assert ids(sf) == ["2", "4"]
+    assert ids(sf, JobFilters(eligibility=("not_eligible",))) == ["1", "2", "3"]
+    assert ids(sf, JobFilters(eligibility=("eligible",))) == ["4"]
+    with sf() as s:
+        assert hidden_ineligible_count(s, JobFilters(), NOW) == 2
+        assert hidden_ineligible_count(s, JobFilters(eligibility=("eligible",)), NOW) == 0
+        assert tab_counts(s, JobFilters(), NOW)["undecided"] == 1
+        assert [i for i, _ in ordered_ids(s, JobFilters(tab="undecided"), NOW)] == [job_id(sf, "4")]
+    f = JobFilters.from_query(QueryParams("eligibility=relocate&eligibility=bogus"))
+    assert f.eligibility == ("relocate",) and f.query() == "eligibility=relocate" and f.chips()[0][0] == "Relocate"

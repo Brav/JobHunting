@@ -4,7 +4,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from sqlmodel import select
 
-from jobhunt.filters import JobFilters, company_names, filter_options, filtered_jobs, tab_counts
+from jobhunt.eligibility import VERDICTS
+from jobhunt.filters import (JobFilters, company_names, filter_options, filtered_jobs, hidden_ineligible_count,
+                             tab_counts)
 from jobhunt.models import Listing
 from jobhunt.timeutil import utcnow
 from jobhunt.web.common import is_htmx, render, session
@@ -33,6 +35,7 @@ def all_jobs(request: Request):
         jobs, total = filtered_jobs(s, f, now, limit=PER_PAGE + 1, cursor=cursor)  # one extra: are there more?
         if not is_htmx(request):
             counts = tab_counts(s, f, now)
+            hidden_n = hidden_ineligible_count(s, f, now)
             options = filter_options(s)
             listings = list(s.exec(select(Listing).order_by(Listing.id)).all())
     more = len(jobs) > PER_PAGE
@@ -55,6 +58,7 @@ def all_jobs(request: Request):
         selected_id=selected, empty_message=empty, hide_hidden=f.tab not in ("hidden", "all"),
         focus_url="/focus?" + "&".join(x for x in ("source=jobs", f.query()) if x),
         filter_action="/jobs", filter_hidden=[("tab", f.tab)] if f.tab != "active" else [],
+        hidden_n=hidden_n, show_url=_url(f.query(eligibility=VERDICTS)),
         show_listing=True, show_sort=True,
     )
 

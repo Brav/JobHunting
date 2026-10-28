@@ -5,9 +5,10 @@ from datetime import date, datetime, timedelta
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import String, func, or_
+from sqlalchemy import String, and_, func, not_, or_
 from sqlmodel import Session, select
 
+from jobhunt.eligibility import VERDICT_LABELS, VERDICTS
 from jobhunt.language import language_name
 from jobhunt.models import Job, Listing, Match, Run, RunListing
 from jobhunt.timeutil import local_day_bounds_utc
@@ -23,6 +24,12 @@ _TAB_STATUSES = {"undecided": "new", "saved": "interested", "applied": "applied"
 _QUERY_KEYS = {"listing_id": "listing"}  # URL name when it differs from the field name
 
 
+# The verdict that counts (jobhunt.eligibility.effective, as SQL): the user's override, else the automatic one.
+EFFECTIVE_ELIGIBILITY = func.coalesce(Job.eligibility_override, Job.eligibility, "check")
+# Undecided jobs the user can't take are left out unless the eligibility filter asks for them.
+HIDDEN_BY_DEFAULT = and_(Job.status == "new", EFFECTIVE_ELIGIBILITY == "not_eligible")
+
+
 def _lower(column):
     # py_lower is registered in db.make_engine; SQLite's lower() ignores non-ASCII letters.
     return func.py_lower(column, type_=String)
@@ -33,6 +40,7 @@ class JobFilters:
     tab: str = "active"
     listing_id: int | None = None
     workplace: tuple[str, ...] = ()
+    eligibility: tuple[str, ...] = ()  # none = everything except jobs hidden by default
     language: str = ""  # "", "en", "non-en" or an ISO 639-1 code
     seniority: str = ""
     employment_type: str = ""
@@ -53,6 +61,7 @@ class JobFilters:
             tab=get("tab") if get("tab") in TABS else "active",
             listing_id=int(listing) if listing.isdecimal() else None,
             workplace=tuple(dict.fromkeys(v for v in params.getlist("workplace") if v in WORKPLACE_FILTERS)),
+            eligibility=tuple(dict.fromkeys(v for v in params.getlist("eligibility") if v in VERDICTS)),
             language=get("language"), seniority=get("seniority"), employment_type=get("employment_type"),
             company=get("company"),
             found_within=get("found_within") if get("found_within") in WITHIN else "",
@@ -76,6 +85,8 @@ class JobFilters:
         """(label, query without that filter) for each active filter except tab, sort and listing."""
         chips = [(WORKPLACE_LABELS[w], self.query(workplace=tuple(x for x in self.workplace if x != w)))
                  for w in self.workplace]
+        chips += [(VERDICT_LABELS[v], self.query(eligibility=tuple(x for x in self.eligibility if x != v)))
+                  for v in self.eligibility]
         if self.language:
             label = {"en": "English", "non-en": "Not English"}.get(self.language) or language_name(self.language)
             chips.append((label, self.query(language="")))
@@ -106,6 +117,10 @@ def apply_filters(stmt, f: JobFilters, now: datetime, *, include_tab: bool = Tru
         if "unknown" in f.workplace:
             conditions.append(Job.workplace.is_(None))
         stmt = stmt.where(or_(*conditions))
+    if f.eligibility:
+        stmt = stmt.where(EFFECTIVE_ELIGIBILITY.in_(f.eligibility))
+    else:
+        stmt = stmt.where(not_(HIDDEN_BY_DEFAULT))
     if f.language == "non-en":
         stmt = stmt.where(Job.language.is_not(None), Job.language != "en")
     elif f.language:
@@ -171,6 +186,13 @@ def ordered_ids(session: Session, f: JobFilters, now: datetime) -> list[tuple[in
     return [(job_id, status) for job_id, status in session.exec(ordered(stmt, f.sort)).all()]
 
 
+def hidden_ineligible_count(session: Session, f: JobFilters, now: datetime) -> int:
+    """How many jobs matching these filters the default leaves out (0 once the eligibility filter is set)."""
+    if f.eligibility:
+        return 0
+    return _count(session, apply_filters(select(Job), replace(f, eligibility=VERDICTS), now).where(HIDDEN_BY_DEFAULT))
+
+
 def tab_counts(session: Session, f: JobFilters, now: datetime) -> dict[str, int]:
     return {tab: _count(session, apply_filters(select(Job), replace(f, tab=tab), now)) for tab in TABS}
 
@@ -213,12 +235,16 @@ def _run_ids(session: Session, day: date, tz: ZoneInfo) -> list[int]:
                              .order_by(Run.started_at, Run.id)).all())
 
 
-def _new_jobs(run_ids: list[int], listing_id: int | None = None, include_hidden: bool = False):
-    """Jobs first found (is_new) by these runs, optionally by one listing; hidden jobs left out unless asked."""
+def _new_jobs(run_ids: list[int], listing_id: int | None = None, include_hidden: bool = False,
+              include_ineligible: bool = False):
+    """Jobs first found (is_new) by these runs, optionally by one listing; hidden jobs, and jobs hidden by default
+    for eligibility, left out unless asked."""
     matches = select(Match.job_id).where(Match.run_id.in_(run_ids), Match.is_new == True)  # noqa: E712
     if listing_id is not None:
         matches = matches.where(Match.listing_id == listing_id)
     stmt = select(Job).where(Job.id.in_(matches))
+    if not include_ineligible:
+        stmt = stmt.where(not_(HIDDEN_BY_DEFAULT))
     return stmt if include_hidden else stmt.where(Job.status != "hidden")
 
 
@@ -243,8 +269,8 @@ def report_jobs(session: Session, day: date, tz: ZoneInfo, f: JobFilters, now: d
     run_ids = _run_ids(session, day, tz)
     if not run_ids:
         return []
-    stmt = apply_filters(_new_jobs(run_ids, f.listing_id, include_hidden), replace(f, listing_id=None), now,
-                         include_tab=False)
+    stmt = apply_filters(_new_jobs(run_ids, f.listing_id, include_hidden, include_ineligible=True),
+                         replace(f, listing_id=None), now, include_tab=False)
     if unseen_only:
         stmt = stmt.where(Job.seen_at.is_(None))
     return list(session.exec(stmt.order_by(Job.posted_at.is_(None), Job.posted_at.desc(), Job.title)).all())
@@ -253,3 +279,13 @@ def report_jobs(session: Session, day: date, tz: ZoneInfo, f: JobFilters, now: d
 def unseen_count(session: Session, day: date, tz: ZoneInfo) -> int:
     run_ids = _run_ids(session, day, tz)
     return _count(session, _new_jobs(run_ids).where(Job.seen_at.is_(None))) if run_ids else 0
+
+
+def report_hidden_ineligible(session: Session, day: date, tz: ZoneInfo, f: JobFilters, now: datetime) -> int:
+    """How many of the day's new jobs (under these filters) the default leaves out."""
+    run_ids = _run_ids(session, day, tz)
+    if f.eligibility or not run_ids:
+        return 0
+    stmt = apply_filters(_new_jobs(run_ids, f.listing_id, include_ineligible=True),
+                         replace(f, listing_id=None, eligibility=VERDICTS), now, include_tab=False)
+    return _count(session, stmt.where(HIDDEN_BY_DEFAULT))

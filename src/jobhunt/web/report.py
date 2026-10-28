@@ -9,7 +9,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import select
 
 from jobhunt.actions import set_job_status
-from jobhunt.filters import JobFilters, filter_options, report_jobs, report_tabs, unseen_count
+from jobhunt.eligibility import VERDICTS
+from jobhunt.filters import (JobFilters, filter_options, report_hidden_ineligible, report_jobs, report_tabs,
+                             unseen_count)
 from jobhunt.models import Job, Listing
 from jobhunt.reports import report_dates
 from jobhunt.timeutil import utcnow
@@ -36,6 +38,7 @@ def _report(request: Request, day: date | None):
         tabs = report_tabs(s, day, tz) if day else []
         jobs = report_jobs(s, day, tz, f, now, unseen_only=unseen) if day else []
         unseen_n = unseen_count(s, day, tz) if day else 0
+        hidden_n = report_hidden_ineligible(s, day, tz, f, now) if day else 0
         options = filter_options(s)
     empty = "No unseen jobs left" if unseen else "No new jobs on this day"
     if is_htmx(request):
@@ -46,6 +49,7 @@ def _report(request: Request, day: date | None):
     return render(
         request, "report.html", day=day, ran=day in dates, has_listings=has_listings, tabs=tabs, jobs=jobs,
         filters=f, unseen=unseen, unseen_n=unseen_n, options=options, pane=pane, selected_id=selected,
+        hidden_n=hidden_n, show_url=f"?{f.query(eligibility=VERDICTS)}" + ("&unseen=1" if unseen else ""),
         empty_message=empty, hide_hidden=True,
         filter_action=f"/report/{day.isoformat()}" if day else "/", show_listing=False, show_sort=False, listings=[],
         filter_hidden=[(k, v) for k, v in (("listing", f.listing_id), ("unseen", "1" if unseen else None)) if v],

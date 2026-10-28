@@ -16,8 +16,9 @@
   <a class="btn" href="{{ focus_url }}">{{ icon("zap") }} Focus mode {{ key("F") }}</a>
 </div>
 <div class="toolbar">{% include "_filter_bar.html" %}</div>
-{% if chips %}
+{% if chips or hidden_n %}
 <div class="toolbar chips">
+  {% include "_hidden_ineligible.html" %}
   {% for label, url in chips %}<a class="chip" href="{{ url }}" aria-label="Remove filter {{ label }}">{{ label }} {{ icon("x") }}</a>{% endfor %}
   <a class="btn ghost small" href="{{ clear_url }}">Clear all</a>
 </div>

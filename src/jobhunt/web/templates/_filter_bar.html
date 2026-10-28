@@ -15,6 +15,11 @@
     <label class="check"><input type="checkbox" name="workplace" value="{{ value }}"{% if value in filters.workplace %} checked{% endif %}> {{ label }}</label>
     {% endfor %}
   </fieldset>
+  <fieldset class="check-group"><legend class="sr-only">Eligibility</legend>
+    {% for value in verdicts %}
+    <label class="check"><input type="checkbox" name="eligibility" value="{{ value }}"{% if value in filters.eligibility %} checked{% endif %}> {{ verdict_labels[value] }}</label>
+    {% endfor %}
+  </fieldset>
   <select name="language" aria-label="Language">
     <option value="">Any language</option>
     <option value="en"{% if filters.language == "en" %} selected{% endif %}>English</option>

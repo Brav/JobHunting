@@ -11,6 +11,7 @@ from markupsafe import Markup
 from sqlmodel import Session
 
 from jobhunt.applications import STAGE_LABELS, STAGES, stage_kind
+from jobhunt.eligibility import VERDICT_LABELS, VERDICT_SYMBOLS, VERDICTS
 from jobhunt.language import language_name
 from jobhunt.reports import run_summary
 from jobhunt.timeutil import local_date, to_local, utcnow
@@ -85,7 +86,8 @@ def job_age(job, now: datetime, tz: ZoneInfo) -> tuple[str, str]:
 
 templates.env.filters.update(tags=job_tags, stage_kind=stage_kind)
 templates.env.globals.update(status_labels=STATUS_LABELS, workplace_labels=WORKPLACE_LABELS, stages=STAGES,
-                             stage_labels=STAGE_LABELS)
+                             stage_labels=STAGE_LABELS, verdicts=VERDICTS,
+                             verdict_labels=VERDICT_LABELS, verdict_symbols=VERDICT_SYMBOLS)
 
 
 def is_htmx(request: Request) -> bool:
