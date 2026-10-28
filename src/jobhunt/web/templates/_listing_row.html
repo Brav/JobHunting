@@ -2,7 +2,7 @@
   <td>{{ row.listing.name }}</td>
   <td>{{ row.listing.keywords }}</td>
   <td>{{ row.listing.location }}</td>
-  <td>{{ row.listing.radius_km }} km</td>
+  <td class="nowrap">{{ row.listing.radius_km }} km</td>
   <td>
     {% if not row.last %}<span class="muted">not run yet</span>
     {% elif row.last.error %}<span class="error">{{ row.last.error }}</span>
@@ -11,14 +11,14 @@
     {% endif %}
   </td>
   <td>
-    <button class="{{ 'current' if row.listing.active }}" hx-post="/listings/{{ row.listing.id }}/toggle"
+    <button class="btn small{{ ' primary' if row.listing.active }}" aria-pressed="{{ 'true' if row.listing.active else 'false' }}" hx-post="/listings/{{ row.listing.id }}/toggle"
             hx-target="closest tr" hx-swap="outerHTML">{{ "On" if row.listing.active else "Off" }}</button>
   </td>
   <td class="actions">
-    <a class="button" href="/listings/{{ row.listing.id }}/edit">Edit</a>
+    <a class="btn small" href="/listings/{{ row.listing.id }}/edit">Edit</a>
     <form class="inline" method="post" action="/listings/{{ row.listing.id }}/delete"
-          onsubmit="return confirm('Delete this listing? Jobs you marked Interested or Applied are kept.')">
-      <button type="submit">Delete</button>
+          onsubmit="return confirm('Delete this listing? Jobs you saved, applied to or hid are kept.')">
+      <button class="btn small ghost" type="submit">Delete</button>
     </form>
   </td>
 </tr>

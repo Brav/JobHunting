@@ -172,3 +172,12 @@ dl.shortcuts dd { margin: 0; }
 .filters-collapsed { display: block; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .load-more { list-style: none; padding: var(--s3) var(--s4); text-align: center; }
+
+/* Listings and the standalone job page */
+.listings-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--s5); align-items: start; }
+.listings-form h2 { margin-top: 0; }
+.listings-form form.stack { max-width: none; }
+.nowrap { white-space: nowrap; }
+.back-link { margin: var(--s4) 0 0; }
+.standalone-pane { padding: var(--s2) 0 var(--s5); }
+@media (max-width: 900px) { .listings-layout { grid-template-columns: 1fr; } .listings-table { overflow-x: auto; } }

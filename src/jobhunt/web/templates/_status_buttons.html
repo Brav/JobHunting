@@ -1,9 +1,0 @@
-{# Needs: job, target (hx-target), view ("" for table rows, "page" for the job page) #}
-{% for value, label in [("interested", "Interested"), ("applied", "Applied"), ("hidden", "Hide")] %}
-<button class="{{ 'current' if job.status == value }}" hx-post="/jobs/{{ job.id }}/status{{ '?view=page' if view == 'page' }}"
-        hx-vals='{"status": "{{ value }}"}' hx-target="{{ target }}" hx-swap="outerHTML">{{ label }}</button>
-{% endfor %}
-{% if job.status != "new" %}
-<button hx-post="/jobs/{{ job.id }}/status{{ '?view=page' if view == 'page' }}" hx-vals='{"status": "new"}'
-        hx-target="{{ target }}" hx-swap="outerHTML">Reset</button>
-{% endif %}

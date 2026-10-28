@@ -43,8 +43,8 @@ def test_job_page_shows_whole_listing(app_factory):
     assert pages.calls == ["123"] and translator.calls == []
     assert "<strong>PHP</strong>" in page and "&lt;script&gt;" in page and "<script>alert(1)" not in page
     assert 'href="javascript:' not in page
-    assert "Seniority level" in page and "Mid-Senior level" in page and "Open on LinkedIn" in page
-    assert f'href="/jobs/{jid}/cv-prompt"' in page and "Interested" in page
+    assert "Seniority level" in page and "Mid-Senior level" in page and 'data-action="linkedin"' in page
+    assert f'href="/jobs/{jid}/cv-prompt"' in page and 'data-action="save"' in page and 'id="job-pane"' in page
 
 
 def test_job_page_translates_non_english(app_factory):
@@ -96,14 +96,27 @@ def test_job_rows_show_translated_title_and_language(app_factory):
         assert c.get("/jobs/9999").status_code == 404
 
 
-def test_status_buttons_on_job_page_return_the_actions_block(app_factory):
+def test_job_page_buttons_update_the_pane(app_factory):
     app = app_factory()
     jid = seed_job(app)
     with TestClient(app) as c:
-        assert 'hx-target="#job-actions"' in c.get(f"/jobs/{jid}").text
-        r = c.post(f"/jobs/{jid}/status", params={"view": "page"}, data={"status": "hidden"})
-    assert r.status_code == 200 and 'id="job-actions"' in r.text and "Reset" in r.text
+        page = c.get(f"/jobs/{jid}").text
+        r = c.post(f"/jobs/{jid}/status", data={"status": "hidden"})
+    assert 'hx-target="#job-pane"' in page and "Back" in page
+    assert r.status_code == 200 and f'id="pane-title-{jid}"' in r.text and "Reset" in r.text
+    assert "HX-Trigger-After-Settle" in r.headers
 
+
+def test_labels_say_save(app_factory):
+    app = app_factory()
+    jid = seed_job(app)
+    with TestClient(app) as c:
+        pane = c.get(f"/jobs/{jid}/pane").text
+        assert 'data-action="save"' in pane and "Save <kbd>S</kbd>" in pane
+        c.post(f"/jobs/{jid}/status", data={"status": "interested", "view": "pane"})
+        pages = [c.get(url).text for url in ("/", "/jobs", f"/jobs/{jid}", "/listings")]
+    assert '<span class="tag status-interested">Saved</span>' in pages[1]
+    assert all("Interested" not in page for page in pages)
 
 def test_identical_translated_title_is_not_repeated(app_factory):
     app = app_factory()

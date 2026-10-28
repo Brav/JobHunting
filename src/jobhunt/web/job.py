@@ -59,10 +59,9 @@ def prepare_job(request: Request, job_id: int, error: str = "", fetch: bool = Tr
 
 @router.get("/jobs/{job_id}", response_class=HTMLResponse)
 def job_page(request: Request, job_id: int, error: str = ""):
-    pane = prepare_job(request, job_id, error)
+    pane = {**prepare_job(request, job_id, error), "standalone": True}
     mark_seen(request.app.state.session_factory, job_id, utcnow())
-    return render(request, "job.html", job=pane["job"], download_error=pane["download_error"],
-                  details=pane["details"], translation_error=pane["translation_error"])
+    return render(request, "job.html", pane=pane)
 
 
 @router.get("/jobs/{job_id}/pane", response_class=HTMLResponse)

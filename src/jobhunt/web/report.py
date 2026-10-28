@@ -76,8 +76,8 @@ def report_for_day(request: Request, day: date):
 
 
 @router.post("/jobs/{job_id}/status", response_class=HTMLResponse)
-def change_status(request: Request, job_id: int, status: str = Form(""), view: str = Form("")):
-    view = view or request.query_params.get("view", "")  # the pane sends it in the body, older buttons in the URL
+def change_status(request: Request, job_id: int, status: str = Form("")):
+    """Set a job's status; answers with the updated detail pane, the row out of band, and an event for undo."""
     with session(request) as s:
         current = s.get(Job, job_id)
         if current is None:
@@ -87,14 +87,9 @@ def change_status(request: Request, job_id: int, status: str = Form(""), view: s
             job = set_job_status(s, job_id, status, utcnow())
         except ValueError:
             raise HTTPException(status_code=400, detail="Unknown status")
-    if view == "pane":
-        response = render(request, "_status_response.html", pane=prepare_job(request, job_id, fetch=False),
-                          job=job, oob=True)
-        response.headers["HX-Trigger-After-Settle"] = json.dumps({"jobStatusChanged": {
-            "jobId": job.id, "status": job.status, "previous": previous, "label": STATUS_LABELS[job.status]}})
-        return response
-    if view == "page":
-        return render(request, "_job_actions.html", job=job)
-    if job.status == "hidden":
-        return HTMLResponse("")  # htmx swaps the row out
-    return render(request, "_job_row.html", job=job)
+    standalone = request.headers.get("HX-Current-URL", "").rstrip("/").endswith(f"/jobs/{job_id}")
+    pane = {**prepare_job(request, job_id, fetch=False), "standalone": standalone}
+    response = render(request, "_status_response.html", pane=pane, job=job, oob=True)
+    response.headers["HX-Trigger-After-Settle"] = json.dumps({"jobStatusChanged": {
+        "jobId": job.id, "status": job.status, "previous": previous, "label": STATUS_LABELS[job.status]}})
+    return response
