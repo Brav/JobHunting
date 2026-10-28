@@ -33,11 +33,19 @@ document.addEventListener("alpine:init", () => {
       if (selected) { this.selectedId = selected.dataset.jobId; selected.scrollIntoView({ block: "nearest" }); }
       // A pane that arrives after the selection moved on belongs to another job: don't show it.
       document.body.addEventListener("htmx:beforeSwap", (e) => {
-        const match = (e.detail.requestConfig?.path || "").match(/^\/jobs\/(\d+)\/(pane|steps)/);
+        const match = (e.detail.requestConfig?.path || "").match(/^\/jobs\/(\d+)\/pane/);
         if (match && e.detail.target?.id === "job-pane" && match[1] !== this.selectedId) e.detail.shouldSwap = false;
       });
       document.body.addEventListener("htmx:afterSwap", (e) => {
         if (e.detail.target?.id === "job-pane") e.detail.target.removeAttribute("aria-busy");
+      });
+      document.body.addEventListener("htmx:afterSettle", () => {
+        // Rows the server sends back (after a status change or a new step) arrive unselected: restore the selection.
+        this.syncSelection();
+        // An answer about a job you've since left replaced the pane (its row update still lands): show the selected job.
+        const shown = document.querySelector('#job-pane [id^="pane-title-"]');
+        const selected = this.row(this.selectedId);
+        if (shown && selected && shown.id !== `pane-title-${this.selectedId}`) this.loadPane(selected);
       });
       const failed = (e) => {
         this.undoing = null;
@@ -53,6 +61,12 @@ document.addEventListener("alpine:init", () => {
     list() { return this.$root.querySelector("#job-list"); },
     rows() { return [...this.list().querySelectorAll(".job-item:not(.is-removed)")]; },
     row(id) { return document.getElementById(`job-item-${id}`); },
+    syncSelection() {
+      for (const r of this.list().querySelectorAll(".job-item")) {
+        const want = r.dataset.jobId === this.selectedId ? "true" : "false";
+        if (r.getAttribute("aria-selected") !== want) r.setAttribute("aria-selected", want);
+      }
+    },
 
     select(row, { load = true } = {}) {
       if (!row) return;
