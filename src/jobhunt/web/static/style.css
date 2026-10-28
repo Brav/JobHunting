@@ -53,6 +53,10 @@ kbd { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 0 5px;
 .theme-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
 .theme-switch label:has(input:checked) { background: var(--surface-2); color: var(--fg); }
 .theme-switch label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+.settings-link { order: 2; display: inline-flex; padding: 6px; border-radius: var(--r1); color: var(--muted); }
+.settings-link:hover, .settings-link[aria-current="page"] { color: var(--fg); background: var(--surface-2); }
+.settings-form fieldset { border: 1px solid var(--line); border-radius: var(--r2); padding: var(--s3) var(--s4); display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); }
+.settings-form legend { font-weight: 600; padding: 0 var(--s1); }
 .status-bar.running .status-text strong { color: var(--accent); }
 
 /* Buttons, tags, chips, forms */
@@ -195,6 +199,7 @@ dl.shortcuts dd { margin: 0; }
   .topbar { gap: var(--s3); height: auto; min-height: var(--topbar); flex-wrap: wrap; padding: var(--s2) var(--s3); }
   .status-bar { margin-left: 0; width: 100%; justify-content: space-between; }
   .theme-switch { order: 0; margin-left: auto; }
+  .settings-link { order: 0; }
   .page-wide { height: auto; display: block; }
   .split { grid-template-columns: 1fr; height: auto; }
   .split-list { border-right: none; }

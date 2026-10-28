@@ -29,6 +29,7 @@
       <label title="{{ label }}"><input type="radio" name="theme" value="{{ value }}" :checked="choice === '{{ value }}'" @change="set('{{ value }}')">{{ icon(icon_name) }}<span class="sr-only">{{ label }}</span></label>
       {% endfor %}
     </div>
+    <a class="settings-link" href="/settings" aria-label="Settings"{% if active == "settings" %} aria-current="page"{% endif %}>{{ icon("settings") }}</a>
   </header>
   <main class="{% block main_class %}page{% endblock %}">
     {% block content %}{% endblock %}
