@@ -66,7 +66,12 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
         def enabled_feeds() -> tuple[str, ...]:
             with session_factory() as s:
                 return load_preferences(s).sources
-        source = CombinedSource(LinkedInSource(), get=requests.get, enabled=enabled_feeds)
+        def watched_boards() -> list[tuple[str, str, str]]:
+            from sqlmodel import select
+            from jobhunt.models import WatchedCompany
+            with session_factory() as s:
+                return [(w.ats, w.token, w.name) for w in s.exec(select(WatchedCompany)).all()]
+        source = CombinedSource(LinkedInSource(), get=requests.get, enabled=enabled_feeds, watched=watched_boards)
     if fetch_page is None:
         from jobhunt.sources.linkedin import fetch_job_page as fetch_page
     if translator is None:
@@ -89,6 +94,8 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     app.state.session_factory = session_factory
     app.state.coordinator = coordinator
     app.state.source = source
+    import requests as _requests
+    app.state.http_get = _requests.get  # board detection; tests swap in a fake
     app.state.fetch_page = fetch_page
     app.state.translator = translator
     app.include_router(report.router)

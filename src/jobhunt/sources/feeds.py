@@ -178,8 +178,10 @@ class CombinedSource:
     """The LinkedIn search plus the enabled feeds' jobs matching the same keywords."""
 
     def __init__(self, primary, *, get, enabled: Callable[[], tuple[str, ...]],
+                 watched: Callable[[], list[tuple[str, str, str]]] = lambda: [],
                  clock: Callable[[], datetime] = utcnow, ttl: timedelta = timedelta(hours=1)):
         self.primary, self.get, self.enabled, self.clock, self.ttl = primary, get, enabled, clock, ttl
+        self.watched = watched  # (ats, board token, company name) of each watched company
         self._cache: dict[tuple, tuple[datetime, list[FeedPosting]]] = {}
         self.errors: dict[str, str] = {}
 
@@ -188,15 +190,21 @@ class CombinedSource:
         hit = self._cache.get(key)
         if hit and self.clock() - hit[0] < self.ttl:
             return hit[1]
-        fetched = FETCHERS[name](keywords, self.get)
+        if ":" in name:  # a watched company's board: "greenhouse:acme:Acme"
+            from jobhunt.watchlist import fetch_board
+            ats, token, company = name.split(":", 2)
+            fetched = fetch_board(ats, token, company, self.get)
+        else:
+            fetched = FETCHERS[name](keywords, self.get)
         self._cache[key] = (self.clock(), fetched)
         return fetched
 
     def search(self, keywords: str, location: str, radius_km: int, window_hours: int, limit: int) -> list[JobPosting]:
         postings = list(self.primary.search(keywords, location, radius_km, window_hours, limit))
         oldest = (self.clock() - timedelta(days=MAX_AGE_DAYS)).date()
-        for name in self.enabled():
-            if name not in FETCHERS:
+        boards = [f"{ats}:{token}:{company}" for ats, token, company in self.watched()]
+        for name in [*self.enabled(), *boards]:
+            if name not in FETCHERS and ":" not in name:
                 continue
             try:
                 feed = self._feed(name, keywords)

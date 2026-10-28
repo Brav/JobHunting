@@ -10,6 +10,21 @@
     <button class="btn" type="submit">{{ "Unblock company" if is_blocked else "Block company" }}</button></form>
   {% for label, url in links %}<a class="btn ghost" href="{{ url }}" target="_blank" rel="noopener noreferrer">{{ label }} ↗</a>{% endfor %}
 </div>
+<section class="watch" aria-label="Watch the company's job board">
+  {% if watch %}<p>Watching {{ ats_names[watch.ats] }} board “{{ watch.token }}” — its new jobs that match your listings arrive with every run.
+    {% if board_error %}<span class="error">Last read failed: {{ board_error }}</span>{% endif %}</p>
+    <form method="post" action="/companies/{{ key | urlencode }}/unwatch"><button class="btn ghost small" type="submit">Stop watching</button></form>
+  {% else %}
+    {% if watch_message %}<p class="notice">{{ watch_message }}</p>{% endif %}
+    <form class="inline-form" method="post" action="/companies/{{ key | urlencode }}/watch">
+      <input type="hidden" name="name" value="{{ company_name }}">
+      <button class="btn small" type="submit">Watch for new jobs</button>
+      <span class="muted small">or name the board:</span>
+      <select name="ats" aria-label="Job board system"><option value="">Find it</option>{% for value, label in ats_names.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+      <input name="token" placeholder="board name, e.g. acme" aria-label="Board name">
+    </form>
+  {% endif %}
+</section>
 {% if people %}<h2>People</h2><ul class="plain-list">{% for c in people %}<li><a href="/contacts/{{ c.id }}">{{ c.name }}</a>
   <span class="muted small">{{ c.role }}</span></li>{% endfor %}</ul>{% endif %}
 <h2>Jobs</h2>

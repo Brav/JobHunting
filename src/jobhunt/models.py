@@ -214,3 +214,16 @@ class Question(SQLModel, table=True):
     company: str = ""
     tags: str = ""
     created_at: NaiveDatetime = Field(default_factory=utcnow)
+
+
+class WatchedCompany(SQLModel, table=True):
+    """A company whose own job board (Greenhouse, Lever or Ashby) is read on every run."""
+
+    __tablename__ = "watched_companies"
+
+    id: int | None = Field(default=None, primary_key=True)
+    company_key: str = Field(index=True)  # jobhunt.blocks.company_key of the company's name
+    name: str
+    ats: str
+    token: str
+    created_at: NaiveDatetime = Field(default_factory=utcnow)
