@@ -24,7 +24,7 @@ def validate_listing_form(session: Session, form: Mapping[str, str],
                           listing_id: int | None = None) -> tuple[dict, dict[str, str]]:
     values = {key: (form.get(key) or "").strip() for key in ("name", "keywords", "location", "radius_km")}
     errors = {key: REQUIRED for key in ("name", "keywords", "location") if not values[key]}
-    if not values["radius_km"].isdigit() or int(values["radius_km"]) > 200:
+    if not values["radius_km"].isdecimal() or int(values["radius_km"]) > 200:
         errors["radius_km"] = BAD_RADIUS
     else:
         values["radius_km"] = int(values["radius_km"])

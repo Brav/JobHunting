@@ -35,3 +35,8 @@ def test_tracker_pagination_keeps_filters(app_factory):
         assert "51 jobs" in first and "Next" in first and "page=2" in first and "q=job" in first
         second = c.get("/jobs", params={"q": "job", "page": 2}).text
         assert "Job 0" in second and "Previous" in second and "Job 50" not in second
+
+
+def test_tracker_ignores_a_superscript_listing_id(app_factory):
+    with TestClient(app_factory()) as c:
+        assert c.get("/jobs", params={"listing": "²"}).status_code == 200

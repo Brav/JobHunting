@@ -29,7 +29,7 @@ def test_validation(app_factory):
         assert r.status_code == 400 and "Required." in r.text
         r = c.post("/listings", data=FORM)
         assert r.status_code == 400 and "A listing with this name already exists." in r.text
-        for bad in ("201", "abc", "-1"):
+        for bad in ("201", "abc", "-1", "²"):
             r = c.post("/listings", data={**FORM, "name": "Other", "radius_km": bad})
             assert r.status_code == 400 and "Radius must be a whole number from 0 to 200." in r.text
     assert len(listings(app)) == 1

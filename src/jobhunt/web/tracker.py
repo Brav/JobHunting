@@ -24,7 +24,7 @@ def tracker(request: Request,
             status: Literal["default", "all", "new", "interested", "applied", "hidden"] = "default",
             listing: str = "", q: str = "", page: int = Query(1, ge=1)):
     # The filter form sends listing="" for "All listings", so it is parsed here rather than typed as int.
-    listing_id = int(listing) if listing.isdigit() else None
+    listing_id = int(listing) if listing.isdecimal() else None
     with session(request) as s:
         jobs, total = tracker_jobs(s, status=status, listing_id=listing_id, q=q, page=page, per_page=PER_PAGE)
         listings = s.exec(select(Listing).order_by(Listing.id)).all()
