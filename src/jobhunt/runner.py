@@ -1,4 +1,4 @@
-"""The daily run: search each active listing, record jobs, work out what is new."""
+"""A search run (every few hours, or on demand): search each active listing, record jobs, work out what is new."""
 
 import logging
 import math
@@ -33,7 +33,7 @@ class ListingResult:
 
 
 def window_hours(last_success: datetime | None, now: datetime) -> int:
-    """How far back to search: since the last success plus overlap, within 24 h – 7 days."""
+    """How far back to search: since the last success plus overlap, within 12 h – 7 days."""
     if last_success is None:
         return WINDOW_MAX_HOURS
     hours = math.ceil((now - last_success).total_seconds() / 3600) + WINDOW_OVERLAP_HOURS
