@@ -147,3 +147,33 @@ def test_filter_options_and_company_names(session_factory):
         assert (options.languages, options.seniorities, options.employment_types) == (
             ["de", "it"], ["Associate"], ["Full-time"])
         assert company_names(s, "acme") == ["Acme", "Acme Labs"]
+
+
+def test_cursor_paging_does_not_skip_jobs_after_decisions(session_factory):
+    seed(session_factory, [p(str(i)) for i in range(60)])
+    f = JobFilters(tab="undecided")
+    with session_factory() as s:
+        first, total = filtered_jobs(s, f, NOW, limit=50)
+    assert (len(first), total) == (50, 60)
+    for job in first[:10]:
+        set_job(session_factory, job.external_id, status="interested")
+    with session_factory() as s:
+        rest, _ = filtered_jobs(s, f, NOW, limit=50, cursor=first[-1].id)
+    shown = {j.external_id for j in first} | {j.external_id for j in rest}
+    assert len(rest) == 10 and len(shown) == 60
+
+
+def test_cursor_paging_for_each_sort(session_factory):
+    seed(session_factory, [p(str(i), company=f"Co {i % 7}", posted_at=None if i % 5 == 0 else date(2026, 10, 1 + i % 20))
+                           for i in range(23)])
+    for sort in ("found", "posted", "company"):
+        f, seen, cursor = JobFilters(sort=sort), [], None
+        with session_factory() as s:
+            everything = [j.external_id for j in filtered_jobs(s, f, NOW, limit=100)[0]]
+            while True:
+                page, _ = filtered_jobs(s, f, NOW, limit=5, cursor=cursor)
+                if not page:
+                    break
+                seen += [j.external_id for j in page]
+                cursor = page[-1].id
+        assert seen == everything, sort

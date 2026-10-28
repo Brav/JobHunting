@@ -39,14 +39,14 @@ def _report(request: Request, day: date | None):
         options = filter_options(s)
     empty = "No unseen jobs left" if unseen else "No new jobs on this day"
     if is_htmx(request):
-        return render(request, "_job_items.html", jobs=jobs, offset=0, empty_message=empty)
+        return render(request, "_job_items.html", jobs=jobs, empty_message=empty)
     selected = _selected(request)
     pane = prepare_job(request, selected) if selected and any(j.id == selected for j in jobs) else None
     day_query = urlencode({"day": day.isoformat()}) if day else ""
     return render(
         request, "report.html", day=day, ran=day in dates, has_listings=has_listings, tabs=tabs, jobs=jobs,
         filters=f, unseen=unseen, unseen_n=unseen_n, options=options, pane=pane, selected_id=selected,
-        empty_message=empty, offset=0, hide_hidden=True,
+        empty_message=empty, hide_hidden=True,
         filter_action=f"/report/{day.isoformat()}" if day else "/", show_listing=False, show_sort=False, listings=[],
         filter_hidden=[(k, v) for k, v in (("listing", f.listing_id), ("unseen", "1" if unseen else None)) if v],
         focus_url=f"/focus?{day_query}&{f.query()}".rstrip("&") if day else "",

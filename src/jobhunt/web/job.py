@@ -11,12 +11,14 @@ from sqlmodel import select
 from jobhunt.actions import mark_seen
 from jobhunt.job_listing import download_listing, translate_description, translate_title
 from jobhunt.models import Job, Listing, Match
-from jobhunt.sources.base import SourceError
+from jobhunt.sources.base import SourceBlocked, SourceError
 from jobhunt.timeutil import utcnow
 from jobhunt.translate import TranslationUnavailable
 from jobhunt.web.common import render, session
 
 router = APIRouter()
+
+LINKEDIN_LIMITED = "LinkedIn is limiting requests right now; try again in a few minutes"
 
 
 def _job(request: Request, job_id: int) -> Job:
@@ -35,9 +37,14 @@ def prepare_job(request: Request, job_id: int, error: str = "", fetch: bool = Tr
     if fetch and not job.description:
         if error:
             download_error = error  # Try again just failed; don't send a second request
+        elif state.coordinator.linkedin_blocked():
+            download_error = LINKEDIN_LIMITED  # skimming mustn't keep hitting LinkedIn while it's refusing
         else:
             try:
                 download_listing(sf, job_id, state.fetch_page, utcnow())
+            except SourceBlocked as e:
+                state.coordinator.note_blocked()
+                download_error = str(e)
             except SourceError as e:
                 download_error = str(e)
     reason = None
@@ -78,5 +85,7 @@ def retry_download(request: Request, job_id: int, next: str = Form("")):
     try:
         download_listing(request.app.state.session_factory, job_id, request.app.state.fetch_page, utcnow())
     except SourceError as e:
+        if isinstance(e, SourceBlocked):
+            request.app.state.coordinator.note_blocked()
         target += f"?error={quote(str(e))}"  # the page shows this instead of downloading again
     return RedirectResponse(target, status_code=303)

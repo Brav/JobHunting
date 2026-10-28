@@ -139,11 +139,36 @@ def _count(session: Session, stmt) -> int:
     return session.exec(select(func.count()).select_from(stmt.subquery())).one()
 
 
-def filtered_jobs(session: Session, f: JobFilters, now: datetime, *, offset: int = 0,
-                  limit: int = 50) -> tuple[list[Job], int]:
+def _after(stmt, sort: str, last: Job):
+    """Rows that come after `last` in `sort` order (keyset paging: deciding on jobs doesn't shift pages)."""
+    if sort == "posted":
+        if last.posted_at is None:
+            return stmt.where(Job.posted_at.is_(None), Job.id < last.id)
+        return stmt.where(or_(Job.posted_at.is_(None), Job.posted_at < last.posted_at,
+                              (Job.posted_at == last.posted_at) & (Job.id < last.id)))
+    if sort == "company":
+        key = last.company.lower()
+        return stmt.where(or_(_lower(Job.company) > key, (_lower(Job.company) == key) & (Job.id > last.id)))
+    return stmt.where(or_(Job.first_seen_at < last.first_seen_at,
+                          (Job.first_seen_at == last.first_seen_at) & (Job.id < last.id)))
+
+
+def filtered_jobs(session: Session, f: JobFilters, now: datetime, *, offset: int = 0, limit: int = 50,
+                  cursor: int | None = None) -> tuple[list[Job], int]:
+    """A page of jobs and the total count. `cursor` is the id of the last job already shown."""
     stmt = apply_filters(select(Job), f, now)
-    jobs = session.exec(ordered(stmt, f.sort).offset(offset).limit(limit)).all()
+    page = stmt
+    last = session.get(Job, cursor) if cursor is not None else None
+    if last is not None:
+        page = _after(stmt, f.sort, last)
+    jobs = session.exec(ordered(page, f.sort).offset(offset).limit(limit)).all()
     return list(jobs), _count(session, stmt)
+
+
+def ordered_ids(session: Session, f: JobFilters, now: datetime) -> list[tuple[int, str]]:
+    """(id, status) of every matching job in list order — light enough for thousands of jobs."""
+    stmt = apply_filters(select(Job.id, Job.status), f, now)
+    return [(job_id, status) for job_id, status in session.exec(ordered(stmt, f.sort)).all()]
 
 
 def tab_counts(session: Session, f: JobFilters, now: datetime) -> dict[str, int]:

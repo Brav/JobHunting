@@ -26,19 +26,21 @@ def _url(query: str, **extra) -> str:
 @router.get("/jobs", response_class=HTMLResponse)
 def all_jobs(request: Request):
     f = JobFilters.from_query(request.query_params)
-    raw_offset = request.query_params.get("offset", "")
-    offset = int(raw_offset) if raw_offset.isdecimal() else 0
+    raw_cursor = request.query_params.get("cursor", "")
+    cursor = int(raw_cursor) if raw_cursor.isdecimal() else None
     now = utcnow()
     with session(request) as s:
-        jobs, total = filtered_jobs(s, f, now, offset=offset, limit=PER_PAGE)
+        jobs, total = filtered_jobs(s, f, now, limit=PER_PAGE + 1, cursor=cursor)  # one extra: are there more?
         if not is_htmx(request):
             counts = tab_counts(s, f, now)
             options = filter_options(s)
             listings = list(s.exec(select(Listing).order_by(Listing.id)).all())
-    next_url = _url(f.query(), offset=offset + PER_PAGE) if offset + len(jobs) < total else None
+    more = len(jobs) > PER_PAGE
+    jobs = jobs[:PER_PAGE]
+    next_url = _url(f.query(), cursor=jobs[-1].id) if more else None
     empty = "No jobs match these filters"
     if is_htmx(request):
-        return render(request, "_job_items.html", jobs=jobs, next_url=next_url, offset=offset, empty_message=empty)
+        return render(request, "_job_items.html", jobs=jobs, next_url=next_url, cursor=cursor, empty_message=empty)
     chips = [(label, _url(query)) for label, query in f.chips()]
     listing = next((l for l in listings if l.id == f.listing_id), None)
     if listing:
@@ -47,7 +49,7 @@ def all_jobs(request: Request):
     selected = int(raw_job) if raw_job.isdecimal() else None
     pane = prepare_job(request, selected) if selected and any(j.id == selected for j in jobs) else None
     return render(
-        request, "tracker.html", jobs=jobs, total=total, offset=0, next_url=next_url, filters=f, counts=counts,
+        request, "tracker.html", jobs=jobs, total=total, cursor=None, next_url=next_url, filters=f, counts=counts,
         tab_labels=TAB_LABELS, tab_url=lambda tab: _url(f.query(tab=tab)), chips=chips,
         clear_url=_url(JobFilters(tab=f.tab).query()), options=options, listings=listings, pane=pane,
         selected_id=selected, empty_message=empty, hide_hidden=f.tab not in ("hidden", "all"),

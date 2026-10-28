@@ -76,3 +76,17 @@ def test_focus_act_validation(app_factory):
     with TestClient(app) as c:
         assert c.post("/focus/act", data={"job_id": ids[1], "action": "delete", "back": ""}).status_code == 400
         assert c.post("/focus/act", data={"job_id": 99999, "action": "save", "back": ""}).status_code == 404
+
+
+def test_focus_from_all_jobs_reaches_beyond_500(app_factory):
+    app = app_factory()
+    add_listing(app.state.session_factory, "PHP", keywords="php")
+    clock = FakeClock(datetime(2026, 10, 28, 9, 0))
+    run_daily(app.state.session_factory, FakeSource({"php": [[p(str(n), title=f"Job {n}") for n in range(520)]]}),
+              trigger="manual", clock=clock, sleep=clock.sleep)
+    with app.state.session_factory() as s:
+        s.exec(update(Job).where(Job.external_id != "0").values(status="interested"))
+        s.commit()
+    with TestClient(app) as c:
+        page = c.get("/focus", params={"source": "jobs"}).text
+    assert "Job 0" in page and "520 of 520" in page              # the oldest job is last in "newest found" order

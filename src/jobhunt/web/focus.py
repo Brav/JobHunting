@@ -8,7 +8,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from jobhunt.actions import mark_seen, set_job_status
-from jobhunt.filters import JobFilters, filtered_jobs, report_jobs
+from jobhunt.filters import JobFilters, ordered_ids, report_jobs
 from jobhunt.models import Job
 from jobhunt.reports import report_dates
 from jobhunt.timeutil import utcnow
@@ -34,7 +34,7 @@ def focus(request: Request):
     with session(request) as s:
         if from_jobs:
             # Ordered like All jobs, but with every status so a just-decided job keeps its place.
-            ordered = filtered_jobs(s, replace(f, tab="all"), now, limit=500)[0]
+            ordered = ordered_ids(s, replace(f, tab="all"), now)
             candidates = f.tab in ("active", "undecided", "all")
             back_url = "/jobs" + (f"?{f.query()}" if f.query() else "")
             back_query = "&".join(x for x in ("source=jobs", f.query()) if x)
@@ -45,21 +45,22 @@ def focus(request: Request):
             except ValueError:
                 dates = report_dates(s, tz)
                 day = dates[-1] if dates else None
-            ordered = report_jobs(s, day, tz, f, now, include_hidden=True) if day else []
+            jobs = report_jobs(s, day, tz, f, now, include_hidden=True) if day else []
+            ordered = [(job.id, job.status) for job in jobs]
             candidates = True
             back_url = f"/report/{day.isoformat()}" + (f"?{f.query()}" if f.query() else "") if day else "/"
             back_query = "&".join(x for x in (urlencode({"day": day.isoformat()}) if day else "", f.query()) if x)
             name = "All listings"
-    ids = [job.id for job in ordered]
+    ids = [job_id for job_id, _ in ordered]
     after = _number(params.get("after"))
     start = ids.index(after) + 1 if after in ids else 0
-    current = next((job for job in ordered[start:] if job.status == "new"), None) if candidates else None
+    current = next((job_id for job_id, status in ordered[start:] if status == "new"), None) if candidates else None
     counters = {name_: _number(params.get(name_)) for name_ in COUNTERS}
     pane = None
     if current:
-        pane = {**prepare_job(request, current.id), "focus": True}
-        mark_seen(request.app.state.session_factory, current.id, now)
-    return render(request, "focus.html", pane=pane, position=ids.index(current.id) + 1 if current else 0,
+        pane = {**prepare_job(request, current), "focus": True}
+        mark_seen(request.app.state.session_factory, current, now)
+    return render(request, "focus.html", pane=pane, position=ids.index(current) + 1 if current else 0,
                   total=len(ids), list_name=name, back_url=back_url, back_query=back_query, counters=counters)
 
 

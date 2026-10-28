@@ -110,6 +110,13 @@ class RunCoordinator:
         logger.info("a scheduled run was missed; catching up now")
         return self.trigger("catch_up")
 
+    def linkedin_blocked(self) -> bool:
+        """True while backing off after LinkedIn blocked a request (background pass or a job page)."""
+        return self._blocked_until is not None and self.clock() < self._blocked_until
+
+    def note_blocked(self) -> None:
+        self._blocked_until = self.clock() + BLOCK_BACKOFF
+
     def enrich_if_idle(self) -> EnrichResult | None:
         """One background pass, unless disabled, a search or another pass is running, or LinkedIn blocked us."""
         if self.fetch_page is None or self.is_running:
@@ -118,14 +125,14 @@ class RunCoordinator:
             return None
         try:
             now = self.clock()
-            if self._blocked_until is not None and now < self._blocked_until:
+            if self.linkedin_blocked():
                 return None
             titles = self._titles_paused_until is None or now >= self._titles_paused_until
             result = enrich_pending(self.session_factory, self.fetch_page, self.translator,
                                     should_stop=lambda: self.is_running, translate_titles=titles,
                                     clock=self.clock, sleep=self.sleep)
             if result.blocked:
-                self._blocked_until = self.clock() + BLOCK_BACKOFF
+                self.note_blocked()
             if result.quota_exceeded:
                 self._titles_paused_until = first_of_next_month(self.clock())
             if result.downloaded or result.failed or result.blocked or result.titles or result.quota_exceeded:

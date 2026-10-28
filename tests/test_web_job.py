@@ -151,3 +151,18 @@ def test_unavailable_translation_is_shown_but_not_stored(app_factory):
     assert "DeepL error: timeout" in page and GERMAN in page
     with app.state.session_factory() as s:
         assert s.get(Job, jid).translation_error is None
+
+
+def test_pane_downloads_respect_linkedin_backoff(app_factory):
+    pages = Pages(SourceBlocked("rate limited by LinkedIn"))
+    app = app_factory(fetch_page=pages)
+    add_listing(app.state.session_factory, "PHP", keywords="php")
+    clock = FakeClock(datetime(2026, 10, 28, 9, 0))
+    run_daily(app.state.session_factory, FakeSource({"php": [[p("1"), p("2")]]}), trigger="manual", clock=clock, sleep=clock.sleep)
+    one, two = job_id(app.state.session_factory, "1"), job_id(app.state.session_factory, "2")
+    with TestClient(app) as c:
+        first = c.get(f"/jobs/{one}/pane").text
+        second = c.get(f"/jobs/{two}/pane").text
+    assert "rate limited by LinkedIn" in first and "LinkedIn is limiting requests" in second
+    assert len(pages.calls) == 1                                  # the second pane didn't ask LinkedIn
+    assert app.state.coordinator.linkedin_blocked()               # and the background pass backs off too

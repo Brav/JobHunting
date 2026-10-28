@@ -68,8 +68,9 @@ def test_infinite_scroll(app_factory):
     seed(app, [p(str(i), title=f"Job {i}") for i in range(51)])
     with TestClient(app) as c:
         first = c.get("/jobs").text
-        more = c.get("/jobs", params={"offset": 50}, headers={"HX-Request": "true"}).text
-    assert first.count('class="job-item') == 50 and 'hx-trigger="intersect once"' in first and "offset=50" in first
+        cursor = first.split("cursor=")[1].split('"')[0]
+        more = c.get("/jobs", params={"cursor": cursor}, headers={"HX-Request": "true"}).text
+    assert first.count('class="job-item') == 50 and 'hx-trigger="intersect once"' in first
     assert more.count('class="job-item') == 1 and "intersect once" not in more and 'class="topbar"' not in more
 
 
@@ -85,4 +86,4 @@ def test_lenient_query(app_factory):
     app = app_factory()
     seed(app, [p("1")])
     with TestClient(app) as c:
-        assert c.get("/jobs", params={"tab": "x", "offset": "abc", "listing": "²", "sort": "?"}).status_code == 200
+        assert c.get("/jobs", params={"tab": "x", "cursor": "abc", "listing": "²", "sort": "?"}).status_code == 200

@@ -4,4 +4,4 @@
   <button class="btn small" type="button" hx-get="{{ next_url }}" hx-target="closest li" hx-swap="outerHTML">Load more</button>
 </li>
 {% endif %}
-{% if not jobs and not offset %}<li class="list-empty" role="presentation">{{ empty_message or "No jobs here" }}</li>{% endif %}
+{% if not jobs and not cursor %}<li class="list-empty" role="presentation">{{ empty_message or "No jobs here" }}</li>{% endif %}
