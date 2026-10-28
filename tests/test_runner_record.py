@@ -165,3 +165,30 @@ def test_jobs_without_a_company_are_not_matched_by_title(session_factory):
     with session_factory() as s:
         assert record_results(s, r1, a, no_company[:2], NOW) == ListingResult(found=2, new=2)
         assert record_results(s, r2, a, no_company[2:], NOW + timedelta(days=1)) == ListingResult(found=1, new=1)
+
+
+def test_changed_title_forgets_its_translation(session_factory):
+    a = add_listing(session_factory, "A")
+    r1, r2 = add_run(session_factory, NOW), add_run(session_factory, NOW + timedelta(days=1))
+    with session_factory() as s:
+        record_results(s, r1, a, [p("1", title="PHP-Entwickler")], NOW)
+        job = s.exec(select(Job)).one()
+        job.language, job.title_en, job.translation_error = "de", "PHP Developer", "DeepL can't translate German"
+        s.add(job)
+        s.commit()
+        record_results(s, r2, a, [p("1", title="Senior PHP-Entwickler")], NOW + timedelta(days=1))
+        job = s.exec(select(Job)).one()
+    assert (job.title, job.language, job.title_en, job.translation_error) == ("Senior PHP-Entwickler", "de", None, None)
+
+
+def test_same_title_keeps_its_translation(session_factory):
+    a = add_listing(session_factory, "A")
+    r1, r2 = add_run(session_factory, NOW), add_run(session_factory, NOW + timedelta(days=1))
+    with session_factory() as s:
+        record_results(s, r1, a, [p("1", title="PHP-Entwickler")], NOW)
+        job = s.exec(select(Job)).one()
+        job.language, job.title_en = "de", "PHP Developer"
+        s.add(job)
+        s.commit()
+        record_results(s, r2, a, [p("1", title="PHP-Entwickler")], NOW + timedelta(days=1))
+        assert s.exec(select(Job)).one().title_en == "PHP Developer"
