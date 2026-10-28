@@ -197,6 +197,8 @@ dl.shortcuts dd { margin: 0; }
 /* Narrow windows: one column; the pane replaces the list while a job is open */
 @media (max-width: 900px) {
   .topbar { gap: var(--s3); height: auto; min-height: var(--topbar); flex-wrap: wrap; padding: var(--s2) var(--s3); }
+  .mainnav { order: 1; position: relative; width: 100%; overflow-x: auto; scrollbar-width: none; }  /* scrolls sideways, not the page */
+  .mainnav a { flex: none; white-space: nowrap; }
   .status-bar { margin-left: 0; width: 100%; justify-content: space-between; }
   .theme-switch { order: 0; margin-left: auto; }
   .settings-link { order: 0; }
@@ -218,7 +220,7 @@ dl.shortcuts dd { margin: 0; }
 .stats-section { margin-bottom: var(--s5); }
 .stats-section > .chips { margin-bottom: var(--s3); }
 .empty { color: var(--muted); }
-.table-scroll { overflow-x: auto; border-radius: var(--r2); }
+.table-scroll { position: relative; overflow-x: auto; border-radius: var(--r2); }  /* positioned: clips its .sr-only labels too */
 .table-scroll table { min-width: 100%; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 caption { text-align: left; font-weight: 600; font-size: var(--t2); padding: 0 0 var(--s1); }
@@ -263,7 +265,7 @@ caption { text-align: left; font-weight: 600; font-size: var(--t2); padding: 0 0
 .nowrap { white-space: nowrap; }
 .back-link { margin: var(--s4) 0 0; }
 .standalone-pane { padding: var(--s2) 0 var(--s5); }
-@media (max-width: 900px) { .listings-layout { grid-template-columns: 1fr; } .listings-table { overflow-x: auto; } }
+@media (max-width: 900px) { .listings-layout { grid-template-columns: 1fr; } .listings-table { position: relative; overflow-x: auto; } }
 .actions-row { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; margin: var(--s3) 0; }
 .item-age .reposts { color: var(--warning); font-variant-numeric: tabular-nums; }
 .pane-signals { margin: 0 0 var(--s2); }
@@ -272,6 +274,7 @@ caption { text-align: left; font-weight: 600; font-size: var(--t2); padding: 0 0
 .plain-list { list-style: none; padding: 0; margin: var(--s2) 0; }
 .plain-list li { display: flex; gap: var(--s2); align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line); }
 .inline-form { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; margin: var(--s2) 0; }
+.inline-form input { max-width: 100%; }  /* a size="50" field still fits a phone */
 form.inline { display: inline; }
 .scam-mark { color: var(--danger); }
 .item-pay { color: var(--success); }
