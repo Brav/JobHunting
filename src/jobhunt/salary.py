@@ -1,7 +1,7 @@
 """Pay from a job's salary box, title or text, as a yearly range in euros so jobs can be compared and filtered.
 
 An amount counts only next to a currency ("€50K", "65.000 €", "PLN 20 000"), so years, phone numbers and headcounts
-never read as pay. Per-month, -day and -hour pay is annualised (×12, ×220 days, ×1760 hours).
+never read as pay; budgets, bonuses and allowances don't either, and a lone amount needs a word for pay or a "K". Per-month, -day and -hour pay is annualised (×12, ×220 days, ×1760 hours).
 """
 
 import re
@@ -22,11 +22,33 @@ PERIODS = [
     ("day", re.compile(r"/\s?(?:d|day)\b|\bper\s+day\b|\bday\s+rate\b|\bdaily\b|\bTagessatz\b|\bpro\s+Tag\b|\bpar\s+jour\b|"
                        r"\bal\s+giorno\b|\bpor\s+d[ií]a\b|\bper\s+dag\b|\bdziennie\b", re.I)),
     ("month", re.compile(r"/\s?(?:mo|month|mies\.?|mc)\b|\bper\s+month\b|\bmonthly\b|\bmonatlich\b|\bpro\s+Monat\b|"
-                         r"\bpar\s+mois\b|\bal\s+mese\b|\bmensual\b|\bper\s+maand\b|\bmiesi[eę]cznie\b|\bmjese[cč]no\b", re.I)),
+                         r"\bpar\s+mois\b|\bal\s+mese\b|\bmensual\b|\bper\s+maand\b|\bmiesi[eę]cznie\b|\bmjese[cč]no\b|"
+                         r"\bmesiac\w*|\bmesa[čc]ne\b|\bm[ěe]s[íi][cč]\w*", re.I)),
     ("year", re.compile(r"/\s?(?:yr|year|y|a)\b|\bper\s+(?:year|annum)\b|\bp\.\s?a\.|\bannual(?:ly)?\b|\byearly\b|"
                         r"\bjährlich\b|\bpro\s+Jahr\b|\bpar\s+an\b|\bannuo\b|\banual\b|\bper\s+jaar\b|\brocznie\b", re.I)),
 ]
 TIMES = {"hour": 1760, "day": 220, "month": 12, "year": 1}
+# Money that isn't pay: "€500 home office budget", "Referral bonus of €1,000", "1.000 € Weiterbildungsbudget".
+PERK = re.compile(r"(?:budget|bonus|allowance|stipend|voucher|relocation|equipment|learning|training|referral|"
+                  r"reimburse|per\s+diem|zuschuss|prämie|pr[aä]mie)", re.I)
+# A small lone amount with no period ("€2,500") counts only next to a word for pay ("Salary", "brutto", "RAL").
+PAY = re.compile(r"\b(?:salar(?:y|ies)|pay|paid|compensation|remuneration|wages?|base|OTE|package|gross|net|brutto|"
+                 r"netto|neto|bruto|verg[üu]tung|lohn|salaire|r[ée]mun[ée]ration|sueldo|salario|stipendio|RAL|"
+                 r"retribuci[oó]n|retribuzione|wynagrodzenie|plata|zarada|pla[cć]a|rate)\b|gehalt", re.I)
+_CLAUSE = re.compile(r"[!?\n;•]|\.\s")
+_ADDITION = re.compile(r"\+|\bplus\b|\band\b|&|,|\(|\)|\|", re.I)  # "€60k + Bonus": the bonus is on top
+
+
+def _next_words(text: str, n: int = 4) -> str:
+    return " ".join(_ADDITION.split(_CLAUSE.split(text)[0])[0].split()[:n])
+
+
+def _previous_words(text: str, n: int = 4) -> str:
+    return " ".join(_ADDITION.split(_CLAUSE.split(text)[-1])[-1].split()[-n:])
+
+
+def _year_like(m: re.Match) -> bool:
+    return not m.group("k") and re.fullmatch(r"(?:19|20)\d\d", m.group("num")) is not None
 
 
 @dataclass(frozen=True)
@@ -75,7 +97,17 @@ def parse_salary(text: str | None) -> Salary | None:
         tail = text[last.end():last.end() + 40]
         head = text[max(0, first.start() - 20):first.start()]
         period = next((name for name, pattern in PERIODS if pattern.search(tail) or pattern.search(head)), None)
+        # Words around the amount, up to the next or previous amount and within its sentence or bullet.
+        j = amounts.index(last)
+        after = text[last.end():amounts[j + 1].start() if j + 1 < len(amounts) else len(text)]
+        before = text[amounts[i - 1].end() if i else 0:first.start()]
+        lone, says_pay = last is first, PAY.search(before[-60:]) or PAY.search(after[:40])
         euros = high * RATES[currency]
+        if (PERK.search(_next_words(after)) or PERK.search(_previous_words(before)) or after.startswith("(k)")
+                or (period is None and not says_pay and ((_year_like(first) and _year_like(last))
+                                                         or (lone and not first.group("k") and euros < 15000)))):
+            i += 1 if lone else 2
+            continue
         if period is None:  # no word for it: judge by size
             period = "year" if euros >= 15000 else "month" if euros >= 1000 else "day" if euros >= 100 else "hour"
         factor = TIMES[period] * RATES[currency]

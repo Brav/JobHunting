@@ -25,6 +25,16 @@ def eur(amount, currency="EUR", times=1):
     ("Gehalt: 65.000 € p.a.", 65000, 65000),
     ("€50,000.00/yr - €60,000.00/yr", 50000, 60000),
     ("🤖 Forward Deployed Engineer (IA & Agentes) | €50K - €60K", 50000, 60000),
+    ("* €500 home office budget\n* Salary: €60,000 per year + €5k sign-on bonus", 60000, 60000),
+    ("Plata: 2000 EUR neto", eur(2000, times=12), eur(2000, times=12)),
+    ("Salary €65k plus a €2,000 relocation bonus", 65000, 65000),
+    # From real jobs: a bonus on top is still pay, and a lone yearly amount needs no word for pay.
+    ("**Salary:** £35,000 - £65,000 + Bonus + Pension + Benefits", eur(35000, "GBP"), eur(65000, "GBP")),
+    ("📍Berlin | 💶 €70,000 - €100,000 + Bonus! | 🌍 Remote Working", 70000, 100000),
+    ("Up to £50,000 + benefits!", eur(50000, "GBP"), eur(50000, "GBP")),
+    ("**Einstiegsgehalt**: Bis zu 65.000 Euro je nach Vorerfahrung", 65000, 65000),
+    ("RAL up to € 35.000.", 35000, 35000),
+    ("* Od 2000 EUR/mesiac + atraktívne výkonnostné bonusy", eur(2000, times=12), eur(2000, times=12)),
 ])
 def test_parses(text, low, high):
     found = parse_salary(text)
@@ -34,7 +44,14 @@ def test_parses(text, low, high):
 
 @pytest.mark.parametrize("text", ["Founded in 2015, we have 10,000 employees.", "Call +44 20 7946 0958.",
                                   "We serve 500 customers.", "Python 3.12 and PHP 8.3", "Raised $40M in 2024",
-                                  ""])
+                                  "", "€500 home office budget", "€5k sign-on bonus", "€2,000 relocation bonus",
+                                  "Referral bonus of €1,000", "1.000 € Weiterbildungsbudget", "Budget of €200 for books",
+                                  "Join our team din 2015", "Tickets for Euro 2024", "USD 401(k) matching",
+                                  "Laptop and €100 monthly gym allowance",
+                                  "* Partial reimbursement of vacation costs (2,400 RON)",
+                                  "ticket restaurant 8 €, welfare", "Food vouchers ( €102.26 month per person)",
+                                  "**Personal Development** - £2,500 *training budget to acquire certifications",
+                                  "We've raised $781M in funding and our last valuation was $22B"])
 def test_ignores_numbers_that_are_not_pay(text):
     assert parse_salary(text) is None
 
