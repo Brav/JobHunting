@@ -59,3 +59,8 @@ def test_no_translator():
     with pytest.raises(TranslationUnavailable, match="Add a DeepL key"):
         NoTranslator().translate("Hallo", "de")
     assert NO_KEY_MESSAGE.startswith("Add a DeepL key")
+
+
+def test_deepl_outage_fails_fast():
+    # The job page waits for DeepL; the library's default 5 retries with back-off take about 30 s.
+    assert deepl.http_client.max_network_retries <= 1
