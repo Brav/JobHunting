@@ -34,6 +34,19 @@ def test_latest_slot():
     assert latest_slot(datetime(2026, 7, 1, 8, 30), TZ, TEN, 4) == datetime(2026, 7, 1, 8, 0)        # 10:30 CEST → 10:00 CEST
 
 
+def test_latest_slot_on_the_dst_fall_back_day():
+    # 2026-10-25: clocks go back from 03:00 CEST to 02:00 CET, so 02:00–03:00 local happens twice.
+    def slot(utc_hour, utc_minute=0, day=25):
+        return latest_slot(datetime(2026, 10, day, utc_hour, utc_minute), TZ, TEN, 4)
+
+    assert slot(23, 59, day=24) == datetime(2026, 10, 24, 20, 0)  # 01:59 CEST → 22:00 CEST the day before
+    assert slot(0, 30) == datetime(2026, 10, 25, 0, 0)  # 02:30 CEST → 02:00 CEST
+    assert slot(1, 30) == datetime(2026, 10, 25, 0, 0)  # 02:30 CET (the repeated hour) → still 02:00 CEST, not a new slot
+    assert slot(4, 59) == datetime(2026, 10, 25, 0, 0)  # 05:59 CET → 02:00 CEST
+    assert slot(5, 0) == datetime(2026, 10, 25, 5, 0)   # 06:00 CET
+    assert slot(9, 30) == datetime(2026, 10, 25, 9, 0)  # 10:30 CET → 10:00 CET
+
+
 def test_should_catch_up():
     now = datetime(2026, 10, 28, 9, 30)  # 10:30 local; latest slot 10:00 local = 09:00 UTC
     assert should_catch_up(now, TZ, TEN, 4, None)
