@@ -26,16 +26,35 @@ document.addEventListener("alpine:init", () => {
     selectedId: null,
     last: null, // {jobId, previous} of the latest status change, for U and the toast
     undoing: null,
+    paneTimer: null,
 
     init() {
       const selected = this.list().querySelector('.job-item[aria-selected="true"]');
       if (selected) { this.selectedId = selected.dataset.jobId; selected.scrollIntoView({ block: "nearest" }); }
+      // A pane that arrives after the selection moved on belongs to another job: don't show it.
+      document.body.addEventListener("htmx:beforeSwap", (e) => {
+        const match = (e.detail.requestConfig?.path || "").match(/^\/jobs\/(\d+)\/pane/);
+        if (match && e.detail.target?.id === "job-pane" && match[1] !== this.selectedId) e.detail.shouldSwap = false;
+      });
+      document.body.addEventListener("htmx:afterSwap", (e) => {
+        if (e.detail.target?.id === "job-pane") e.detail.target.removeAttribute("aria-busy");
+      });
+      const failed = (e) => {
+        this.undoing = null;
+        const pane = document.getElementById("job-pane");
+        if (pane?.getAttribute("aria-busy") && /^\/jobs\/\d+\/pane/.test(e.detail.requestConfig?.path || "")) {
+          pane.removeAttribute("aria-busy");
+          pane.innerHTML = '<p class="pane-empty">Couldn\'t load this job. Select it again to retry.</p>';
+        }
+      };
+      document.body.addEventListener("htmx:responseError", failed);
+      document.body.addEventListener("htmx:sendError", failed);
     },
     list() { return this.$root.querySelector("#job-list"); },
     rows() { return [...this.list().querySelectorAll(".job-item:not(.is-removed)")]; },
     row(id) { return document.getElementById(`job-item-${id}`); },
 
-    select(row) {
+    select(row, { load = true } = {}) {
       if (!row) return;
       this.list().querySelectorAll('.job-item[aria-selected="true"]').forEach((r) => r.setAttribute("aria-selected", "false"));
       row.setAttribute("aria-selected", "true");
@@ -43,12 +62,27 @@ document.addEventListener("alpine:init", () => {
       row.focus({ preventScroll: true });
       row.scrollIntoView({ block: "nearest" });
       this.selectedId = row.dataset.jobId;
-      document.getElementById("job-pane").innerHTML = '<p class="pane-loading">Loading…</p>';
-      htmx.ajax("GET", row.dataset.paneUrl, { target: "#job-pane", swap: "innerHTML" });
+      if (load) this.loadPane(row);
       const url = new URL(location.href);
       url.searchParams.set("job", row.dataset.jobId);
       history.replaceState(null, "", url);
       this.$root.classList.add("has-selection");
+    },
+    // Wait a moment so skimming with J/K only loads (and downloads) the job you stop on.
+    loadPane(row) {
+      const id = row.dataset.jobId;
+      clearTimeout(this.paneTimer);
+      const pane = document.getElementById("job-pane");
+      // Keep the previous job in place, dimmed, until the next one arrives: removing it would cut off the
+      // answer to a status change still on its way (htmx finds the row to update from the clicked button).
+      if (pane.querySelector('[id^="pane-title-"]')) pane.setAttribute("aria-busy", "true");
+      else pane.innerHTML = '<p class="pane-loading">Loading…</p>';
+      this.paneTimer = setTimeout(() => {
+        const current = this.row(id); // the row may have been swapped in the meantime
+        if (id !== this.selectedId || !current) return;
+        // Each row is its own request source, so htmx never queues one job's load behind another's.
+        htmx.ajax("GET", current.dataset.paneUrl, { source: current, target: "#job-pane", swap: "innerHTML" });
+      }, 200);
     },
     move(step) {
       const rows = this.rows();
@@ -58,13 +92,21 @@ document.addEventListener("alpine:init", () => {
     },
     onClick(e) { const row = e.target.closest(".job-item"); if (row) this.select(row); },
     closePane() { this.$root.classList.remove("has-selection"); },
-    act(name) { const el = document.querySelector(`#job-pane [data-action="${name}"]`); if (el) el.click(); },
+    act(name) {
+      // Only act on the job you're looking at: the pane must already show the selected job.
+      const title = document.querySelector('#job-pane [id^="pane-title-"]');
+      if (!title || title.id !== `pane-title-${this.selectedId}`) return;
+      const el = document.querySelector(`#job-pane [data-action="${name}"]`);
+      if (el) el.click();
+    },
 
     // Sent by the server (HX-Trigger-After-Settle) after a status change from the pane.
     onStatus({ jobId, status, previous, label }) {
       const id = String(jobId);
       const row = this.row(id);
       if (row && id === this.selectedId) row.setAttribute("aria-selected", "true");
+      // The answer replaced the pane after you'd moved on: show the selected job again.
+      if (id !== this.selectedId && this.row(this.selectedId)) this.loadPane(this.row(this.selectedId));
       if (this.undoing === id) { this.undoing = null; return; }
       const rows = this.rows();
       const i = rows.indexOf(row);
@@ -84,8 +126,12 @@ document.addEventListener("alpine:init", () => {
       this.last = null;
       this.undoing = jobId;
       const row = this.row(jobId);
-      if (row) { row.classList.remove("is-removed"); this.select(row); }
-      htmx.ajax("POST", `/jobs/${jobId}/status`, { values: { status: previous, view: "pane" }, target: "#job-pane", swap: "innerHTML" });
+      if (row) { row.classList.remove("is-removed"); this.select(row, { load: false }); }
+      clearTimeout(this.paneTimer);
+      // The answer carries the restored job's pane; its own source keeps later loads from replacing it.
+      htmx.ajax("POST", `/jobs/${jobId}/status`, {
+        source: row || document.body, values: { status: previous, view: "pane" }, target: "#job-pane", swap: "innerHTML",
+      });
       Alpine.store("toast").open = false;
     },
 
@@ -93,6 +139,7 @@ document.addEventListener("alpine:init", () => {
       if (isTyping(e) || hasModifier(e) || Alpine.store("help").open) return;
       const actions = { s: "save", a: "applied", x: "hide", c: "cv", o: "linkedin" };
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      if (e.repeat && !["j", "k", "ArrowDown", "ArrowUp"].includes(key)) return; // a held X mustn't hide the next job too
       if (key === "j" || key === "ArrowDown") this.move(1);
       else if (key === "k" || key === "ArrowUp") this.move(-1);
       else if (actions[key]) this.act(actions[key]);
@@ -104,10 +151,23 @@ document.addEventListener("alpine:init", () => {
     },
   }));
 
+  // Filter bar: leave empty fields and the default sort out of the URL.
+  Alpine.data("filterBar", () => ({
+    init() {
+      // Back/forward can restore the page as you left it; show the filters this URL actually applies.
+      window.addEventListener("pageshow", () => this.$root.reset());
+    },
+    clean(e) {
+      for (const [key, value] of [...e.formData.entries()]) {
+        if (value === "" || (key === "sort" && value === "found")) e.formData.delete(key);
+      }
+    },
+  }));
+
   // Focus mode: one job at a time; keys submit the matching form.
   Alpine.data("focusPage", () => ({
     onKey(e) {
-      if (isTyping(e) || hasModifier(e) || Alpine.store("help").open) return;
+      if (isTyping(e) || hasModifier(e) || Alpine.store("help").open || e.repeat) return;
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
       const forms = { x: "hide", s: "save", a: "applied", l: "later" };
       if (forms[key]) this.$root.querySelector(`form[data-focus-action="${forms[key]}"]`)?.requestSubmit();

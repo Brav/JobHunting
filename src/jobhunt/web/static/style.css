@@ -101,6 +101,8 @@ label { display: grid; gap: 4px; font-size: var(--t2); color: var(--muted); }
 .item-age { font-size: var(--t1); color: var(--muted); white-space: nowrap; }
 .list-empty { padding: var(--s5) var(--s4); color: var(--muted); }
 .pane-empty, .pane-loading { color: var(--muted); padding: var(--s5) 0; }
+#job-pane[aria-busy="true"] > * { opacity: .45; pointer-events: none; transition: opacity .15s; }
+#job-pane[aria-busy="true"] { cursor: progress; }
 .pane-title { margin-top: 0; display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
 .pane-meta { color: var(--muted); font-size: var(--t2); margin: 0 0 var(--s3); }
 .pane-actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s3) 0; }
