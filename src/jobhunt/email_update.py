@@ -8,27 +8,30 @@ from jobhunt.applications import INTERVIEW_STAGES
 from jobhunt.blocks import company_key
 from jobhunt.models import Job
 
-# Checked in this order: a rejection often thanks you for applying, and an invitation often does too.
-_KINDS = {
-    "rejected": [r"unfortunately", r"not (?:be )?(?:moving|move|proceeding|proceed|progressing) forward",
-                 r"regret to inform you", r"decided (?:not to|to (?:move|proceed|go) forward with other)",
-                 r"(?:pursue|proceed with|move forward with|go with) other candidates",
-                 r"(?:have )?not (?:been )?selected", r"position has (?:now )?been filled",
-                 r"no longer (?:being )?considered", r"leider", r"absage", r"nicht (?:weiter )?berücksichtig\w*",
-                 r"für (?:einen anderen|eine andere) (?:kandidat|bewerber)\w*"],
-    "offer": [r"(?:pleased|happy|delighted|excited) to (?:offer|extend)(?: you)?", r"(?:would|'d) like to offer you",
-              r"(?:job|employment|formal|written) offer", r"offer letter", r"vertragsangebot"],
-    "interview": [r"invit\w* you (?:to|for) (?:an? |the |our )?(?:\w+ )?(?:interview|call|chat|conversation|meeting)",
-                  r"schedule (?:an? |the |a quick )?(?:\w+ )?(?:interview|call|chat|meeting|time)",
-                  r"(?:book|pick|choose) a (?:time|slot)", r"calendly\.com",
-                  r"(?:hr|phone|video|technical|tech|final|first|second|onsite|on-site) (?:interview|screen|round)",
-                  r"your availability", r"vorstellungsgespräch", r"kennenlerngespräch", r"einladung zu\w*"],
-    "received": [r"thank(?:s| you) for (?:applying|your application|your interest)",
-                 r"(?:received|receipt of) your application", r"application (?:has been |was )?(?:received|submitted)",
-                 r"vielen dank für (?:ihre|deine) bewerbung", r"eingangsbestätigung",
-                 r"bewerbung (?:ist )?(?:eingegangen|erhalten)"],
-}
-_PATTERNS = {kind: [re.compile(p, re.I) for p in patterns] for kind, patterns in _KINDS.items()}
+# Checked in this order: a rejection often thanks you for applying, and an invitation often does too. A bare
+# "unfortunately" comes last: receipts say "unfortunately we can't reply to everyone".
+_KINDS = [
+    ("rejected", [r"not (?:be )?(?:moving|move|proceeding|proceed|progressing) forward",
+                  r"(?:won't|will not|cannot|can't) (?:be )?(?:progress|proceed|mov|continu)\w*(?: forward)?",
+                  r"regret to inform you", r"decided (?:not to|to (?:move|proceed|go) forward with other)",
+                  r"(?:pursue|proceed with|move forward with|go with) other candidates",
+                  r"(?:have )?not (?:been )?selected", r"(?:position|role) has (?:now )?been filled",
+                  r"no longer (?:being )?considered", r"absage", r"nicht (?:weiter )?berücksichtig\w*",
+                  r"für (?:einen anderen|eine andere) (?:kandidat|bewerber)\w*"]),
+    ("offer", [r"(?:pleased|happy|delighted|excited) to (?:offer|extend)(?: you)?", r"(?:would|'d) like to offer you",
+               r"(?:job|employment|formal|written) offer", r"offer letter", r"vertragsangebot"]),
+    ("interview", [r"invit\w* you (?:to|for) (?:an? |the |our )?(?:\w+ )?(?:interview|call|chat|conversation|meeting)",
+                   r"schedule (?:an? |the |a quick )?(?:\w+ )?(?:interview|call|chat|meeting|time)",
+                   r"(?:book|pick|choose) a (?:time|slot)", r"calendly\.com",
+                   r"(?:hr|phone|video|technical|tech|final|first|second|onsite|on-site) (?:interview|screen|round)",
+                   r"your availability", r"vorstellungsgespräch", r"kennenlerngespräch", r"einladung zu\w*"]),
+    ("received", [r"thank(?:s| you) for (?:applying|your application|your interest)",
+                  r"(?:received|receipt of) your application", r"application (?:has been |was )?(?:received|submitted)",
+                  r"vielen dank für (?:ihre|deine) bewerbung", r"eingangsbestätigung",
+                  r"bewerbung (?:ist )?(?:eingegangen|erhalten)"]),
+    ("rejected", [r"unfortunately", r"leider"]),
+]
+_PATTERNS = [(kind, [re.compile(p, re.I) for p in patterns]) for kind, patterns in _KINDS]
 _LEGAL = {"gmbh", "ag", "kg", "ug", "se", "ltd", "limited", "inc", "llc", "plc", "corp", "corporation", "co",
           "company", "bv", "nv", "doo", "sa", "srl", "sro", "spa", "oy", "ab", "as", "group", "holding"}
 _EMAIL = re.compile(r"[\w.+-]+@([\w-]+(?:\.[\w-]+)+)")
@@ -38,7 +41,7 @@ _GENERIC_LABELS = {"mail", "email", "jobs", "careers", "hr", "talent", "recruiti
 
 def classify(text: str) -> tuple[str | None, str | None]:
     """(kind, the phrase that decided it), or (None, None) when the email says nothing recognisable."""
-    for kind, patterns in _PATTERNS.items():
+    for kind, patterns in _PATTERNS:
         for pattern in patterns:
             m = pattern.search(text)
             if m:
