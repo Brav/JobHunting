@@ -151,6 +151,18 @@ document.addEventListener("alpine:init", () => {
     },
   }));
 
+  // Theme switch: System follows the OS; Light and Dark are remembered in this browser.
+  Alpine.data("themeSwitch", () => ({
+    choice: "system",
+    init() { this.choice = document.documentElement.dataset.theme || "system"; },
+    set(value) {
+      this.choice = value;
+      try { value === "system" ? localStorage.removeItem("theme") : localStorage.setItem("theme", value); } catch (e) {}
+      if (value === "system") delete document.documentElement.dataset.theme;
+      else document.documentElement.dataset.theme = value;
+    },
+  }));
+
   // Filter bar: leave empty fields and the default sort out of the URL.
   Alpine.data("filterBar", () => ({
     init() {

@@ -1,11 +1,14 @@
 <!doctype html>
 <html lang="en">
 <head>
+  {% from "_macros.html" import icon %}
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {# Form validation answers (422) carry the form with its message, so htmx swaps them like a success. #}
   <meta name="htmx-config" content='{"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"422","swap":true},{"code":"[45]..","swap":false,"error":true}]}'>
   <title>{% block title %}{% endblock %} · Job tracker</title>
+  {# Before the stylesheet, so the first paint already uses the chosen theme (see the theme switch). #}
+  <script>try { const t = localStorage.getItem("theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}</script>
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/htmx.min.js" defer></script>
   <script src="/static/app.js" defer></script>
@@ -21,6 +24,11 @@
       <a href="/stats"{% if active == "stats" %} aria-current="page"{% endif %}>Stats</a>
     </nav>
     {% include "_status_bar.html" %}
+    <div class="theme-switch" role="radiogroup" aria-label="Theme" x-data="themeSwitch">
+      {% for value, label, icon_name in [("system", "System", "monitor"), ("light", "Light", "sun"), ("dark", "Dark", "moon")] %}
+      <label title="{{ label }}"><input type="radio" name="theme" value="{{ value }}" :checked="choice === '{{ value }}'" @change="set('{{ value }}')">{{ icon(icon_name) }}<span class="sr-only">{{ label }}</span></label>
+      {% endfor %}
+    </div>
   </header>
   <main class="{% block main_class %}page{% endblock %}">
     {% block content %}{% endblock %}

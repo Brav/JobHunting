@@ -88,3 +88,21 @@ def test_compact_status_bar(app_factory):
         bar = c.get("/runs/status").text
     assert "0 of 1 OK" in bar and "'Data Eng Berlin' failed" in bar and "Run now" in bar
     assert "listings OK" not in bar
+
+
+def test_theme_is_applied_before_the_stylesheet(app_factory):
+    with TestClient(app_factory()) as c:
+        html = c.get("/").text
+        assert html.index('localStorage.getItem("theme")') < html.index('href="/static/style.css"')
+        assert 'role="radiogroup" aria-label="Theme"' in html
+        for value in ("system", "light", "dark"):
+            assert f'name="theme" value="{value}"' in html
+        sprite = c.get("/static/icons.svg").text
+        assert all(f'id="i-{name}"' in sprite for name in ("sun", "moon", "monitor"))
+
+
+def test_forced_themes_have_tokens(app_factory):
+    with TestClient(app_factory()) as c:
+        css = c.get("/static/style.css").text
+        assert ':root[data-theme="dark"]' in css and ':root:not([data-theme="light"])' in css
+        assert ':root[data-theme="light"] { color-scheme: light; }' in css

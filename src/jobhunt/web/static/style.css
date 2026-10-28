@@ -1,4 +1,5 @@
-/* Job tracker — design tokens, then layout and components. Light and dark follow the system. */
+/* Job tracker — design tokens, then layout and components. Light and dark follow the system unless the
+   theme switch forces one (data-theme on <html>, set before the first paint). */
 :root {
   --bg: #f7f7f5; --surface: #ffffff; --surface-2: #f1f1ee; --fg: #1c1c1a; --muted: #6b6b66; --line: #e4e4df;
   --line-strong: #cfcfc8; --accent: #2557d6; --accent-fg: #ffffff; --accent-tint: #e8eefc; --accent-wash: #f2f5fd;
@@ -9,13 +10,21 @@
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #151514; --surface: #1d1d1b; --surface-2: #262624; --fg: #ededea; --muted: #a3a39c; --line: #2f2f2c;
     --line-strong: #44443f; --accent: #7aa2ff; --accent-fg: #0d1426; --accent-tint: #1f2a44; --accent-wash: #1a2133;
     --success: #5ccf8e; --success-tint: #17301f; --violet: #b49bff; --violet-tint: #2a2140;
     --danger: #ff8a80; --danger-tint: #3a1c19; --warning-tint: #3a3015;
   }
 }
+:root[data-theme="dark"] {
+  --bg: #151514; --surface: #1d1d1b; --surface-2: #262624; --fg: #ededea; --muted: #a3a39c; --line: #2f2f2c;
+  --line-strong: #44443f; --accent: #7aa2ff; --accent-fg: #0d1426; --accent-tint: #1f2a44; --accent-wash: #1a2133;
+  --success: #5ccf8e; --success-tint: #17301f; --violet: #b49bff; --violet-tint: #2a2140;
+  --danger: #ff8a80; --danger-tint: #3a1c19; --warning-tint: #3a3015;
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
 * { box-sizing: border-box; }
 [x-cloak] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--fg); font-size: var(--t3); line-height: 1.45; }
@@ -38,6 +47,12 @@ kbd { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 0 5px;
 .mainnav a:hover { background: var(--surface-2); text-decoration: none; }
 .mainnav a[aria-current="page"] { color: var(--fg); background: var(--surface-2); font-weight: 600; }
 .status-bar { margin-left: auto; display: flex; align-items: center; gap: var(--s3); font-size: var(--t2); color: var(--muted); }
+.theme-switch { order: 1; display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: var(--r1); }
+.theme-switch label { display: inline-flex; padding: 4px 6px; border-radius: 4px; color: var(--muted); cursor: pointer; }
+.theme-switch label:hover { color: var(--fg); }
+.theme-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+.theme-switch label:has(input:checked) { background: var(--surface-2); color: var(--fg); }
+.theme-switch label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
 .status-bar.running .status-text strong { color: var(--accent); }
 
 /* Buttons, tags, chips, forms */
@@ -166,6 +181,7 @@ dl.shortcuts dd { margin: 0; }
 @media (max-width: 900px) {
   .topbar { gap: var(--s3); height: auto; min-height: var(--topbar); flex-wrap: wrap; padding: var(--s2) var(--s3); }
   .status-bar { margin-left: 0; width: 100%; justify-content: space-between; }
+  .theme-switch { order: 0; margin-left: auto; }
   .page-wide { height: auto; display: block; }
   .split { grid-template-columns: 1fr; height: auto; }
   .split-list { border-right: none; }
