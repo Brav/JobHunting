@@ -65,6 +65,7 @@ class RunCoordinator:
         self.settings = settings
         self.clock = clock
         self.sleep = sleep
+        self.post = None  # tests may set a fake HTTP POST for the digest push
         self.fetch_page = fetch_page
         self.translator = translator
         self._lock = threading.Lock()
@@ -188,6 +189,24 @@ class RunCoordinator:
         except Exception:
             logger.exception("auto-close failed")
 
+    def push_digest(self) -> None:
+        """The morning push (after the run nearest 10:00), only to an ntfy address the user set."""
+        import requests
+        from jobhunt.digest import build_digest, push_digest
+        from jobhunt.preferences import is_paused, load_preferences
+        try:
+            now = utcnow()
+            today = local_date(now, self.settings.tz)
+            with self.session_factory() as s:
+                prefs = load_preferences(s)
+                if not prefs.ntfy_url or is_paused(prefs, today):
+                    return
+                digest = build_digest(s, prefs, now - timedelta(hours=24), now, today, self.settings.tz)
+            if push_digest(prefs, digest, self.settings.public_url, self.post or requests.post):
+                logger.info("digest pushed")
+        except Exception:
+            logger.exception("digest push failed")
+
     def start(self) -> None:
         s = self.settings
         hours = run_hours(s.run_at, s.run_every_hours)
@@ -201,6 +220,9 @@ class RunCoordinator:
                                 coalesce=True, misfire_grace_time=6 * 3600)
         self._scheduler.add_job(self.nightly_recheck, CronTrigger(hour=4, minute=0, timezone=s.tz), id="recheck",
                                 coalesce=True, misfire_grace_time=6 * 3600)
+        push_at = datetime.combine(datetime.now(s.tz).date(), s.run_at) + timedelta(minutes=30)
+        self._scheduler.add_job(self.push_digest, CronTrigger(hour=push_at.hour, minute=push_at.minute, timezone=s.tz),
+                                id="digest_push", coalesce=True, misfire_grace_time=3600)
         self._scheduler.add_job(self.daily_auto_close, CronTrigger(hour=5, minute=15, timezone=s.tz), id="auto_close",
                                 coalesce=True, misfire_grace_time=6 * 3600)
         if self.fetch_page is not None:

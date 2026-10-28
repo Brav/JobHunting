@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Digest{% endblock %}
+{% block content %}
+<h1>Digest</h1>
+<p class="muted">Since {{ digest.since | local_dt(tz) }}{% if digest.summary() %} · {{ digest.summary() }}{% endif %}</p>
+<form method="post" action="/digest/read"><button class="btn small" type="submit">Mark as read</button></form>
+<section class="stats-section"><h2>New jobs you can take</h2>
+  {% if digest.new_jobs %}<ul class="plain-list">{% for job in digest.new_jobs %}{% set tags = job | tags %}
+    <li><span class="tag {{ tags[0][1] }}">{{ tags[0][0] }}</span> <a href="/jobs/{{ job.id }}">{{ job.title_en or job.title }}</a>
+      <span class="muted small">{{ job.company }}{% if job.salary_max_eur %} · {{ job | salary_short }}{% endif %}</span></li>{% endfor %}</ul>
+    {% if digest.new_total > digest.new_jobs | length %}<p class="muted small">…and {{ digest.new_total - digest.new_jobs | length }} more in the <a href="/">report</a>.</p>{% endif %}
+  {% else %}<p class="empty">Nothing new since then.</p>{% endif %}
+</section>
+{% if digest.follow_ups %}<section class="stats-section"><h2>Follow-ups due</h2><ul class="plain-list">{% for job in digest.follow_ups %}
+  <li><a href="/jobs/{{ job.id }}">{{ job.title_en or job.title }}</a> <span class="muted small">{{ job.company }}</span></li>{% endfor %}</ul></section>{% endif %}
+{% if digest.contacts_due %}<section class="stats-section"><h2>Contacts to follow up</h2><ul class="plain-list">{% for c in digest.contacts_due %}
+  <li><a href="/contacts/{{ c.id }}">{{ c.name }}</a> <span class="muted small">{{ c.company }}</span></li>{% endfor %}</ul></section>{% endif %}
+{% if digest.auto_closed %}<section class="stats-section"><h2>Closed without a reply</h2><ul class="plain-list">{% for job in digest.auto_closed %}
+  <li><a href="/jobs/{{ job.id }}">{{ job.title_en or job.title }}</a> <span class="muted small">{{ job.company }}</span></li>{% endfor %}</ul></section>{% endif %}
+<section class="goals" aria-label="Weekly goals">{% for g in digest.goals %}<div class="goal"><span class="tile-label">{{ g.label }}</span>
+  <span class="goal-value">{{ g.done }} / {{ g.target }}</span></div>{% endfor %}</section>
+{% endblock %}

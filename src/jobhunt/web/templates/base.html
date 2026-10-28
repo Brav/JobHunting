@@ -19,6 +19,7 @@
     <a class="brand" href="/">Job tracker</a>
     <nav class="mainnav" aria-label="Sections">
       <a href="/"{% if active == "report" %} aria-current="page"{% endif %}>Report</a>
+      <a href="/digest"{% if active == "digest" %} aria-current="page"{% endif %}>Digest</a>
       <a href="/jobs"{% if active == "jobs" %} aria-current="page"{% endif %}>All jobs</a>
       <a href="/listings"{% if active == "listings" %} aria-current="page"{% endif %}>Listings</a>
       <a href="/stats"{% if active == "stats" %} aria-current="page"{% endif %}>Stats</a>
