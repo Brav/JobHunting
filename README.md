@@ -73,6 +73,30 @@ JOBHUNT_CV_NAME=CV.pdf
 Replacing the CV with a newer version (same name) takes effect immediately; if the file is missing, the CV prompt
 page says where it looked, and the searches keep running.
 
+## Use with Claude Desktop
+
+The tracker is also an MCP server, so Claude can search your jobs and update applications in a chat ("which saved
+jobs fit best?", "I had the HR call with Acme today"). Its tools: `search_jobs`, `get_job`, `list_applications`,
+`stats_summary`, `add_application_step` and `set_job_status`. It uses the same database as the app, on your
+machine; nothing is uploaded except what Claude reads in the conversation.
+
+Add this to Claude Desktop's config (`~/.config/Claude/claude_desktop_config.json` on Linux,
+`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS) and restart Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "job-tracker": {
+      "command": "/home/you/.local/bin/uv",
+      "args": ["run", "--directory", "/home/you/job_hunting", "python", "-m", "jobhunt.mcp_server"],
+      "env": {"JOBHUNT_DB_PATH": "/home/you/job_hunting/data/jobhunt.db", "TZ": "Europe/Belgrade"}
+    }
+  }
+}
+```
+
+Start the web app once after each update first: it updates the database, and the MCP server refuses an older one.
+
 ## Develop
 
 ```bash

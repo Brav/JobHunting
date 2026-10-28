@@ -16,6 +16,7 @@ dependencies = [
     "lingua-language-detector>=2.2.0",
     "markdown-it-py>=4.2.0",
     "markdownify>=1.2.3",
+    "mcp>=2.3.0",
     "pypdf>=6.21.3",
     "python-jobspy>=1.4.1",
     "python-multipart>=0.0.32",
