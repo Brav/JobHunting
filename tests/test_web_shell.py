@@ -50,3 +50,14 @@ def test_translator_choice(tmp_path):
     assert isinstance(create_app(load_settings(base), start_scheduler=False).state.translator, NoTranslator)
     app = create_app(load_settings({**base, "DEEPL_AUTH_KEY": "abc:fx"}), start_scheduler=False)
     assert isinstance(app.state.translator, DeepLTranslator)
+
+
+def test_status_poll_refreshes_the_page_when_the_run_has_finished(app_factory):
+    app = app_factory()
+    with TestClient(app) as client:
+        app.state.coordinator._lock.acquire()  # a run in progress
+        try:
+            assert "HX-Refresh" not in client.get("/runs/status").headers
+        finally:
+            app.state.coordinator._lock.release()
+        assert client.get("/runs/status").headers.get("HX-Refresh") == "true"

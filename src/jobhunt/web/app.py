@@ -65,6 +65,9 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
 
     @app.get("/runs/status", response_class=HTMLResponse)
     def run_status(request: Request):
-        return render(request, "_status_bar.html")
+        response = render(request, "_status_bar.html")
+        if not coordinator.is_running:
+            response.headers["HX-Refresh"] = "true"  # only a running bar polls: reload to show the new jobs
+        return response
 
     return app
