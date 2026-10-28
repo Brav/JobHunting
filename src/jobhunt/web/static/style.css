@@ -48,3 +48,6 @@ input, select { font: inherit; padding: 6px 8px; border-radius: 6px; border: 1px
 .badge { font-size: 0.8rem; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); }
 .badge.interested { border-color: var(--accent); color: var(--accent); }
 .badge.applied { border-color: var(--ok); color: var(--ok); }
+textarea.prompt { width: 100%; margin: 8px 0 12px; padding: 10px; border-radius: 8px; border: 1px solid var(--line);
+                  background: var(--card); color: var(--fg); font: 0.85rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+a.button { display: inline-block; text-decoration: none; color: var(--fg); }

@@ -12,5 +12,6 @@
     <button hx-post="/jobs/{{ job.id }}/status" hx-vals='{"status": "new"}'
             hx-target="closest tr" hx-swap="outerHTML">Reset</button>
     {% endif %}
+    <a class="button" href="/jobs/{{ job.id }}/cv-prompt" target="_blank" rel="noopener">CV prompt</a>
   </td>
 </tr>

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}CV prompt · {{ job.title }}{% endblock %}
+{% block content %}
+<h1>CV prompt</h1>
+<p><a href="{{ job.url }}" target="_blank" rel="noopener">{{ job.title }}</a> · {{ job.company }}</p>
+{% if description_error %}
+<p class="error">Couldn't load the job description: {{ description_error }}</p>
+<div class="actions">
+  <a class="button" href="{{ job.url }}" target="_blank" rel="noopener">Open the job on LinkedIn</a>
+  <form class="inline" method="post" action="/jobs/{{ job.id }}/description"><button type="submit">Try again</button></form>
+</div>
+{% endif %}
+{% if cv_error %}
+<p class="error">{{ cv_error }}</p>
+{% else %}
+<p class="hint">Edit it here if you like, copy it, then paste it into a new chat on Claude.ai.</p>
+<textarea id="prompt" class="prompt" rows="28">{{ prompt }}</textarea>
+<div class="actions">
+  <button id="copy" class="primary" type="button">Copy prompt</button>
+  <a class="button" href="https://claude.ai/new" target="_blank" rel="noopener">Open Claude.ai</a>
+</div>
+<script>
+document.getElementById("copy").addEventListener("click", async (event) => {
+  const box = document.getElementById("prompt");
+  try { await navigator.clipboard.writeText(box.value); }
+  catch { box.select(); document.execCommand("copy"); }
+  event.target.textContent = "Copied!";
+  setTimeout(() => { event.target.textContent = "Copy prompt"; }, 2000);
+});
+</script>
+{% endif %}
+{% endblock %}

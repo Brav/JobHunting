@@ -13,11 +13,12 @@ from jobhunt.config import Settings
 from jobhunt.db import init_db, make_engine, make_session_factory
 from jobhunt.scheduler import RunCoordinator
 from jobhunt.sources.base import JobSource
-from jobhunt.web import listings, report, tracker
+from jobhunt.web import cv, listings, report, tracker
 from jobhunt.web.common import render
 
 
-def create_app(settings: Settings, *, source: JobSource | None = None, start_scheduler: bool = True,
+def create_app(settings: Settings, *, source: JobSource | None = None,
+               describe: Callable[[str], str] | None = None, start_scheduler: bool = True,
                sleep: Callable[[float], None] = time.sleep) -> FastAPI:
     engine = make_engine(settings.db_path)
     init_db(engine)
@@ -25,6 +26,8 @@ def create_app(settings: Settings, *, source: JobSource | None = None, start_sch
     if source is None:
         from jobhunt.sources.linkedin import LinkedInSource
         source = LinkedInSource()
+    if describe is None:
+        from jobhunt.sources.linkedin import fetch_description as describe
     coordinator = RunCoordinator(session_factory, source, settings, sleep=sleep)
 
     @asynccontextmanager
@@ -40,9 +43,11 @@ def create_app(settings: Settings, *, source: JobSource | None = None, start_sch
     app.state.settings = settings
     app.state.session_factory = session_factory
     app.state.coordinator = coordinator
+    app.state.describe = describe
     app.include_router(report.router)
     app.include_router(listings.router)
     app.include_router(tracker.router)
+    app.include_router(cv.router)
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
     @app.post("/runs", response_class=HTMLResponse)

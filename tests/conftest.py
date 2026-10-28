@@ -20,7 +20,10 @@ def session_factory(engine):
 
 @pytest.fixture
 def app_factory(tmp_path):
-    def make(source=None):
-        settings = load_settings({"JOBHUNT_DB_PATH": str(tmp_path / "web.db")})
-        return create_app(settings, source=source or FakeSource({}), start_scheduler=False, sleep=lambda s: None)
+    def make(source=None, describe=None, cv_path=None):
+        settings = load_settings({"JOBHUNT_DB_PATH": str(tmp_path / "web.db"),
+                                  "JOBHUNT_CV_PATH": str(cv_path or tmp_path / "missing.pdf")})
+        return create_app(settings, source=source or FakeSource({}),
+                          describe=describe or (lambda external_id: "Job description."),
+                          start_scheduler=False, sleep=lambda s: None)
     return make
