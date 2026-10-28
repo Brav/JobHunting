@@ -1,10 +1,10 @@
-"""When runs happen: daily at the configured time, on startup catch-up, or on demand — one at a time."""
+"""When runs happen: every N hours from an anchor time, catch-up after missed slots, or on demand — one at a time."""
 
 import logging
 import threading
 import time as _time
 from collections.abc import Callable
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -21,10 +21,27 @@ from jobhunt.timeutil import local_date, local_to_utc, utcnow
 logger = logging.getLogger(__name__)
 
 
-def should_catch_up(now: datetime, tz: ZoneInfo, run_at: time, last_started: datetime | None) -> bool:
-    """True when today's run time has passed and no run has started since then."""
-    today_run = local_to_utc(local_date(now, tz), run_at, tz)
-    return now >= today_run and (last_started is None or last_started < today_run)
+CATCH_UP_CHECK_MINUTES = 15
+
+
+def run_hours(run_at: time, every_hours: int) -> list[int]:
+    """Local hours of the scheduled runs, e.g. 10:00 every 4 h → [2, 6, 10, 14, 18, 22]."""
+    return sorted((run_at.hour + k * every_hours) % 24 for k in range(24 // every_hours))
+
+
+def latest_slot(now: datetime, tz: ZoneInfo, run_at: time, every_hours: int) -> datetime:
+    """The most recent scheduled run time at or before now (naive UTC)."""
+    today = local_date(now, tz)
+    candidates = (local_to_utc(day, time(hour, run_at.minute), tz)
+                  for day in (today - timedelta(days=1), today)
+                  for hour in run_hours(run_at, every_hours))
+    return max(slot for slot in candidates if slot <= now)
+
+
+def should_catch_up(now: datetime, tz: ZoneInfo, run_at: time, every_hours: int,
+                    last_started: datetime | None) -> bool:
+    """True when no run has started since the most recent scheduled run time."""
+    return last_started is None or last_started < latest_slot(now, tz, run_at, every_hours)
 
 
 def latest_run_started(session: Session) -> datetime | None:
@@ -76,18 +93,28 @@ class RunCoordinator:
         threading.Thread(target=work, name=f"jobhunt-run-{trigger}", daemon=True).start()
         return True
 
-    def start(self) -> None:
+    def catch_up_if_needed(self) -> bool:
         s = self.settings
-        self._scheduler = BackgroundScheduler(timezone=s.tz)
-        self._scheduler.add_job(self.trigger, CronTrigger(hour=s.run_at.hour, minute=s.run_at.minute, timezone=s.tz),
-                                args=["scheduled"], id="daily", coalesce=True, misfire_grace_time=3600)
-        self._scheduler.start()
-        logger.info("scheduler started; daily run at %s %s", s.run_at.strftime("%H:%M"), s.tz.key)
         with self.session_factory() as session:
             last = latest_run_started(session)
-        if should_catch_up(self.clock(), s.tz, s.run_at, last):
-            logger.info("today's run was missed; catching up now")
-            self.trigger("catch_up")
+        if not should_catch_up(self.clock(), s.tz, s.run_at, s.run_every_hours, last):
+            return False
+        logger.info("a scheduled run was missed; catching up now")
+        return self.trigger("catch_up")
+
+    def start(self) -> None:
+        s = self.settings
+        hours = run_hours(s.run_at, s.run_every_hours)
+        self._scheduler = BackgroundScheduler(timezone=s.tz)
+        self._scheduler.add_job(self.trigger, CronTrigger(hour=",".join(map(str, hours)), minute=s.run_at.minute,
+                                                          timezone=s.tz),
+                                args=["scheduled"], id="scheduled", coalesce=True, misfire_grace_time=3600)
+        self._scheduler.add_job(self.catch_up_if_needed, "interval", minutes=CATCH_UP_CHECK_MINUTES,
+                                id="catch_up_check", coalesce=True)
+        self._scheduler.start()
+        logger.info("scheduler started; runs at %s %s",
+                    ", ".join(f"{h:02d}:{s.run_at.minute:02d}" for h in hours), s.tz.key)
+        self.catch_up_if_needed()
 
     def shutdown(self) -> None:
         if self._scheduler is not None:
@@ -97,5 +124,5 @@ class RunCoordinator:
     def next_run_at(self) -> datetime | None:
         if self._scheduler is None:
             return None
-        job = self._scheduler.get_job("daily")
+        job = self._scheduler.get_job("scheduled")
         return job.next_run_time if job else None

@@ -36,3 +36,16 @@ def test_time_helpers():
     assert local_to_utc(date(2026, 7, 1), time(10, 0), TZ) == datetime(2026, 7, 1, 8, 0)
     assert local_day_bounds_utc(date(2026, 10, 28), TZ) == (
         datetime(2026, 10, 27, 23, 0), datetime(2026, 10, 28, 23, 0))
+
+
+def test_schedule_and_cv_settings():
+    s = load_settings({})
+    assert (s.run_every_hours, s.cv_path) == (4, Path("/app/cv/original.pdf"))
+    s = load_settings({"JOBHUNT_RUN_EVERY_HOURS": "6", "JOBHUNT_CV_PATH": "/x/cv.pdf"})
+    assert (s.run_every_hours, s.cv_path) == (6, Path("/x/cv.pdf"))
+
+
+@pytest.mark.parametrize("bad", ["5", "0", "25", "x"])
+def test_bad_run_interval(bad):
+    with pytest.raises(ValueError):
+        load_settings({"JOBHUNT_RUN_EVERY_HOURS": bad})

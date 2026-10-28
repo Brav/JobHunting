@@ -14,12 +14,19 @@ class Settings:
     run_at: time
     db_path: Path
     results_per_listing: int
+    run_every_hours: int = 4
+    cv_path: Path = Path("/app/cv/original.pdf")
 
 
 def load_settings(env: Mapping[str, str] = os.environ) -> Settings:
+    every = int(env.get("JOBHUNT_RUN_EVERY_HOURS", "4"))
+    if every <= 0 or 24 % every:
+        raise ValueError(f"JOBHUNT_RUN_EVERY_HOURS must divide 24, got {every}")
     return Settings(
         tz=ZoneInfo(env.get("TZ", "Europe/Belgrade")),
         run_at=datetime.strptime(env.get("JOBHUNT_RUN_AT", "10:00"), "%H:%M").time(),
         db_path=Path(env.get("JOBHUNT_DB_PATH", "/app/data/jobhunt.db")),
         results_per_listing=int(env.get("JOBHUNT_RESULTS_PER_LISTING", "100")),
+        run_every_hours=every,
+        cv_path=Path(env.get("JOBHUNT_CV_PATH", "/app/cv/original.pdf")),
     )

@@ -8,7 +8,7 @@ from sqlmodel import select
 from fakes import FakeClock, FakeSource, add_listing, add_run, wait_until
 from jobhunt.config import load_settings
 from jobhunt.models import Run
-from jobhunt.scheduler import RunCoordinator, latest_run_started, should_catch_up
+from jobhunt.scheduler import RunCoordinator, latest_run_started, latest_slot, run_hours, should_catch_up
 
 TZ, TEN = ZoneInfo("Europe/Belgrade"), time(10, 0)
 
@@ -18,17 +18,25 @@ def settings(tmp_path):
     return load_settings({"JOBHUNT_DB_PATH": str(tmp_path / "unused.db")})
 
 
-def test_should_catch_up_winter():
-    assert not should_catch_up(datetime(2026, 10, 28, 8, 59), TZ, TEN, None)
-    assert should_catch_up(datetime(2026, 10, 28, 9, 30), TZ, TEN, None)
-    assert should_catch_up(datetime(2026, 10, 28, 9, 30), TZ, TEN, datetime(2026, 10, 28, 8, 0))  # manual run at 09:00
-    assert not should_catch_up(datetime(2026, 10, 28, 9, 30), TZ, TEN, datetime(2026, 10, 28, 9, 0))
-    assert should_catch_up(datetime(2026, 10, 28, 9, 30), TZ, TEN, datetime(2026, 10, 27, 9, 0))
+def test_run_hours():
+    assert run_hours(time(10, 0), 4) == [2, 6, 10, 14, 18, 22]
+    assert run_hours(time(10, 0), 24) == [10]
+    assert run_hours(time(7, 30), 6) == [1, 7, 13, 19]
 
 
-def test_should_catch_up_summer():
-    assert should_catch_up(datetime(2026, 7, 1, 8, 30), TZ, TEN, None)      # 10:30 CEST
-    assert not should_catch_up(datetime(2026, 7, 1, 7, 59), TZ, TEN, None)  # 09:59 CEST
+def test_latest_slot():
+    assert latest_slot(datetime(2026, 10, 28, 9, 30), TZ, TEN, 4) == datetime(2026, 10, 28, 9, 0)    # 10:30 → 10:00
+    assert latest_slot(datetime(2026, 10, 28, 8, 59), TZ, TEN, 4) == datetime(2026, 10, 28, 5, 0)    # 09:59 → 06:00
+    assert latest_slot(datetime(2026, 10, 27, 23, 30), TZ, TEN, 4) == datetime(2026, 10, 27, 21, 0)  # 00:30 → 22:00 the day before
+    assert latest_slot(datetime(2026, 7, 1, 8, 30), TZ, TEN, 4) == datetime(2026, 7, 1, 8, 0)        # 10:30 CEST → 10:00 CEST
+
+
+def test_should_catch_up():
+    now = datetime(2026, 10, 28, 9, 30)  # 10:30 local; latest slot 10:00 local = 09:00 UTC
+    assert should_catch_up(now, TZ, TEN, 4, None)
+    assert should_catch_up(now, TZ, TEN, 4, datetime(2026, 10, 28, 8, 0))       # last run 09:00 local
+    assert not should_catch_up(now, TZ, TEN, 4, datetime(2026, 10, 28, 9, 0))
+    assert not should_catch_up(now, TZ, TEN, 4, datetime(2026, 10, 28, 9, 10))
 
 
 def test_latest_run_started_ignores_interrupted(session_factory):
@@ -71,6 +79,19 @@ def test_start_catches_up_and_schedules(session_factory, settings):
         with session_factory() as s:
             assert [r.trigger for r in s.exec(select(Run)).all()] == ["catch_up"]
         nxt = coord.next_run_at()
-        assert (nxt.hour, nxt.minute) == (10, 0)
+        assert nxt.hour in (2, 6, 10, 14, 18, 22) and nxt.minute == 0
     finally:
         coord.shutdown()
+
+
+def test_catch_up_check_runs_only_after_a_missed_slot(session_factory, settings):
+    clock = FakeClock(datetime(2026, 10, 28, 9, 30))
+    coord = RunCoordinator(session_factory, FakeSource({}), settings, clock=clock, sleep=clock.sleep)
+    assert coord.catch_up_if_needed() is True
+    wait_until(lambda: not coord.is_running)
+    assert coord.catch_up_if_needed() is False
+    clock.now = datetime(2026, 10, 28, 13, 5)  # 14:05 local: the 14:00 slot was missed
+    assert coord.catch_up_if_needed() is True
+    wait_until(lambda: not coord.is_running)
+    with session_factory() as s:
+        assert [r.trigger for r in s.exec(select(Run)).all()] == ["catch_up", "catch_up"]
