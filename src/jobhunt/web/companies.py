@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from sqlmodel import func, select
 
 from jobhunt.blocks import blocked_keys, company_key
-from jobhunt.models import Job, Sighting
+from jobhunt.models import Contact, Job, Sighting
 from jobhunt.stats import load_applications
 from jobhunt.web.common import render, session
 
@@ -48,9 +48,11 @@ def company_page(request: Request, key: str):
         apps = [a for a in load_applications(s) if company_key(a.job.company) == key]
         sightings = s.exec(select(func.count()).select_from(Sighting).where(Sighting.job_id.in_([j.id for j in jobs]))).one()
         is_blocked = key in blocked_keys(s)
+        people = [c for c in s.exec(select(Contact).order_by(Contact.name)).all() if company_key(c.company) == key]
     name = Counter(j.company for j in jobs).most_common(1)[0][0]
     links = [("LinkedIn", f"https://www.linkedin.com/search/results/companies/?keywords={quote_plus(name)}"),
              ("Glassdoor", f"https://www.glassdoor.com/Search/results.htm?keyword={quote_plus(name)}"),
              ("Web search", f"https://duckduckgo.com/?q={quote_plus(name + ' careers')}")]
     return render(request, "company.html", active="companies", key=key, company_name=name, jobs=jobs, outcome=_outcome(apps),
-                  reposts=sum(j.reposts or 0 for j in jobs), sightings=sightings, is_blocked=is_blocked, links=links)
+                  reposts=sum(j.reposts or 0 for j in jobs), sightings=sightings, is_blocked=is_blocked, links=links,
+                  people=people)

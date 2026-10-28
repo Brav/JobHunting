@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Contacts{% endblock %}
+{% block content %}
+<h1>Contacts</h1>
+{% if errors %}<ul class="field-error" role="alert">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+<form class="inline-form contact-form" method="post" action="/contacts">
+  <input name="name" placeholder="Name" aria-label="Name" required>
+  <input name="company" placeholder="Company" aria-label="Company">
+  <input name="role" placeholder="Role" aria-label="Role">
+  <input name="email" type="email" placeholder="Email" aria-label="Email">
+  <input name="url" placeholder="LinkedIn or other link" aria-label="Link">
+  <label class="check">Follow up on <input name="follow_up_on" type="date"></label>
+  <button class="btn primary small" type="submit">Add contact</button>
+</form>
+{% if people %}
+<div class="table-scroll"><table>
+  <thead><tr><th>Name</th><th>Company</th><th>Role</th><th>Follow up</th><th class="num">Jobs</th></tr></thead>
+  <tbody>{% for c in people %}
+    <tr><td><a href="/contacts/{{ c.id }}">{{ c.name }}</a></td><td>{{ c.company }}</td><td>{{ c.role }}</td>
+      <td>{% if c.follow_up_on %}{% if c.follow_up_on <= today %}<span class="tag follow-up">Follow up</span> {% endif %}{{ c.follow_up_on.isoformat() }}{% endif %}</td>
+      <td class="num">{{ counts[c.id] or "" }}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% else %}<p class="empty">No contacts yet. Add recruiters, referrers and interviewers here or from a job.</p>{% endif %}
+{% endblock %}

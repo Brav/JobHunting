@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ contact.name }}{% endblock %}
+{% block content %}
+<p><a href="/contacts">‹ Contacts</a></p>
+<h1>{{ contact.name }}</h1>
+<form class="stack settings-form" method="post" action="/contacts/{{ contact.id }}">
+  <fieldset><legend>Details</legend>
+    <label>Name<input name="name" value="{{ contact.name }}" required></label>
+    <label>Company<input name="company" value="{{ contact.company }}"></label>
+    <label>Role<input name="role" value="{{ contact.role }}"></label>
+    <label>Email<input name="email" type="email" value="{{ contact.email }}"></label>
+    <label>Link<input name="url" value="{{ contact.url }}"></label>
+    <label>Follow up on<input name="follow_up_on" type="date" value="{{ contact.follow_up_on.isoformat() if contact.follow_up_on else '' }}"></label>
+    <label>Notes<textarea name="notes" rows="4">{{ contact.notes }}</textarea></label>
+  </fieldset>
+  <div class="actions-row"><button class="btn primary" type="submit">Save</button>
+    {% if contact.url %}<a class="btn ghost" href="{{ contact.url }}" target="_blank" rel="noopener noreferrer">Open link ↗</a>{% endif %}</div>
+</form>
+<form method="post" action="/contacts/{{ contact.id }}/delete"><button class="btn ghost" type="submit">Delete contact</button></form>
+<h2>Jobs</h2>
+{% if jobs %}<ul class="plain-list">{% for job, relation in jobs %}<li><a href="/jobs/{{ job.id }}">{{ job.title_en or job.title }}</a>
+  <span class="muted small">{{ job.company }} · {{ relations[relation] }}</span></li>{% endfor %}</ul>
+{% else %}<p class="empty">Not linked to any job yet.</p>{% endif %}
+{% endblock %}

@@ -44,6 +44,22 @@
   {% if job.status == "applied" %}{% include "_application.html" %}
   {% elif pane.step_error %}<p class="notice error-notice" role="alert">{{ pane.step_error }}</p>{% endif %}
   {% endif %}
+  {% if not pane.focus %}
+  <section class="people" aria-label="People">
+    <h2 class="application-title">People</h2>
+    {% if pane.people %}<ul class="plain-list">{% for c, relation in pane.people %}
+      <li><a href="/contacts/{{ c.id }}">{{ c.name }}</a> <span class="muted small">{{ contact_relations[relation] }}{% if c.role %} · {{ c.role }}{% endif %}</span>
+        <button class="btn ghost small" type="button" hx-post="/jobs/{{ job.id }}/contacts/{{ c.id }}/unlink" hx-target="#job-pane" hx-swap="innerHTML" aria-label="Unlink {{ c.name }}">✕</button></li>{% endfor %}</ul>{% endif %}
+    <form class="inline-form" hx-post="/jobs/{{ job.id }}/contacts" hx-target="#job-pane" hx-swap="innerHTML">
+      <select name="contact_id" aria-label="Existing contact"><option value="">New contact…</option>
+        {% for c in pane.known_contacts %}<option value="{{ c.id }}">{{ c.name }}{% if c.company %} ({{ c.company }}){% endif %}</option>{% endfor %}</select>
+      <input name="name" placeholder="Name" aria-label="New contact's name">
+      <input name="role" placeholder="Role" aria-label="New contact's role">
+      <select name="relation" aria-label="Their part">{% for value, label in contact_relations.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+      <button class="btn small" type="submit">Link</button>
+    </form>
+  </section>
+  {% endif %}
   {% if pane.download_error %}
   <div class="notice error-notice">
     <p>Couldn't load the job listing: {{ pane.download_error }}</p>

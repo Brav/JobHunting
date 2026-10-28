@@ -10,7 +10,8 @@
     <button class="btn" type="submit">{{ "Unblock company" if is_blocked else "Block company" }}</button></form>
   {% for label, url in links %}<a class="btn ghost" href="{{ url }}" target="_blank" rel="noopener noreferrer">{{ label }} ↗</a>{% endfor %}
 </div>
-{% block company_extra %}{% endblock %}
+{% if people %}<h2>People</h2><ul class="plain-list">{% for c in people %}<li><a href="/contacts/{{ c.id }}">{{ c.name }}</a>
+  <span class="muted small">{{ c.role }}</span></li>{% endfor %}</ul>{% endif %}
 <h2>Jobs</h2>
 <div class="table-scroll"><table>
   <thead><tr><th>Job</th><th>Status</th><th>Eligibility</th><th>Found</th></tr></thead>

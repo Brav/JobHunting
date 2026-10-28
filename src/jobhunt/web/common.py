@@ -94,7 +94,8 @@ templates.env.globals.update(status_labels=STATUS_LABELS, workplace_labels=WORKP
                              stage_labels=STAGE_LABELS, verdicts=VERDICTS,
                              verdict_labels=VERDICT_LABELS, verdict_symbols=VERDICT_SYMBOLS,
                              hide_reasons=HIDE_REASONS, rule_scopes=SCOPES, channels=CHANNELS,
-                             company_key=company_key)
+                             company_key=company_key,
+                             contact_relations={"referral": "Referral", "recruiter": "Recruiter", "interviewer": "Interviewer", "other": "Other"})
 
 
 def is_htmx(request: Request) -> bool:

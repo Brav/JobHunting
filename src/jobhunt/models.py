@@ -175,3 +175,29 @@ class NegativeRule(SQLModel, table=True):
     scope: str = "title"  # "title" or "anywhere"
     active: bool = True
     created_at: NaiveDatetime = Field(default_factory=utcnow)
+
+
+class Contact(SQLModel, table=True):
+    """Someone the user knows at a company: a recruiter, a referrer, an interviewer."""
+
+    __tablename__ = "contacts"
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    company: str = ""
+    role: str = ""
+    email: str = ""
+    url: str = ""  # LinkedIn profile or similar
+    notes: str = ""
+    follow_up_on: date | None = None
+    created_at: NaiveDatetime = Field(default_factory=utcnow)
+
+
+class ContactJob(SQLModel, table=True):
+    """A contact's part in a job: referral, recruiter, interviewer or other."""
+
+    __tablename__ = "contact_jobs"
+
+    contact_id: int = Field(foreign_key="contacts.id", primary_key=True, ondelete="CASCADE")
+    job_id: int = Field(foreign_key="jobs.id", primary_key=True, index=True, ondelete="CASCADE")
+    relation: str = "other"

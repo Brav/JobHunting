@@ -17,7 +17,7 @@ from jobhunt.preferences import load_preferences
 from jobhunt.stats import load_application
 from jobhunt.signals import LIKELY_GHOST
 from jobhunt.job_listing import download_listing, translate_description, translate_title
-from jobhunt.models import Job, Listing, Match
+from jobhunt.models import Contact, ContactJob, Job, Listing, Match
 from jobhunt.sources.base import SourceBlocked, SourceError
 from jobhunt.timeutil import local_date, utcnow
 from jobhunt.translate import TranslationUnavailable
@@ -70,10 +70,13 @@ def prepare_job(request: Request, job_id: int, error: str = "", fetch: bool = Tr
         due = job.status == "applied" and follow_up_due(job, load_application(s, job_id), load_preferences(s),
                                                         local_date(utcnow(), request.app.state.settings.tz))
         company_blocked = company_key(job.company) in blocked_keys(s)
+        people = list(s.exec(select(Contact, ContactJob.relation).join(ContactJob, ContactJob.contact_id == Contact.id)
+                             .where(ContactJob.job_id == job_id)).all())
+        known = list(s.exec(select(Contact).order_by(Contact.name)).all())
     return {"job": job, "details": json.loads(job.details) if job.details else [], "download_error": download_error,
             "translation_error": (reason or job.translation_error) if untranslated else None,
             "found_by": found_by, "standalone": False, "steps": steps, "stage_default": next_stage(job.stage),
-            "step_error": "", "follow_up_due": due, "fit": _fit(job), "signals": _signals(job), "company_blocked": company_blocked,
+            "step_error": "", "follow_up_due": due, "fit": _fit(job), "people": people, "known_contacts": known, "signals": _signals(job), "company_blocked": company_blocked,
             "scam": json.loads(job.scam_flags) if job.scam_flags else [], "eligibility": {
                 "verdict": effective(job), "override": job.eligibility_override,
                 "reasons": json.loads(job.eligibility_reasons) if job.eligibility_reasons else []}}

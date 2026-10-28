@@ -287,3 +287,4 @@ form.inline { display: inline; }
 .star { border: 0; background: none; font-size: 18px; color: var(--line-strong); cursor: pointer; padding: 0 2px; }
 .star.on { color: var(--warning); }
 .star:focus-visible { outline: 2px solid var(--accent); border-radius: 4px; }
+.people { border-top: 1px solid var(--line); margin: var(--s3) 0; padding-top: var(--s2); }
