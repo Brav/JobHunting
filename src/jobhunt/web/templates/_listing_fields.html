@@ -1,0 +1,20 @@
+<form class="stack" method="post" action="{{ action }}">
+  <label>Name
+    <input name="name" value="{{ values.name }}" required>
+  </label>
+  {% if errors.name %}<span class="field-error">{{ errors.name }}</span>{% endif %}
+  <label>Keywords
+    <input name="keywords" value="{{ values.keywords }}" required>
+  </label>
+  <span class="hint">LinkedIn understands quotes and AND / OR / NOT, e.g. "data engineer" NOT senior</span>
+  {% if errors.keywords %}<span class="field-error">{{ errors.keywords }}</span>{% endif %}
+  <label>Location
+    <input name="location" value="{{ values.location }}" placeholder="Belgrade, Serbia" required>
+  </label>
+  {% if errors.location %}<span class="field-error">{{ errors.location }}</span>{% endif %}
+  <label>Radius (km)
+    <input name="radius_km" type="number" min="0" max="200" value="{{ values.radius_km }}" required>
+  </label>
+  {% if errors.radius_km %}<span class="field-error">{{ errors.radius_km }}</span>{% endif %}
+  <div><button class="primary" type="submit">{{ submit }}</button></div>
+</form>

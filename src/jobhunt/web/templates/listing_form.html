@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ listing.name }}{% endblock %}
+{% block content %}
+<h1>Edit listing</h1>
+{% set action = "/listings/" ~ listing.id %}
+{% set submit = "Save" %}
+{% include "_listing_fields.html" %}
+<p><a href="/listings">Cancel</a></p>
+{% endblock %}

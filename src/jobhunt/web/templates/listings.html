@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Listings{% endblock %}
+{% block content %}
+<h1>Listings</h1>
+{% if rows %}
+<table>
+  <thead>
+    <tr><th>Name</th><th>Keywords</th><th>Location</th><th>Radius</th><th>Last run</th><th>Active</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}{% include "_listing_row.html" %}{% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No listings yet. Add your first search below.</p>
+{% endif %}
+
+<h2>Add a listing</h2>
+{% set action = "/listings" %}
+{% set submit = "Add listing" %}
+{% include "_listing_fields.html" %}
+{% endblock %}

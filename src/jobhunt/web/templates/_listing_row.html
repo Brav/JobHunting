@@ -1,0 +1,22 @@
+<tr id="listing-{{ row.listing.id }}">
+  <td>{{ row.listing.name }}</td>
+  <td>{{ row.listing.keywords }}</td>
+  <td>{{ row.listing.location }}</td>
+  <td>{{ row.listing.radius_km }} km</td>
+  <td>
+    {% if not row.last %}<span class="muted">not run yet</span>
+    {% elif row.last.error %}<span class="error">{{ row.last.error }}</span>
+    {% else %}found {{ row.last.found }} · new {{ row.last.new }}{% endif %}
+  </td>
+  <td>
+    <button class="{{ 'current' if row.listing.active }}" hx-post="/listings/{{ row.listing.id }}/toggle"
+            hx-target="closest tr" hx-swap="outerHTML">{{ "On" if row.listing.active else "Off" }}</button>
+  </td>
+  <td class="actions">
+    <a class="button" href="/listings/{{ row.listing.id }}/edit">Edit</a>
+    <form class="inline" method="post" action="/listings/{{ row.listing.id }}/delete"
+          onsubmit="return confirm('Delete this listing? Jobs you marked Interested or Applied are kept.')">
+      <button type="submit">Delete</button>
+    </form>
+  </td>
+</tr>
