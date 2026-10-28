@@ -14,7 +14,7 @@ router = APIRouter()
 
 def _recheck(request: Request) -> None:
     with session(request) as s:
-        checks.refresh_all(s)
+        checks.refresh_blocks(s)
 
 
 def _job(request: Request, job_id: int) -> Job:

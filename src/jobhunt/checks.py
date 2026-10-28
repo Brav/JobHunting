@@ -44,11 +44,15 @@ def refresh(session: Session, job: Job, ctx: CheckContext) -> None:
                 if (found := salary.parse_salary(text))), None)
     job.salary_min_eur, job.salary_max_eur, job.salary_text = \
         (pay.min_eur, pay.max_eur, pay.text) if pay else (None, None, None)
+    _fit(job, ctx)
+    job.scam_flags = json.dumps(flags, ensure_ascii=False) if flags else None
+
+
+def _fit(job: Job, ctx: CheckContext) -> None:
     matched, missing, score = fit.fit(" ".join(t for t in (job.title, job.description_en or job.description) if t),
                                       ctx.prefs.skills)
     job.fit_matched, job.fit_missing, job.fit_score = json.dumps(matched), json.dumps(missing), score
     job.best_score = fit.rank(job)
-    job.scam_flags = json.dumps(flags, ensure_ascii=False) if flags else None
 
 
 def refresh_job(session_factory, job_id: int) -> None:
@@ -66,7 +70,28 @@ def refresh_all(session: Session, ctx: CheckContext | None = None, *, stale_only
     if stale_only:
         stmt = stmt.where(or_(Job.eligibility_rules.is_(None), Job.eligibility_rules < eligibility.RULES_VERSION))
     jobs = session.exec(stmt).all()
-    for job in jobs:
-        refresh(session, job, ctx)
+    with session.no_autoflush:  # decide in memory; the database is locked only for the final write
+        for job in jobs:
+            refresh(session, job, ctx)
     session.commit()
     return len(jobs)
+
+
+def refresh_blocks(session: Session) -> int:
+    """After a block or keyword rule changes only `blocked_by` can: decided in memory, then one short write."""
+    ctx = load_context(session)
+    changed = 0
+    for job in session.exec(select(Job)).all():
+        reason = blocks.blocked_reason(job, ctx.blocked, ctx.rules)
+        if reason != job.blocked_by:
+            job.blocked_by, changed = reason, changed + 1
+    session.commit()
+    return changed
+
+
+def refresh_fit(session: Session) -> None:
+    """After the skills change only the fit and the best-first rank can."""
+    ctx = load_context(session)
+    for job in session.exec(select(Job)).all():
+        _fit(job, ctx)
+    session.commit()

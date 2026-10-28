@@ -1,10 +1,10 @@
 from fastapi.testclient import TestClient
-from sqlmodel import update
+from sqlmodel import select, update
 
 from fakes import FakeClock, FakeSource, add_listing, job_id, make_posting as p
 from jobhunt import checks
 from jobhunt.filters import JobFilters, filtered_jobs
-from jobhunt.fit import default_skills, fit, terms_in
+from jobhunt.fit import default_skills, fit, rank, terms_in
 from jobhunt.models import Job
 from jobhunt.preferences import Preferences, save_preferences
 from jobhunt.runner import run_daily
@@ -57,3 +57,23 @@ def test_best_first_sort_and_excitement(app_factory):
         pane = c.get(f"/jobs/{ids[4]}/pane").text
         assert "Fit: 2 of 3" in pane and "Kubernetes ✗" in pane
         assert c.post(f"/jobs/{ids[3]}/excitement", data={"value": "9"}).status_code == 400
+
+
+def test_changing_skills_rechecks_only_the_fit(app_factory, monkeypatch):
+    app = app_factory()
+    with TestClient(app) as c:
+        sf = app.state.session_factory
+        add_listing(sf, "A", keywords="python")
+        clock = FakeClock(utcnow())
+        run_daily(sf, FakeSource({"python": [[p("1", title="PHP Laravel Dev")]]}), trigger="manual", clock=clock,
+                  sleep=clock.sleep)
+
+        def full_check(*args, **kwargs):
+            raise AssertionError("a skills change ran the full check")
+        monkeypatch.setattr(checks, "refresh", full_check)
+        form = {"skills": "PHP, Laravel", "follow_up_days": "7", "auto_close_days": "30",
+                "goal_applications_per_week": "5", "goal_reviews_per_week": "50"}
+        assert c.post("/settings/preferences", data=form, follow_redirects=False).status_code == 303
+        with sf() as s:
+            job = s.exec(select(Job)).one()
+        assert job.fit_score == 100 and job.best_score == rank(job)

@@ -81,3 +81,21 @@ def test_hide_reason(app_factory):
         assert statuses(app)["2"][1] == "Company blocked"
         stats = c.get("/stats").text
         assert "Why I hid" in stats and "Stack" in stats
+
+
+def test_block_changes_only_recheck_the_block(app_factory, monkeypatch):
+    """Blocking re-decides only `blocked_by`: the full check of every job held the write lock for seconds."""
+    from jobhunt import checks
+
+    app = app_factory()
+    with TestClient(app) as c:
+        one, _, three = seeded(app)
+
+        def full_check(*args, **kwargs):
+            raise AssertionError("a block change ran the full check")
+        monkeypatch.setattr(checks, "refresh", full_check)
+        c.post(f"/jobs/{one}/block-company")
+        c.post("/blocks/rules", data={"phrase": "Java", "scope": "title"})
+        assert statuses(app)["1"][1] == "Company blocked" and statuses(app)["3"][1] == 'Keyword "Java" in title'
+        c.post("/blocks/companies/remove", data={"name": "Spammy Recruiting"})
+        assert statuses(app)["1"][1] is None

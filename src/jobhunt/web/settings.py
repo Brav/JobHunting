@@ -124,5 +124,5 @@ def save_preferences_form(request: Request, skills: str = Form(""), follow_up_da
         save_preferences(s, prefs, utcnow())
         if prefs.skills != current.skills:
             from jobhunt import checks
-            checks.refresh_all(s)
+            checks.refresh_fit(s)
     return RedirectResponse("/settings?prefs=saved#preferences", status_code=303)
