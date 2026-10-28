@@ -1,41 +1,64 @@
-"""The job tracker: every job found, filterable by status, listing and text."""
+"""All jobs: every job found, with status tabs, filters, chips, sorting and infinite scroll."""
 
-import math
-from typing import Literal
-from urllib.parse import urlencode
-
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from sqlmodel import select
 
+from jobhunt.filters import JobFilters, company_names, filter_options, filtered_jobs, tab_counts
 from jobhunt.models import Listing
-from jobhunt.reports import tracker_jobs
-from jobhunt.web.common import render, session
+from jobhunt.timeutil import utcnow
+from jobhunt.web.common import is_htmx, render, session
+from jobhunt.web.job import prepare_job
 
 router = APIRouter()
 
 PER_PAGE = 50
-STATUS_OPTIONS = [("default", "All except hidden"), ("all", "All"), ("new", "New"),
-                  ("interested", "Interested"), ("applied", "Applied"), ("hidden", "Hidden")]
+TAB_LABELS = [("active", "Active"), ("undecided", "Undecided"), ("saved", "Saved"), ("applied", "Applied"),
+              ("hidden", "Hidden"), ("all", "All")]
+
+
+def _url(query: str, **extra) -> str:
+    parts = [query] if query else []
+    parts += [f"{k}={v}" for k, v in extra.items()]
+    return "/jobs" + ("?" + "&".join(parts) if parts else "")
 
 
 @router.get("/jobs", response_class=HTMLResponse)
-def tracker(request: Request,
-            status: Literal["default", "all", "new", "interested", "applied", "hidden"] = "default",
-            listing: str = "", q: str = "", page: int = Query(1, ge=1)):
-    # The filter form sends listing="" for "All listings", so it is parsed here rather than typed as int.
-    listing_id = int(listing) if listing.isdecimal() else None
+def all_jobs(request: Request):
+    f = JobFilters.from_query(request.query_params)
+    raw_offset = request.query_params.get("offset", "")
+    offset = int(raw_offset) if raw_offset.isdecimal() else 0
+    now = utcnow()
     with session(request) as s:
-        jobs, total = tracker_jobs(s, status=status, listing_id=listing_id, q=q, page=page, per_page=PER_PAGE)
-        listings = s.exec(select(Listing).order_by(Listing.id)).all()
-    pages = max(1, math.ceil(total / PER_PAGE))
+        jobs, total = filtered_jobs(s, f, now, offset=offset, limit=PER_PAGE)
+        if not is_htmx(request):
+            counts = tab_counts(s, f, now)
+            options = filter_options(s)
+            listings = list(s.exec(select(Listing).order_by(Listing.id)).all())
+    next_url = _url(f.query(), offset=offset + PER_PAGE) if offset + len(jobs) < total else None
+    empty = "No jobs match these filters"
+    if is_htmx(request):
+        return render(request, "_job_items.html", jobs=jobs, next_url=next_url, offset=offset, empty_message=empty)
+    chips = [(label, _url(query)) for label, query in f.chips()]
+    listing = next((l for l in listings if l.id == f.listing_id), None)
+    if listing:
+        chips.insert(0, (f"Listing: {listing.name}", _url(f.query(listing_id=None))))
+    raw_job = request.query_params.get("job", "")
+    selected = int(raw_job) if raw_job.isdecimal() else None
+    pane = prepare_job(request, selected) if selected and any(j.id == selected for j in jobs) else None
+    return render(
+        request, "tracker.html", jobs=jobs, total=total, offset=0, next_url=next_url, filters=f, counts=counts,
+        tab_labels=TAB_LABELS, tab_url=lambda tab: _url(f.query(tab=tab)), chips=chips,
+        clear_url=_url(JobFilters(tab=f.tab).query()), options=options, listings=listings, pane=pane,
+        selected_id=selected, empty_message=empty, hide_hidden=f.tab not in ("hidden", "all"),
+        focus_url="/focus?" + "&".join(x for x in ("source=jobs", f.query()) if x),
+        filter_action="/jobs", filter_hidden=[("tab", f.tab)] if f.tab != "active" else [],
+        show_listing=True, show_sort=True,
+    )
 
-    def page_url(n: int) -> str:
-        params = {"status": status if status != "default" else None, "listing": listing_id,
-                  "q": q or None, "page": n}
-        return "/jobs?" + urlencode({k: v for k, v in params.items() if v is not None})
 
-    return render(request, "tracker.html", jobs=jobs, total=total, page=page, pages=pages,
-                  status=status, status_options=STATUS_OPTIONS, listing_id=listing_id, listings=listings,
-                  q=q, prev_url=page_url(page - 1) if page > 1 else None,
-                  next_url=page_url(page + 1) if page < pages else None)
+@router.get("/companies", response_class=HTMLResponse)
+def companies(request: Request, company: str = "", q: str = ""):
+    with session(request) as s:
+        names = company_names(s, company or q)
+    return render(request, "_company_options.html", names=names)

@@ -72,7 +72,8 @@ label { display: grid; gap: 4px; font-size: var(--t2); color: var(--muted); }
 
 /* Pages */
 .page { max-width: 1100px; margin: 0 auto; padding: 0 var(--s4) var(--s5); }
-.page-wide { padding: 0; }
+.page-wide { padding: 0; display: flex; flex-direction: column; height: calc(100vh - var(--topbar)); }
+.page-wide > .split { flex: 1; min-height: 0; height: auto; }
 .toolbar { display: flex; flex-wrap: wrap; gap: var(--s3); align-items: center; padding: var(--s3) var(--s4);
            border-bottom: 1px solid var(--line); background: var(--surface); }
 .toolbar h1 { font-size: var(--t4); margin: 0; }
@@ -149,6 +150,7 @@ dl.shortcuts dd { margin: 0; }
 @media (max-width: 900px) {
   .topbar { gap: var(--s3); height: auto; min-height: var(--topbar); flex-wrap: wrap; padding: var(--s2) var(--s3); }
   .status-bar { margin-left: 0; width: 100%; justify-content: space-between; }
+  .page-wide { height: auto; display: block; }
   .split { grid-template-columns: 1fr; height: auto; }
   .split-list { border-right: none; }
   .split.has-selection .split-list { display: none; }
@@ -157,3 +159,16 @@ dl.shortcuts dd { margin: 0; }
   .back-to-list { display: inline-flex; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* Filter bar */
+.filter-bar { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; width: 100%; }
+.filter-bar .search { display: flex; align-items: center; gap: 6px; flex-direction: row; padding: 0 8px; border: 1px solid var(--line-strong);
+                      border-radius: var(--r1); background: var(--surface); color: var(--muted); }
+.filter-bar .search input { border: none; padding: 6px 0; min-width: 200px; background: transparent; }
+.check-group { display: flex; gap: var(--s3); border: none; margin: 0; padding: 0 var(--s2); }
+.check { display: inline-flex; flex-direction: row; gap: 4px; align-items: center; color: var(--fg); }
+.filters-collapsed summary { cursor: pointer; color: var(--muted); font-size: var(--t2); display: inline-flex; gap: 6px; align-items: center; }
+.filters-collapsed[open] summary { margin-bottom: var(--s2); }
+.filters-collapsed { display: block; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.load-more { list-style: none; padding: var(--s3) var(--s4); text-align: center; }

@@ -1,0 +1,50 @@
+{% from "_macros.html" import icon %}
+{# Needs: filters, options, filter_action, filter_hidden [(name, value)], show_listing, show_sort, listings #}
+<form class="filter-bar" method="get" action="{{ filter_action }}" x-data @change="$el.requestSubmit()">
+  {% for name, value in filter_hidden %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+  <label class="search">{{ icon("search") }}<input id="search" type="search" name="q" value="{{ filters.q }}" placeholder="Title or company" aria-label="Search title or company"></label>
+  {% if show_listing %}
+  <select name="listing" aria-label="Listing">
+    <option value="">All listings</option>
+    {% for l in listings %}<option value="{{ l.id }}"{% if filters.listing_id == l.id %} selected{% endif %}>{{ l.name }}</option>{% endfor %}
+  </select>
+  {% endif %}
+  <fieldset class="check-group"><legend class="sr-only">Workplace</legend>
+    {% for value, label in [("remote", "Remote"), ("hybrid", "Hybrid"), ("on-site", "On-site"), ("unknown", "Unknown")] %}
+    <label class="check"><input type="checkbox" name="workplace" value="{{ value }}"{% if value in filters.workplace %} checked{% endif %}> {{ label }}</label>
+    {% endfor %}
+  </fieldset>
+  <select name="language" aria-label="Language">
+    <option value="">Any language</option>
+    <option value="en"{% if filters.language == "en" %} selected{% endif %}>English</option>
+    <option value="non-en"{% if filters.language == "non-en" %} selected{% endif %}>Not English</option>
+    {% for code in options.languages if code != "en" %}<option value="{{ code }}"{% if filters.language == code %} selected{% endif %}>{{ code | language_name }}</option>{% endfor %}
+  </select>
+  <select name="seniority" aria-label="Seniority">
+    <option value="">Any seniority</option>
+    {% for value in options.seniorities %}<option{% if filters.seniority == value %} selected{% endif %}>{{ value }}</option>{% endfor %}
+  </select>
+  <select name="employment_type" aria-label="Employment type">
+    <option value="">Any type</option>
+    {% for value in options.employment_types %}<option{% if filters.employment_type == value %} selected{% endif %}>{{ value }}</option>{% endfor %}
+  </select>
+  <input name="company" value="{{ filters.company }}" placeholder="Company" aria-label="Company" list="companies" autocomplete="off"
+         hx-get="/companies" hx-trigger="focus once, keyup changed delay:300ms" hx-target="#companies" hx-swap="innerHTML">
+  <datalist id="companies"></datalist>
+  {% for name, label in [("found_within", "Found"), ("posted_within", "Posted")] %}
+  <select name="{{ name }}" aria-label="{{ label }} within">
+    <option value="">{{ label }} any time</option>
+    {% for value, text in [("24h", "last 24 h"), ("3d", "last 3 days"), ("7d", "last 7 days"), ("30d", "last 30 days")] %}
+    <option value="{{ value }}"{% if filters[name] == value %} selected{% endif %}>{{ label }} {{ text }}</option>
+    {% endfor %}
+  </select>
+  {% endfor %}
+  {% if show_sort %}
+  <select name="sort" aria-label="Sort">
+    {% for value, text in [("found", "Newest found"), ("posted", "Newest posted"), ("company", "Company A–Z")] %}
+    <option value="{{ value }}"{% if filters.sort == value %} selected{% endif %}>{{ text }}</option>
+    {% endfor %}
+  </select>
+  {% endif %}
+  <noscript><button class="btn small" type="submit">Apply</button></noscript>
+</form>

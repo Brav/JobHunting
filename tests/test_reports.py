@@ -3,7 +3,8 @@ from zoneinfo import ZoneInfo
 
 from fakes import FakeClock, FakeSource, add_listing, job_id, make_posting as p
 from jobhunt.actions import set_job_status
-from jobhunt.reports import RunSummary, listing_rows, report_dates, report_for_date, run_summary, tracker_jobs
+from jobhunt.reports import RunSummary, listing_rows, report_dates, report_for_date, run_summary
+from jobhunt.filters import JobFilters, filtered_jobs
 from jobhunt.runner import run_daily
 from jobhunt.sources.base import SourceBlocked
 
@@ -43,7 +44,7 @@ def test_job_found_by_two_listings_appears_once(session_factory):
     with session_factory() as s:
         sections = report_for_date(s, date(2026, 10, 28), TZ)
         go_listing = sections[1].listing.id
-        tracked = [j.external_id for j in tracker_jobs(s, listing_id=go_listing)[0]]
+        tracked = [j.external_id for j in filtered_jobs(s, JobFilters(listing_id=go_listing), NOW)[0]]
     shown = [j.external_id for x in sections for j in x.jobs]
     assert shown.count("2") == 1 and sections[0].listing.name == "Python BG" and "2" in [j.external_id for j in sections[0].jobs]
     assert tracked == ["2"]
@@ -65,37 +66,6 @@ def test_local_midnight_boundary(session_factory):
         assert report_dates(s, TZ) == [date(2026, 10, 28)]
         assert [j.external_id for j in report_for_date(s, date(2026, 10, 28), TZ)[0].jobs] == ["1"]
         assert report_for_date(s, date(2026, 10, 27), TZ) == []
-
-
-def test_tracker_filters(session_factory):
-    a = add_listing(session_factory, "Python BG", keywords="python")
-    add_listing(session_factory, "Go BG", keywords="go")
-    run_at(session_factory, FakeSource({
-        "python": [[p("1", title="Програмер Python"), p("2", title="Backend Engineer")]],
-        "go": [[p("3", title="Go Developer")]],
-    }), NOW)
-    with session_factory() as s:
-        set_job_status(s, job_id(session_factory, "2"), "applied", NOW)
-        set_job_status(s, job_id(session_factory, "3"), "hidden", NOW)
-
-        def ids(**kw):
-            return sorted(j.external_id for j in tracker_jobs(s, **kw)[0])
-
-        assert ids() == ["1", "2"]
-        assert ids(status="all") == ["1", "2", "3"]
-        assert ids(status="applied") == ["2"]
-        assert ids(status="hidden") == ["3"]
-        assert ids(listing_id=a) == ["1", "2"]
-        assert ids(q="програмер") == ["1"]
-        assert ids(q="ACME") == ["1", "2"]
-
-
-def test_tracker_pagination(session_factory):
-    add_listing(session_factory, "Python BG", keywords="python")
-    run_at(session_factory, FakeSource({"python": [[p(str(i)) for i in range(51)]]}), NOW)
-    with session_factory() as s:
-        jobs, total = tracker_jobs(s, page=2)
-    assert total == 51 and [j.external_id for j in jobs] == ["0"]
 
 
 def test_run_summary_and_listing_rows(session_factory):

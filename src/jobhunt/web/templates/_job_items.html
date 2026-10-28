@@ -1,2 +1,7 @@
-{% for job in jobs %}{% with is_last=loop.last %}{% include "_job_item.html" %}{% endwith %}{% endfor %}
+{% for job in jobs %}{% include "_job_item.html" %}{% endfor %}
+{% if next_url %}
+<li class="load-more" role="presentation" hx-get="{{ next_url }}" hx-trigger="intersect once" hx-swap="outerHTML">
+  <button class="btn small" type="button" hx-get="{{ next_url }}" hx-target="closest li" hx-swap="outerHTML">Load more</button>
+</li>
+{% endif %}
 {% if not jobs and not offset %}<li class="list-empty" role="presentation">{{ empty_message or "No jobs here" }}</li>{% endif %}

@@ -47,6 +47,8 @@ def _report(request: Request, day: date | None):
         request, "report.html", day=day, ran=day in dates, has_listings=has_listings, tabs=tabs, jobs=jobs,
         filters=f, unseen=unseen, unseen_n=unseen_n, options=options, pane=pane, selected_id=selected,
         empty_message=empty, offset=0, hide_hidden=True,
+        filter_action=f"/report/{day.isoformat()}" if day else "/", show_listing=False, show_sort=False, listings=[],
+        filter_hidden=[(k, v) for k, v in (("listing", f.listing_id), ("unseen", "1" if unseen else None)) if v],
         focus_url=f"/focus?{day_query}&{f.query()}".rstrip("&") if day else "",
         prev_day=max((d for d in dates if day and d < day), default=None),
         next_day=min((d for d in dates if day and d > day), default=None),

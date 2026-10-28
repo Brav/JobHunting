@@ -24,6 +24,10 @@
   <a class="chip{% if unseen %} on{% endif %}" href="/report/{{ day.isoformat() }}?{{ filters.query() }}{% if not unseen %}{{ '&' if filters.query() }}unseen=1{% endif %}">{{ unseen_n }} unseen</a>
   <a class="btn" href="{{ focus_url }}">{{ icon("zap") }} Focus mode {{ key("F") }}</a>
 </div>
+<details class="toolbar filters-collapsed"{% if filters.chips() %} open{% endif %}>
+  <summary>{{ icon("sliders-horizontal") }} Filters{% if filters.chips() %} · {{ filters.chips() | length }} on{% endif %}</summary>
+  {% include "_filter_bar.html" %}
+</details>
 <nav class="toolbar chips listing-tabs" aria-label="Listings">
   {% for tab in tabs %}
   {% set tab_id = tab.listing.id if tab.listing else none %}

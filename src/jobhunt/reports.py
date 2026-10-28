@@ -5,14 +5,10 @@ from dataclasses import dataclass
 from datetime import date
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import String, func
-from sqlmodel import Session, or_, select
+from sqlmodel import Session, select
 
 from jobhunt.models import Job, Listing, Match, Run, RunListing
 from jobhunt.timeutil import local_date, local_day_bounds_utc
-
-STATUS_FILTERS = ("default", "all", "new", "interested", "applied", "hidden")
-
 
 @dataclass
 class RunSummary:
@@ -82,29 +78,6 @@ def report_for_date(session: Session, day: date, tz: ZoneInfo) -> list[ReportSec
     return [ReportSection(listing=listing, jobs=sorted(jobs_by_listing[listing.id], key=_report_order),
                           error=latest[listing.id].error, found=latest[listing.id].found)
             for listing in listings]
-
-
-def tracker_jobs(session: Session, *, status: str = "default", listing_id: int | None = None,
-                 q: str = "", page: int = 1, per_page: int = 50) -> tuple[list[Job], int]:
-    if status not in STATUS_FILTERS:
-        raise ValueError(f"unknown status filter {status!r}")
-    query = select(Job)
-    if status == "default":
-        query = query.where(Job.status != "hidden")
-    elif status != "all":
-        query = query.where(Job.status == status)
-    if listing_id is not None:
-        query = query.where(Job.id.in_(select(Match.job_id).where(Match.listing_id == listing_id)))
-    needle = q.strip().lower()
-    if needle:
-        # py_lower is registered in db.make_engine; SQLite's own lower() ignores non-ASCII letters.
-        query = query.where(or_(*(func.py_lower(column, type_=String).contains(needle, autoescape=True)
-                                  for column in (Job.title, Job.title_en, Job.company))))
-    total = session.exec(select(func.count()).select_from(query.subquery())).one()
-    jobs = session.exec(
-        query.order_by(Job.first_seen_at.desc(), Job.id.desc()).offset((page - 1) * per_page).limit(per_page)
-    ).all()
-    return list(jobs), total
 
 
 def listing_rows(session: Session) -> list[ListingRow]:
