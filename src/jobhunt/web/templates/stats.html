@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Stats{% endblock %}
+{% set no_apps = "No applications yet — mark a job Applied to start tracking." %}
+{% block content %}
+<h1>Stats</h1>
+<section class="tiles" aria-label="Overview">
+  {% for t in tiles %}
+  <div class="tile"><span class="tile-label">{{ t.label }}</span><span class="tile-value">{{ t.total }}</span>
+    <span class="tile-delta">+{{ t.this_week }} this week</span></div>
+  {% endfor %}
+</section>
+
+<section class="stats-section" aria-labelledby="h-applications">
+  <h2 id="h-applications">Applications</h2>
+  {% if counts.all == 0 %}<p class="empty">{{ no_apps }}</p>
+  {% else %}
+  <nav class="chips" aria-label="Which applications">
+    {% for key, label in app_tabs %}
+    <a class="chip{% if which == key %} on{% endif %}"{% if which == key %} aria-current="true"{% endif %}
+       href="/stats{% if key != 'open' %}?apps={{ key }}{% endif %}"><span>{{ label }}</span> <span class="count">{{ counts[key] }}</span></a>
+    {% endfor %}
+  </nav>
+  {% if rows %}
+  <div class="table-scroll">
+    <table class="apps-table">
+      <thead><tr><th>Company</th><th>Job</th><th>Listing</th><th>Stage</th><th class="num">Since</th><th class="num">Waiting</th>
+        <th><span class="sr-only">Move to a stage</span></th></tr></thead>
+      <tbody>{% for row in rows %}{% include "_stats_app_row.html" %}{% endfor %}</tbody>
+    </table>
+  </div>
+  {% else %}<p class="empty">No {{ which }} applications.</p>{% endif %}
+  {% endif %}
+</section>
+
+<section class="stats-section" aria-labelledby="h-pipeline">
+  <h2 id="h-pipeline">Pipeline</h2>
+  {% if pipe.total == 0 %}<p class="empty">{{ no_apps }}</p>
+  {% else %}
+  <div class="pipeline">
+    <ol class="funnel">
+      {% for stage, n in pipe.reached %}
+      <li><span class="funnel-label">{{ stage_labels[stage] }}</span>
+        <span class="bar-track" aria-hidden="true"><span class="bar" style="width: {{ (100 * n / pipe.total) | round(1) }}%" title="{{ stage_labels[stage] }}: {{ n }}"></span></span>
+        <span class="num">{{ n }}</span></li>
+      {% endfor %}
+    </ol>
+    <dl class="facts">
+      {% for stage, n in pipe.ended %}<div><dt>{{ stage_labels[stage] }}</dt><dd>{{ n }}</dd></div>{% endfor %}
+      <div><dt>Reply rate</dt><dd>{{ "%d%%" % pipe.reply_rate if pipe.reply_rate is not none else "—" }}</dd></div>
+      <div><dt>Median days to first reply</dt><dd>{{ "%g" % pipe.median_reply_days if pipe.median_reply_days is not none else "—" }}</dd></div>
+    </dl>
+  </div>
+  {% endif %}
+</section>
+
+<section class="stats-section" aria-labelledby="h-activity">
+  <h2 id="h-activity">Activity</h2>
+  {% if quiet %}<p class="empty">Nothing in the last 12 weeks</p>
+  {% else %}
+  <div class="table-scroll">
+    <table class="activity-table">
+      <thead><tr><th>Week of</th>{% for key, label in columns %}<th class="num">{{ label }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for w in weeks %}
+        <tr><td>{{ w.start.strftime("%-d %b") }}</td>
+          {% for key, label in columns %}{% set n = w[key] %}
+          <td class="num"><span class="cell-bar"><span class="bar-track" aria-hidden="true"><span class="bar" style="width: {{ (100 * n / week_max[key]) | round(1) if week_max[key] else 0 }}%" title="{{ label }}: {{ n }}"></span></span>{{ n }}</span></td>
+          {% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+
+<section class="stats-section" aria-labelledby="h-breakdowns">
+  <h2 id="h-breakdowns">Breakdowns</h2>
+  {% if pipe.total == 0 %}<p class="empty">{{ no_apps }}</p>
+  {% else %}
+  <div class="breakdowns">
+    {% for name, table_rows in breakdowns.items() %}
+    <div class="table-scroll">
+      <table>
+        <caption>By {{ name | lower }}</caption>
+        <thead><tr><th>{{ name }}</th><th class="num">Applied</th><th class="num">Replied</th><th class="num">Interviews</th><th class="num">Offers</th></tr></thead>
+        <tbody>{% for r in table_rows %}<tr><td>{{ r.label }}</td><td class="num">{{ r.applied }}</td><td class="num">{{ r.replied }}</td>
+          <td class="num">{{ r.interviews }}</td><td class="num">{{ r.offers }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

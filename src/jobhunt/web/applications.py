@@ -6,11 +6,21 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from jobhunt.applications import StepError, add_step, delete_step
+from jobhunt.stats import application_row, load_application
 from jobhunt.timeutil import local_date, utcnow
-from jobhunt.web.common import session
+from jobhunt.web.common import render, session
 from jobhunt.web.job import pane_response
 
 router = APIRouter()
+
+
+def _row_response(request: Request, job_id: int, step_error: str = "", status_code: int = 200):
+    """The job's row on the Stats page's applications table."""
+    with session(request) as s:
+        app = load_application(s, job_id)
+    today = local_date(utcnow(), request.app.state.settings.tz)
+    return render(request, "_stats_app_row.html", status_code=status_code, job_id=job_id, step_error=step_error,
+                  row=application_row(app, today) if app else None)
 
 
 @router.post("/jobs/{job_id}/steps", response_class=HTMLResponse)
@@ -27,8 +37,10 @@ def add_application_step(request: Request, job_id: int, stage: str = Form(""), o
     except LookupError:
         raise HTTPException(status_code=404, detail="Job not found")
     except StepError as e:
+        if view == "stats-row":
+            return _row_response(request, job_id, str(e), 422)
         return pane_response(request, job_id, step_error=str(e), status_code=422)
-    return pane_response(request, job_id)
+    return _row_response(request, job_id) if view == "stats-row" else pane_response(request, job_id)
 
 
 @router.post("/jobs/{job_id}/steps/{step_id}/delete", response_class=HTMLResponse)

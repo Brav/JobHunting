@@ -1,0 +1,22 @@
+{% from "_macros.html" import icon %}
+{# Needs: row (AppRow, or None once the job is no longer applied), job_id, step_error #}
+{% if row %}{% set job = row.app.job %}
+<tr id="app-row-{{ job.id }}">
+  <td>{{ job.company }}</td>
+  <td><a href="/jobs/{{ job.id }}">{{ job.title_en or job.title }}</a>
+    {%- if step_error %}<span class="error row-error" role="alert">{{ step_error }}</span>{% endif %}</td>
+  <td class="muted">{{ row.app.listings | join(", ") or "—" }}</td>
+  <td>{% if job.stage %}<span class="tag {{ job.stage | stage_kind }}">{{ stage_labels[job.stage] }}</span>{% else %}<span class="tag status-applied">Applied</span>{% endif %}</td>
+  <td class="num">{{ row.app.latest_on.isoformat() if row.app.latest_on else "—" }}</td>
+  <td class="num">{% if row.waiting is none %}—{% elif row.stale %}<span class="stale">{{ icon("triangle-alert") }} no change for {{ row.waiting }} days</span>
+    {%- elif row.waiting == 0 %}today{% elif row.waiting == 1 %}1 day{% else %}{{ row.waiting }} days{% endif %}</td>
+  <td><select name="stage" aria-label="Move {{ job.title_en or job.title }} to a stage" hx-post="/jobs/{{ job.id }}/steps"
+              hx-trigger="change" hx-vals='{"view": "stats-row", "on_date": "{{ today.isoformat() }}"}'
+              hx-target="closest tr" hx-swap="outerHTML">
+      <option value="" selected>Move to…</option>
+      {% for s in stages %}<option value="{{ s }}">{{ stage_labels[s] }}</option>{% endfor %}
+    </select></td>
+</tr>
+{% else %}
+<tr id="app-row-{{ job_id }}"><td colspan="7" class="error" role="alert">{{ step_error }}</td></tr>
+{% endif %}
