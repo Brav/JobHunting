@@ -13,10 +13,12 @@ from sqlalchemy import func
 from sqlmodel import Session, or_, select
 
 from jobhunt.config import Settings
+from jobhunt.enrich import BLOCK_BACKOFF, ENRICH_EVERY_MINUTES, EnrichResult, enrich_pending, first_of_next_month
 from jobhunt.models import Run
 from jobhunt.runner import run_daily
-from jobhunt.sources.base import JobSource
+from jobhunt.sources.base import JobPage, JobSource
 from jobhunt.timeutil import local_date, local_to_utc, utcnow
+from jobhunt.translate import Translator
 
 logger = logging.getLogger(__name__)
 
@@ -53,13 +55,19 @@ def latest_run_started(session: Session) -> datetime | None:
 
 class RunCoordinator:
     def __init__(self, session_factory: Callable[[], Session], source: JobSource, settings: Settings, *,
-                 clock: Callable[[], datetime] = utcnow, sleep: Callable[[float], None] = _time.sleep):
+                 clock: Callable[[], datetime] = utcnow, sleep: Callable[[float], None] = _time.sleep,
+                 fetch_page: Callable[[str], JobPage] | None = None, translator: Translator | None = None):
         self.session_factory = session_factory
         self.source = source
         self.settings = settings
         self.clock = clock
         self.sleep = sleep
+        self.fetch_page = fetch_page
+        self.translator = translator
         self._lock = threading.Lock()
+        self._enrich_lock = threading.Lock()
+        self._blocked_until: datetime | None = None
+        self._titles_paused_until: datetime | None = None
         self._scheduler: BackgroundScheduler | None = None
 
     @property
@@ -102,6 +110,32 @@ class RunCoordinator:
         logger.info("a scheduled run was missed; catching up now")
         return self.trigger("catch_up")
 
+    def enrich_if_idle(self) -> EnrichResult | None:
+        """One background pass, unless disabled, a search or another pass is running, or LinkedIn blocked us."""
+        if self.fetch_page is None or self.is_running:
+            return None
+        if not self._enrich_lock.acquire(blocking=False):
+            return None
+        try:
+            now = self.clock()
+            if self._blocked_until is not None and now < self._blocked_until:
+                return None
+            titles = self._titles_paused_until is None or now >= self._titles_paused_until
+            result = enrich_pending(self.session_factory, self.fetch_page, self.translator,
+                                    should_stop=lambda: self.is_running, translate_titles=titles,
+                                    clock=self.clock, sleep=self.sleep)
+            if result.blocked:
+                self._blocked_until = self.clock() + BLOCK_BACKOFF
+            if result.quota_exceeded:
+                self._titles_paused_until = first_of_next_month(self.clock())
+            if result.downloaded or result.failed or result.blocked or result.titles or result.quota_exceeded:
+                logger.info("enrichment: downloaded %d, failed %d, titles translated %d%s%s", result.downloaded,
+                            result.failed, result.titles, ", blocked by LinkedIn" if result.blocked else "",
+                            ", DeepL limit reached" if result.quota_exceeded else "")
+            return result
+        finally:
+            self._enrich_lock.release()
+
     def start(self) -> None:
         s = self.settings
         hours = run_hours(s.run_at, s.run_every_hours)
@@ -111,6 +145,9 @@ class RunCoordinator:
                                 args=["scheduled"], id="scheduled", coalesce=True, misfire_grace_time=3600)
         self._scheduler.add_job(self.catch_up_if_needed, "interval", minutes=CATCH_UP_CHECK_MINUTES,
                                 id="catch_up_check", coalesce=True)
+        if self.fetch_page is not None:
+            self._scheduler.add_job(self.enrich_if_idle, "interval", minutes=ENRICH_EVERY_MINUTES, id="enrich",
+                                    coalesce=True, max_instances=1, next_run_time=datetime.now(s.tz))
         self._scheduler.start()
         logger.info("scheduler started; runs at %s %s",
                     ", ".join(f"{h:02d}:{s.run_at.minute:02d}" for h in hours), s.tz.key)
