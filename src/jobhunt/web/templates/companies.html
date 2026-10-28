@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Companies{% endblock %}
+{% block content %}
+<h1>Companies</h1>
+<form class="inline-form" method="get" action="/companies">
+  <input type="search" name="q" value="{{ q }}" placeholder="Company" aria-label="Find a company">
+  <button class="btn small" type="submit">Find</button>
+</form>
+{% if rows %}
+<div class="table-scroll"><table>
+  <thead><tr><th>Company</th><th class="num">Jobs found</th><th class="num">Applied</th><th></th></tr></thead>
+  <tbody>{% for key, name, total, applied, blocked in rows %}
+    <tr><td><a href="/companies/{{ key | urlencode }}">{{ name }}</a></td><td class="num">{{ total }}</td>
+      <td class="num">{{ applied or "" }}</td><td>{% if blocked %}<span class="tag status-hidden">Blocked</span>{% endif %}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% else %}<p class="empty">No companies{{ " match" if q }} yet.</p>{% endif %}
+{% endblock %}

@@ -22,6 +22,7 @@
       <a href="/jobs"{% if active == "jobs" %} aria-current="page"{% endif %}>All jobs</a>
       <a href="/listings"{% if active == "listings" %} aria-current="page"{% endif %}>Listings</a>
       <a href="/stats"{% if active == "stats" %} aria-current="page"{% endif %}>Stats</a>
+      <a href="/companies"{% if active == "companies" %} aria-current="page"{% endif %}>Companies</a>
     </nav>
     {% include "_status_bar.html" %}
     <div class="theme-switch" role="radiogroup" aria-label="Theme" x-data="themeSwitch">

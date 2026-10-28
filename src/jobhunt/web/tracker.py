@@ -62,8 +62,8 @@ def all_jobs(request: Request):
     )
 
 
-@router.get("/companies", response_class=HTMLResponse)
-def companies(request: Request, company: str = "", q: str = ""):
+@router.get("/companies/suggest", response_class=HTMLResponse)
+def company_suggestions(request: Request, company: str = "", q: str = ""):
     with session(request) as s:
         names = company_names(s, company or q)
     return render(request, "_company_options.html", names=names)

@@ -39,7 +39,7 @@
     {% for value in options.employment_types %}<option{% if filters.employment_type == value %} selected{% endif %}>{{ value }}</option>{% endfor %}
   </select>
   <input name="company" value="{{ filters.company }}" placeholder="Company" aria-label="Company" list="companies" autocomplete="off"
-         hx-get="/companies" hx-trigger="focus once, keyup changed delay:300ms" hx-target="#companies" hx-swap="innerHTML">
+         hx-get="/companies/suggest" hx-trigger="focus once, keyup changed delay:300ms" hx-target="#companies" hx-swap="innerHTML">
   <datalist id="companies"></datalist>
   {% for name, label in [("found_within", "Found"), ("posted_within", "Posted")] %}
   <select name="{{ name }}" aria-label="{{ label }} within">

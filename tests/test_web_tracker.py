@@ -78,7 +78,7 @@ def test_company_suggestions_escaped(app_factory):
     app = app_factory()
     seed(app, [p("1", company="A&B <Ltd>"), p("2", company="Beta")])
     with TestClient(app) as c:
-        options = c.get("/companies", params={"company": "a&b"}).text
+        options = c.get("/companies/suggest", params={"company": "a&b"}).text
     assert '<option value="A&amp;B &lt;Ltd&gt;">' in options and "Beta" not in options
 
 

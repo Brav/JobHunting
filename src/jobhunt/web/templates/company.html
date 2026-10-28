@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ company_name }}{% endblock %}
+{% block content %}
+<p><a href="/companies">‹ Companies</a></p>
+<h1>{{ company_name }}</h1>
+<p class="muted">{{ jobs | length }} job{{ "s" if jobs | length != 1 }} found{% if reposts %} · reposted {{ reposts }}× in total{% endif %} · seen in {{ sightings }} search result{{ "s" if sightings != 1 }}{% if outcome %} · <strong>{{ outcome }}</strong>{% endif %}</p>
+<div class="actions-row">
+  <form method="post" action="/blocks/companies{{ '/remove' if is_blocked }}"><input type="hidden" name="name" value="{{ company_name }}">
+    <input type="hidden" name="next" value="/companies/{{ key | urlencode }}">
+    <button class="btn" type="submit">{{ "Unblock company" if is_blocked else "Block company" }}</button></form>
+  {% for label, url in links %}<a class="btn ghost" href="{{ url }}" target="_blank" rel="noopener noreferrer">{{ label }} ↗</a>{% endfor %}
+</div>
+{% block company_extra %}{% endblock %}
+<h2>Jobs</h2>
+<div class="table-scroll"><table>
+  <thead><tr><th>Job</th><th>Status</th><th>Eligibility</th><th>Found</th></tr></thead>
+  <tbody>{% for job in jobs %}{% set tags = job | tags %}
+    <tr><td><a href="/jobs/{{ job.id }}">{{ job.title_en or job.title }}</a>{% if job.reposts %} <span class="muted small">↻{{ job.reposts }}</span>{% endif %}</td>
+      <td>{% if job.status == "applied" and job.stage %}<span class="tag {{ job.stage | stage_kind }}">{{ stage_labels[job.stage] }}</span>{% else %}{{ status_labels[job.status] }}{% endif %}</td>
+      <td><span class="tag {{ tags[0][1] }}">{{ tags[0][0] }}</span></td>
+      <td class="num">{{ job.first_seen_at | local_dt(tz) }}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

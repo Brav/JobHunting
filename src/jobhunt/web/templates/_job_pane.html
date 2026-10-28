@@ -5,7 +5,7 @@
   <h1 id="pane-title-{{ job.id }}" class="pane-title">{{ job.title_en or job.title }}
     {% if job.language and job.language != "en" %}<span class="tag lang">{{ job.language | language_name }}</span>{% endif %}</h1>
   {% if job.title_en and job.title_en != job.title %}<p class="muted small">Original title: {{ job.title }}</p>{% endif %}
-  <p class="pane-meta">{{ job.company }}{% if job.location %} · {{ job.location }}{% endif %}
+  <p class="pane-meta"><a href="/companies/{{ company_key(job.company) | urlencode }}">{{ job.company }}</a>{% if job.location %} · {{ job.location }}{% endif %}
     · {{ age(job)[1] | lower }}{% if pane.found_by %} · found by {{ pane.found_by | join(", ") }}{% endif %}</p>
   {% if pane.signals.line %}<p class="pane-signals muted small">{{ pane.signals.line[:1] | upper }}{{ pane.signals.line[1:] }}</p>{% endif %}
   {% if pane.signals.closed_at %}<p class="notice error-notice">No longer accepting applications (seen {{ pane.signals.closed_at | local_dt(tz) }})</p>{% endif %}
