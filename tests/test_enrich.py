@@ -111,3 +111,20 @@ def test_title_count_excludes_failures(session_factory):
     result, _ = run(session_factory, Pages(texts={"1": GERMAN}),
                     FakeTranslator(fail=TranslationError("DeepL can't translate German")))
     assert result.titles == 0
+
+
+def test_stops_when_a_search_starts_during_the_pause(session_factory):
+    seed(session_factory, 3)
+    pages, search = Pages(), []
+    result, _ = run(session_factory, pages, should_stop=lambda: bool(search), sleep=lambda s: search.append(1))
+    assert pages.calls == ["3"] and result.downloaded == 1
+
+
+def test_an_unexpected_error_is_stored_and_the_pass_goes_on(session_factory):
+    seed(session_factory, 2)
+    pages = Pages(fail={"2": ValueError("unexpected markup")})
+    result, _ = run(session_factory, pages)
+    assert pages.calls == ["2", "1"] and (result.failed, result.downloaded) == (1, 1)
+    with session_factory() as s:
+        errors = {j.external_id: j.description_error for j in s.exec(select(Job))}
+    assert errors == {"1": None, "2": "ValueError: unexpected markup"}

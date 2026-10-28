@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from sqlalchemy import update
 from sqlmodel import select
 
 from jobhunt.job_listing import download_listing, translate_title
@@ -52,6 +53,8 @@ def enrich_pending(session_factory, fetch_page: Callable[[str], JobPage], transl
             break
         if i:
             sleep(rng.uniform(*ENRICH_PAUSE_SECONDS))
+            if should_stop():
+                break  # a search started during the pause
         try:
             download_listing(session_factory, job_id, fetch_page, clock())
         except SourceBlocked:
@@ -60,6 +63,14 @@ def enrich_pending(session_factory, fetch_page: Callable[[str], JobPage], transl
         except SourceUnavailable:
             break  # network or LinkedIn trouble: the next pass tries again
         except SourceError:
+            result.failed += 1
+            continue
+        except Exception as e:
+            # A bug or an odd page: remember it on this job (not retried) rather than end the whole pass.
+            logger.exception("downloading job %d failed", job_id)
+            with session_factory() as s:
+                s.exec(update(Job).where(Job.id == job_id).values(description_error=f"{type(e).__name__}: {e}"))
+                s.commit()
             result.failed += 1
             continue
         result.downloaded += 1
