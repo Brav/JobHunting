@@ -163,3 +163,23 @@ def test_feed_failures_are_kept_and_shown(app_factory):
         with sf() as s:
             assert load_feed_errors(s) == {}
         assert "Remote OK isn't answering" not in c.get("/").text
+
+
+def test_source_filter_and_page(app_factory):
+    from fastapi.testclient import TestClient
+
+    from jobhunt.filters import JobFilters, filtered_jobs
+    from jobhunt.timeutil import utcnow
+    app = app_factory()
+    with TestClient(app) as c:
+        sf = app.state.session_factory
+        with sf() as s:
+            s.add(Job(external_id="1", source=None, title="Old LinkedIn job", company="A", location="", url="u"))
+            s.add(Job(external_id="remoteok:2", source="remoteok", title="Feed job", company="B", location="", url="u"))
+            s.commit()
+            titles = lambda f: sorted(j.title for j in filtered_jobs(s, f, utcnow())[0])
+            assert titles(JobFilters(source="remoteok", blocked="show", eligibility=("check",))) == ["Feed job"]
+            assert titles(JobFilters(source="linkedin", blocked="show", eligibility=("check",))) == ["Old LinkedIn job"]
+        page = c.get("/jobs?source=remoteok&eligibility=check").text
+        assert '<option value="remoteok" selected>Remote OK</option>' in page and "Source: Remote OK" in page
+        assert "Old LinkedIn job" not in page and "Feed job" in page

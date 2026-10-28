@@ -11,9 +11,12 @@ from sqlmodel import Session, select
 from jobhunt.eligibility import VERDICT_LABELS, VERDICTS
 from jobhunt.language import language_name
 from jobhunt.signals import LIKELY_GHOST
+from jobhunt.sources.feeds import SOURCE_LABELS
 from jobhunt.models import Job, Listing, Match, Run, RunListing
 from jobhunt.timeutil import local_day_bounds_utc
 from jobhunt.workplace import WORKPLACES
+
+SOURCE_CHOICES = {**SOURCE_LABELS, "capture": "Added by you"}
 
 TABS = ("active", "undecided", "saved", "applied", "hidden", "all")
 SORTS = ("found", "posted", "company", "best")
@@ -58,6 +61,7 @@ class JobFilters:
     seniority: str = ""
     employment_type: str = ""
     company: str = ""
+    source: str = ""  # jobhunt.sources.feeds.SOURCE_LABELS key; "linkedin" includes older rows without one
     found_within: str = ""
     posted_within: str = ""
     q: str = ""
@@ -80,7 +84,7 @@ class JobFilters:
             has_salary="yes" if get("has_salary") == "yes" else "",
             salary_from=get("salary_from") if get("salary_from").isdecimal() and len(get("salary_from")) <= 4 else "",
             language=get("language"), seniority=get("seniority"), employment_type=get("employment_type"),
-            company=get("company"),
+            company=get("company"), source=get("source") if get("source") in SOURCE_CHOICES else "",
             found_within=get("found_within") if get("found_within") in WITHIN else "",
             posted_within=get("posted_within") if get("posted_within") in WITHIN else "",
             q=get("q"), sort=get("sort") if get("sort") in SORTS else "found",
@@ -120,6 +124,8 @@ class JobFilters:
                 chips.append((getattr(self, name), self.query(**{name: ""})))
         if self.company:
             chips.append((f"Company: {self.company}", self.query(company="")))
+        if self.source:
+            chips.append((f"Source: {SOURCE_CHOICES[self.source]}", self.query(source="")))
         if self.found_within:
             chips.append((f"Found: {WITHIN_LABELS[self.found_within]}", self.query(found_within="")))
         if self.posted_within:
@@ -160,6 +166,9 @@ def apply_filters(stmt, f: JobFilters, now: datetime, *, include_tab: bool = Tru
         stmt = stmt.where(Job.seniority == f.seniority)
     if f.employment_type:
         stmt = stmt.where(Job.employment_type == f.employment_type)
+    if f.source:
+        stmt = stmt.where(or_(Job.source == "linkedin", Job.source.is_(None)) if f.source == "linkedin"
+                          else Job.source == f.source)
     if f.company:
         stmt = stmt.where(_lower(Job.company).contains(f.company.lower(), autoescape=True))
     if f.found_within:
@@ -243,6 +252,7 @@ class FilterOptions:
     languages: list[str]
     seniorities: list[str]
     employment_types: list[str]
+    sources: list[tuple[str, str]]  # (value, label) of the sources the jobs came from
 
 
 def filter_options(session: Session) -> FilterOptions:
@@ -251,7 +261,9 @@ def filter_options(session: Session) -> FilterOptions:
 
     return FilterOptions(languages=sorted(distinct(Job.language), key=language_name),
                          seniorities=sorted(distinct(Job.seniority)),
-                         employment_types=sorted(distinct(Job.employment_type)))
+                         employment_types=sorted(distinct(Job.employment_type)),
+                         sources=[(value, label) for value, label in SOURCE_CHOICES.items()
+                                  if value in {s or "linkedin" for s in session.exec(select(Job.source).distinct())}])
 
 
 def company_names(session: Session, q: str, limit: int = 20) -> list[str]:

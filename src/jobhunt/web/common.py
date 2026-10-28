@@ -69,10 +69,12 @@ STATUS_LABELS = {"new": "New", "interested": "Saved", "applied": "Applied", "hid
 
 
 def job_tags(job) -> list[tuple[str, str]]:
-    """Up to three (label, kind) tags for a job row: eligibility, workplace, then the status (or stage) once
-    decided, else the language; seniority when there is room."""
+    """Up to three (label, kind) tags for a job row: eligibility, Closed for a saved or applied job no longer taking
+    applications, workplace, then the status (or stage) once decided, else the language; seniority when there is room."""
     verdict = effective(job)
     tags = [(f"{VERDICT_SYMBOLS[verdict]} {VERDICT_LABELS[verdict]}", f"elig-{verdict}")]
+    if job.closed_at and job.status != "new":
+        tags.append(("Closed", "stage-closed"))  # a saved job that no longer takes applications
     if job.workplace in WORKPLACE_LABELS:
         tags.append((WORKPLACE_LABELS[job.workplace], ""))
     if job.status == "applied" and job.stage:

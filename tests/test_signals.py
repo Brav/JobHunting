@@ -106,3 +106,11 @@ def test_closed_check(session_factory):
     assert asked == ["1"]
     with sf() as s:
         assert s.exec(select(Job.closed_at).where(Job.external_id == "1")).one() == NOW
+
+
+def test_closed_tag_on_saved_rows():
+    from jobhunt.web.common import job_tags
+
+    saved = job(status="interested", closed_at=NOW, eligibility="eligible")
+    assert ("Closed", "stage-closed") in job_tags(saved)
+    assert ("Closed", "stage-closed") not in job_tags(job(status="interested", eligibility="eligible"))

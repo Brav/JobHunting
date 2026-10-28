@@ -34,6 +34,10 @@
     <option value="">Any seniority</option>
     {% for value in options.seniorities %}<option{% if filters.seniority == value %} selected{% endif %}>{{ value }}</option>{% endfor %}
   </select>
+  {% if options.sources | length > 1 or filters.source %}<select name="source" aria-label="Source">
+    <option value="">Any source</option>
+    {% for value, label in options.sources %}<option value="{{ value }}"{% if filters.source == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>{% endif %}
   <select name="employment_type" aria-label="Employment type">
     <option value="">Any type</option>
     {% for value in options.employment_types %}<option{% if filters.employment_type == value %} selected{% endif %}>{{ value }}</option>{% endfor %}
