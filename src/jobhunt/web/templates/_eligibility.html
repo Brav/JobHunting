@@ -1,0 +1,24 @@
+{# Needs: pane (job, eligibility: verdict, override, reasons) #}
+{% set e = pane.eligibility %}
+<section id="eligibility-{{ pane.job.id }}" class="eligibility" aria-label="Eligibility">
+  {% set first = e.reasons[0] if e.reasons and not e.override else none %}
+  <p class="eligibility-verdict"><span class="muted">Eligibility:</span>
+    <span class="tag elig-{{ e.verdict }}">{{ verdict_symbols[e.verdict] }} {{ verdict_labels[e.verdict] }}</span>
+    {% if e.override %}<span class="muted small">set by you</span>{% elif first %}{{ first.text }}{% endif %}</p>
+  {% if first and first.quote and first.quote != pane.job.location %}<p class="eligibility-quote"><q>{{ first.quote }}</q></p>{% endif %}
+  {% set rest = e.reasons if e.override else e.reasons[1:] %}
+  {% if rest %}
+  <ul class="eligibility-reasons">
+    {% for r in rest %}<li>{{ r.text }}{% if r.quote and r.quote != pane.job.location %} <q>{{ r.quote }}</q>{% endif %}</li>{% endfor %}
+  </ul>
+  {% endif %}
+  <div class="eligibility-override" role="group" aria-label="Correct the eligibility">
+    <span class="muted small">Not right?</span>
+    {% for value, label in [("eligible", "Eligible"), ("relocate", "Relocate"), ("not_eligible", "Not eligible"), ("auto", "Back to automatic")] %}
+    {% if value != "auto" or e.override %}
+    <button class="btn ghost small" type="button" hx-post="/jobs/{{ pane.job.id }}/eligibility" hx-vals='{"value": "{{ value }}"}'
+            hx-target="#job-pane" hx-swap="innerHTML" aria-pressed="{{ 'true' if e.override == value else 'false' }}">{{ label }}</button>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>

@@ -11,7 +11,7 @@ from markupsafe import Markup
 from sqlmodel import Session
 
 from jobhunt.applications import STAGE_LABELS, STAGES, stage_kind
-from jobhunt.eligibility import VERDICT_LABELS, VERDICT_SYMBOLS, VERDICTS
+from jobhunt.eligibility import VERDICT_LABELS, VERDICT_SYMBOLS, VERDICTS, effective
 from jobhunt.language import language_name
 from jobhunt.reports import run_summary
 from jobhunt.timeutil import local_date, to_local, utcnow
@@ -57,17 +57,19 @@ STATUS_LABELS = {"new": "New", "interested": "Saved", "applied": "Applied", "hid
 
 
 def job_tags(job) -> list[tuple[str, str]]:
-    """Up to three (label, kind) tags for a job row: workplace, language, then seniority or the status."""
-    tags = []
+    """Up to three (label, kind) tags for a job row: eligibility, workplace, then the status (or stage) once
+    decided, else the language; seniority when there is room."""
+    verdict = effective(job)
+    tags = [(f"{VERDICT_SYMBOLS[verdict]} {VERDICT_LABELS[verdict]}", f"elig-{verdict}")]
     if job.workplace in WORKPLACE_LABELS:
         tags.append((WORKPLACE_LABELS[job.workplace], ""))
-    if job.language and job.language != "en":
-        tags.append((language_name(job.language), "lang"))
     if job.status == "applied" and job.stage:
         tags.append((STAGE_LABELS[job.stage], stage_kind(job.stage)))
     elif job.status != "new":
         tags.append((STATUS_LABELS[job.status], f"status-{job.status}"))
-    elif job.seniority:
+    elif job.language and job.language != "en":
+        tags.append((language_name(job.language), "lang"))
+    if job.status == "new" and job.seniority:
         tags.append((job.seniority, ""))
     return tags[:3]
 

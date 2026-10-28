@@ -10,6 +10,7 @@ from sqlmodel import select
 
 from jobhunt.actions import mark_seen
 from jobhunt.applications import next_stage, steps_for
+from jobhunt.eligibility import effective
 from jobhunt.job_listing import download_listing, translate_description, translate_title
 from jobhunt.models import Job, Listing, Match
 from jobhunt.sources.base import SourceBlocked, SourceError
@@ -64,7 +65,9 @@ def prepare_job(request: Request, job_id: int, error: str = "", fetch: bool = Tr
     return {"job": job, "details": json.loads(job.details) if job.details else [], "download_error": download_error,
             "translation_error": (reason or job.translation_error) if untranslated else None,
             "found_by": found_by, "standalone": False, "steps": steps, "stage_default": next_stage(job.stage),
-            "step_error": ""}
+            "step_error": "", "eligibility": {
+                "verdict": effective(job), "override": job.eligibility_override,
+                "reasons": json.loads(job.eligibility_reasons) if job.eligibility_reasons else []}}
 
 
 def pane_response(request: Request, job_id: int, *, step_error: str = "", status_code: int = 200):

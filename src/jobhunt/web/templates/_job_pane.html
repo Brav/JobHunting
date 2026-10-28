@@ -7,6 +7,7 @@
   {% if job.title_en and job.title_en != job.title %}<p class="muted small">Original title: {{ job.title }}</p>{% endif %}
   <p class="pane-meta">{{ job.company }}{% if job.location %} · {{ job.location }}{% endif %}
     · {{ age(job)[1] | lower }}{% if pane.found_by %} · found by {{ pane.found_by | join(", ") }}{% endif %}</p>
+  {% include "_eligibility.html" %}
   {% if not pane.focus %}
   <div class="pane-actions" role="group" aria-label="Decide on this job">
     {% for status, action, label, done, icon_name, k in [
