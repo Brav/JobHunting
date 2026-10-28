@@ -1,0 +1,19 @@
+<div id="status-bar" class="status-bar{% if running %} running{% endif %}"
+     {% if running %}hx-get="/runs/status" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
+  <div class="status-text">
+    {% if running %}
+      <strong>Running…</strong>
+    {% elif summary.run is none %}
+      No runs yet.
+    {% elif summary.run.status == "failed" and summary.run.error %}
+      <span class="error">Run failed: {{ summary.run.error }}</span>
+    {% else %}
+      {{ summary.run.started_at | when(tz, today) }} ({{ summary.run.trigger }}) — {{ summary.ok }} of {{ summary.total }} listings OK
+      {% for name, error in summary.failures %}<span class="error"> · '{{ name }}' failed: {{ error }}</span>{% endfor %}
+    {% endif %}
+  </div>
+  <div class="status-actions">
+    <span class="muted">Next run: {{ next_run.strftime("%Y-%m-%d %H:%M") if next_run else "—" }}</span>
+    <button hx-post="/runs" hx-target="#status-bar" hx-swap="outerHTML" {% if running %}disabled{% endif %}>Run now</button>
+  </div>
+</div>
