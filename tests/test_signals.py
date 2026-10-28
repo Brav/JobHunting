@@ -33,6 +33,22 @@ def test_one_sighting_per_job_per_run(session_factory):
     assert len(rows) == 2 and rows[1].posted_at == date(2026, 10, 30)
 
 
+def test_the_same_job_on_other_boards_is_not_a_repost(session_factory):
+    from dataclasses import replace
+
+    sf = session_factory
+    add_listing(sf, "A", keywords="python")
+    linkedin = p("1", title="Backend Developer", posted_at=date(2026, 10, 27))
+    remoteok = replace(p("remoteok:9", title="Backend Developer", posted_at=date(2026, 10, 28)), source="remoteok")
+    himalayas = replace(p("himalayas:5", title="Backend Developer", posted_at=date(2026, 10, 29)), source="himalayas")
+    run(sf, [linkedin], NOW)
+    run(sf, [remoteok], NOW + timedelta(days=1))
+    run(sf, [himalayas], NOW + timedelta(days=2))
+    with sf() as s:
+        (found,) = s.exec(select(Job)).all()
+    assert (found.reposts, found.ghost_risk) == (0, 0)
+
+
 def sight(days_ago, posted, external_id="1"):
     return Sighting(job_id=1, seen_at=NOW - timedelta(days=days_ago), external_id=external_id, posted_at=posted)
 

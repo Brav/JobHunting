@@ -115,7 +115,8 @@ def record_results(session: Session, run_id: int, listing_id: int,
         if job.id in matched:
             continue  # two postings resolved to the same job
         matched.add(job.id)
-        record_sighting(session, job, posting.external_id, posting.posted_at, now)
+        if posting.source == (job.source or "linkedin"):  # the same job on another board isn't a repost
+            record_sighting(session, job, posting.external_id, posting.posted_at, now)
         checks.refresh(session, job, ctx)  # its title, location or texts may have changed
         session.add(Match(run_id=run_id, listing_id=listing_id, job_id=job.id, is_new=is_new))
         new += is_new
