@@ -23,7 +23,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
                fetch_page: Callable[[str], JobPage] | None = None, translator: Translator | None = None,
                start_scheduler: bool = True, sleep: Callable[[float], None] = time.sleep) -> FastAPI:
     engine = make_engine(settings.db_path)
-    init_db(engine)
+    init_db(engine, settings.tz)
     session_factory = make_session_factory(engine)
     if source is None:
         from jobhunt.sources.linkedin import LinkedInSource

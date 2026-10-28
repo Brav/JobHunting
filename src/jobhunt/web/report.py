@@ -84,7 +84,7 @@ def change_status(request: Request, job_id: int, status: str = Form("")):
             raise HTTPException(status_code=404, detail="Job not found")
         previous = current.status
         try:
-            job = set_job_status(s, job_id, status, utcnow())
+            job = set_job_status(s, job_id, status, utcnow(), request.app.state.settings.tz)
         except ValueError:
             raise HTTPException(status_code=400, detail="Unknown status")
     standalone = request.headers.get("HX-Current-URL", "").rstrip("/").endswith(f"/jobs/{job_id}")

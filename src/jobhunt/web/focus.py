@@ -73,7 +73,7 @@ def focus_act(request: Request, job_id: int = Form(...), action: str = Form(...)
         if s.get(Job, job_id) is None:
             raise HTTPException(status_code=404, detail="Job not found")
         if ACTIONS[action]:
-            set_job_status(s, job_id, ACTIONS[action], utcnow())
+            set_job_status(s, job_id, ACTIONS[action], utcnow(), request.app.state.settings.tz)
     mark_seen(request.app.state.session_factory, job_id, utcnow())
     counters = {"n_saved": _number(n_saved), "n_applied": _number(n_applied), "n_hidden": _number(n_hidden),
                 "n_later": _number(n_later)}

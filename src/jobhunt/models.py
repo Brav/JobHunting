@@ -52,6 +52,7 @@ class Job(SQLModel, table=True):
     seniority: str | None = Field(default=None, index=True)  # from LinkedIn's details box
     employment_type: str | None = Field(default=None, index=True)
     seen_at: NaiveDatetime | None = None  # first time it was shown in a detail pane or focus mode
+    stage: str | None = Field(default=None, index=True)  # current application stage; None unless applied
 
 
 class Run(SQLModel, table=True):
@@ -83,3 +84,16 @@ class Match(SQLModel, table=True):
     listing_id: int = Field(foreign_key="listings.id", primary_key=True)
     job_id: int = Field(foreign_key="jobs.id", primary_key=True, index=True)
     is_new: bool
+
+
+class ApplicationStep(SQLModel, table=True):
+    """One dated stage of an application (jobhunt.applications); jobs with steps are never deleted."""
+
+    __tablename__ = "application_steps"
+
+    id: int | None = Field(default=None, primary_key=True)
+    job_id: int = Field(foreign_key="jobs.id", index=True)
+    stage: str
+    on_date: date
+    note: str = ""
+    created_at: NaiveDatetime = Field(default_factory=utcnow)
