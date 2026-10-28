@@ -103,3 +103,17 @@ def make_pdf(rows: list[tuple[float, float, str]]) -> bytes:
     out += b"".join(b"%010d 00000 n \n" % offset for offset in offsets)
     out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objects) + 1, xref)
     return bytes(out)
+
+
+class FakeTranslator:
+    """Prefixes "EN:" instead of translating; raises `fail` when given."""
+
+    def __init__(self, fail: Exception | None = None):
+        self.fail = fail
+        self.calls: list[tuple[str, str]] = []
+
+    def translate(self, text: str, language: str) -> str:
+        self.calls.append((text, language))
+        if self.fail:
+            raise self.fail
+        return f"EN:{text}"

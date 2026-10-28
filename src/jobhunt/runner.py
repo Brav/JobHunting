@@ -79,7 +79,8 @@ def record_results(session: Session, run_id: int, listing_id: int,
             if job is not None and _is_newer(posting, job):
                 # A newer repost of the same job: follow it, so the link and description stay live.
                 job.external_id, job.url, job.posted_at = posting.external_id, posting.url, posting.posted_at
-                job.description = job.description_fetched_at = None
+                job.description = job.description_fetched_at = job.details = job.description_error = None
+                job.description_en = job.translation_error = None  # language and title_en stay: same title
             if job is None:
                 job = Job(external_id=posting.external_id, match_key=key, first_seen_at=now,
                           title=posting.title, company=posting.company, location=posting.location,

@@ -115,6 +115,7 @@ def test_newer_repost_takes_over_link_and_date(session_factory):
         record_results(s, r1, a, [p("1", title="PHP Developer", posted_at=date(2026, 9, 1))], NOW)
         job = s.exec(select(Job)).one()
         job.description = "old posting text"
+        job.details, job.description_en, job.language, job.title_en = "[]", "old", "de", "PHP Developer EN"
         s.add(job)
         s.commit()
         repost = p("7", title="PHP Developer", posted_at=date(2026, 10, 27))
@@ -122,6 +123,7 @@ def test_newer_repost_takes_over_link_and_date(session_factory):
         job = s.exec(select(Job)).one()
     assert (job.external_id, job.url, job.posted_at, job.description) == (
         "7", "https://www.linkedin.com/jobs/view/7", date(2026, 10, 27), None)
+    assert (job.details, job.description_en, job.language, job.title_en) == (None, None, "de", "PHP Developer EN")
 
 
 def test_same_day_repost_keeps_first_link(session_factory):

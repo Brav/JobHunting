@@ -40,8 +40,14 @@ class Job(SQLModel, table=True):
     first_seen_at: NaiveDatetime = Field(default_factory=utcnow)
     status: str = "new"
     status_changed_at: NaiveDatetime | None = None
-    description: str | None = None  # Markdown, fetched when the CV prompt is first opened
+    description: str | None = None  # original-language Markdown from the job's LinkedIn page
     description_fetched_at: NaiveDatetime | None = None
+    details: str | None = None  # JSON list of [label, value] from LinkedIn's details box
+    description_error: str | None = None  # why the last download failed (not "blocked")
+    language: str | None = None  # ISO 639-1 code of the description, e.g. "de"
+    title_en: str | None = None
+    description_en: str | None = None
+    translation_error: str | None = None
 
 
 class Run(SQLModel, table=True):
