@@ -105,3 +105,25 @@ def test_a_captured_job_without_text_is_not_looked_up_on_linkedin(app_factory):
         c.get(f"{job_url}/cv-prompt")
         c.post(f"{job_url}/description")
     assert calls == []
+
+
+def test_only_web_links_from_job_data_become_links(app_factory):
+    app = app_factory()
+    with TestClient(app) as c:
+        with app.state.session_factory() as s:
+            s.add(Job(external_id="remoteok:1", source="remoteok", title="Dev", company="Evil", location="",
+                      url="javascript:alert(1)", apply_url="javascript:fetch('/data/export.zip')",
+                      description="Text."))
+            s.commit()
+            (job,) = s.exec(select(Job)).all()
+        for page in (f"/jobs/{job.id}", f"/jobs/{job.id}/cv-prompt", f"/focus?job={job.id}"):
+            assert 'href="javascript:' not in c.get(page).text
+        r = c.post("/capture/save", data={"token": app.state.form_token, "title": "Dev", "company": "Acme",
+                                          "url": "https://acme.example/jobs/1", "apply_url": "javascript:alert(1)"},
+                   follow_redirects=False)
+        with app.state.session_factory() as s:
+            saved = s.get(Job, int(r.headers["location"].rsplit("/", 1)[1]))
+        assert saved.apply_url is None
+        r = c.post("/capture/save", data={"token": app.state.form_token, "title": "Dev", "company": "Acme",
+                                          "url": "javascript:alert(1)"})
+        assert r.status_code == 422 and "web address" in r.text

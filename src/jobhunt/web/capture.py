@@ -1,5 +1,6 @@
 """Add a job from any site: a bookmarklet posts the page here, the user checks the fields, then saves."""
 
+import re
 from datetime import date
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -53,9 +54,13 @@ def capture_save(request: Request, token: str = Form(""), title: str = Form(""),
               "description": description.strip(), "posted_at": posted_at.strip(),
               "salary_text": " ".join(salary_text.split()), "remote": bool(remote)}
     missing = [name for name in ("title", "company", "url") if not fields[name]]
-    if missing:
+    web = re.compile(r"https?://", re.IGNORECASE)
+    if missing or not web.match(fields["url"]):
+        notice = ("Fill in the " + ", ".join(missing) + ".") if missing else "Give the job page as a web address (https://…)."
         return render(request, "capture_confirm.html", status_code=422, active="jobs", job=fields, token=token,
-                      notice="Fill in the " + ", ".join(missing) + ".")
+                      notice=notice)
+    if not web.match(fields["apply_url"]):
+        fields["apply_url"] = ""  # only a web page to apply on, never a script from the page's data
     try:
         posted = date.fromisoformat(fields["posted_at"]) if fields["posted_at"] else None
     except ValueError:

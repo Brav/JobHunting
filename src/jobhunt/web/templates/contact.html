@@ -14,7 +14,7 @@
     <label>Notes<textarea name="notes" rows="4">{{ contact.notes }}</textarea></label>
   </fieldset>
   <div class="actions-row"><button class="btn primary" type="submit">Save</button>
-    {% if contact.url %}<a class="btn ghost" href="{{ contact.url }}" target="_blank" rel="noopener noreferrer">Open link ↗</a>{% endif %}</div>
+    {% if contact.url %}<a class="btn ghost" href="{{ contact.url | web_url }}" target="_blank" rel="noopener noreferrer">Open link ↗</a>{% endif %}</div>
 </form>
 <form method="post" action="/contacts/{{ contact.id }}/delete"><button class="btn ghost" type="submit">Delete contact</button></form>
 <h2>Jobs</h2>

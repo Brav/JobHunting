@@ -3,11 +3,11 @@
 {% block content %}
 <h1>{{ heading or "CV prompt" }}</h1>
 {% if kind == "interview" %}<p class="muted small">Questions to practise come from your <a href="/questions">question bank</a>.</p>{% endif %}
-<p><a href="{{ job.url }}" target="_blank" rel="noopener">{{ job.title }}</a> · {{ job.company }}</p>
+<p><a href="{{ job.url | web_url }}" target="_blank" rel="noopener">{{ job.title }}</a> · {{ job.company }}</p>
 {% if description_error %}
 <p class="error">Couldn't load the job description: {{ description_error }}</p>
 <div class="actions">
-  <a class="button" href="{{ job.url }}" target="_blank" rel="noopener">Open the job on LinkedIn</a>
+  <a class="button" href="{{ job.url | web_url }}" target="_blank" rel="noopener">Open the job on LinkedIn</a>
   <form class="inline" method="post" action="/jobs/{{ job.id }}/description">
     <input type="hidden" name="next" value="/jobs/{{ job.id }}/{{ 'prompts/' ~ kind if kind else 'cv-prompt' }}"><button type="submit">Try again</button>
   </form>

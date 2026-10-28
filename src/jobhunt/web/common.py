@@ -1,5 +1,6 @@
 """Shared web helpers: templates, Jinja filters, and the context every page needs."""
 
+import re
 import secrets
 from datetime import date, datetime
 from pathlib import Path
@@ -55,8 +56,13 @@ def markdown(text: str | None) -> Markup:
     return Markup(_markdown.render(text or ""))
 
 
+def web_url(url: str | None) -> str:
+    """A link from job data only if it is a web address: never a javascript: or data: link from a feed or a page."""
+    return url if url and re.match(r"https?://", url.strip(), re.IGNORECASE) else "#"
+
+
 templates.env.filters.update(local_dt=local_dt, when=when, days_ago=days_ago, markdown=markdown,
-                             language_name=language_name)
+                             language_name=language_name, web_url=web_url)
 
 
 STATUS_LABELS = {"new": "New", "interested": "Saved", "applied": "Applied", "hidden": "Hidden"}

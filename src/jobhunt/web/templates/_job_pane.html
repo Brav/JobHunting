@@ -36,8 +36,8 @@
             hx-post="/jobs/{{ job.id }}/status" hx-vals='{"status": "new", "view": "pane"}' hx-target="#job-pane" hx-swap="innerHTML">{{ icon("undo-2") }} Reset</button>
     {% endif %}
     <a class="btn" data-action="cv" href="/jobs/{{ job.id }}/cv-prompt" target="_blank" rel="noopener">{{ icon("file-text") }} CV prompt {{ key("C") }}</a>
-    <a class="btn" data-action="linkedin" href="{{ job.url }}" target="_blank" rel="noopener">{{ icon("external-link") }} {{ source_labels.get(job.source or "linkedin", "Original") if (job.source or "linkedin") == "linkedin" else "Open on " ~ source_labels.get(job.source, "the original site") }} {{ key("O") }}</a>
-    {% if job.apply_url %}<a class="btn" href="{{ job.apply_url }}" target="_blank" rel="noopener noreferrer">{{ icon("external-link") }} Apply on company site</a>{% endif %}
+    <a class="btn" data-action="linkedin" href="{{ job.url | web_url }}" target="_blank" rel="noopener">{{ icon("external-link") }} {{ source_labels.get(job.source or "linkedin", "Original") if (job.source or "linkedin") == "linkedin" else "Open on " ~ source_labels.get(job.source, "the original site") }} {{ key("O") }}</a>
+    {% if job.apply_url %}<a class="btn" href="{{ job.apply_url | web_url }}" target="_blank" rel="noopener noreferrer">{{ icon("external-link") }} Apply on company site</a>{% endif %}
     <button class="btn ghost" type="button" hx-post="/jobs/{{ job.id }}/{{ 'unblock' if pane.company_blocked else 'block' }}-company"
             hx-target="#job-pane" hx-swap="innerHTML">{{ "Unblock company" if pane.company_blocked else "Block company" }}</button>
   </div>
@@ -79,7 +79,7 @@
   {% endif %}
   {% if pane.translation_error %}<p class="notice">{{ pane.translation_error }}</p>{% endif %}
   {% if not job.description and job.source and job.source != "linkedin" and not pane.download_error %}
-  <p class="muted">No description saved for this job — <a href="{{ job.url }}" target="_blank" rel="noopener">the original page</a> has it.</p>
+  <p class="muted">No description saved for this job — <a href="{{ job.url | web_url }}" target="_blank" rel="noopener">the original page</a> has it.</p>
   {% endif %}
   {% if job.description %}
   <div class="listing">

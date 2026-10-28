@@ -22,7 +22,7 @@
     </form>
     {% endfor %}
     <a class="btn ghost" data-action="cv" href="/jobs/{{ pane.job.id }}/cv-prompt" target="_blank" rel="noopener">{{ icon("file-text") }} CV prompt {{ key("C") }}</a>
-    <a class="btn ghost" data-action="linkedin" href="{{ pane.job.url }}" target="_blank" rel="noopener">{{ icon("external-link") }} LinkedIn {{ key("O") }}</a>
+    <a class="btn ghost" data-action="linkedin" href="{{ pane.job.url | web_url }}" target="_blank" rel="noopener">{{ icon("external-link") }} LinkedIn {{ key("O") }}</a>
   </div>
   {% else %}
   <section class="focus-summary">
