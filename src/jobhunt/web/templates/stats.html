@@ -10,6 +10,13 @@
   {% endfor %}
 </section>
 
+<section class="goals" aria-label="Weekly goals">
+  {% for g in goals %}<div class="goal"><span class="tile-label">{{ g.label }}</span>
+    <span class="goal-value">{{ g.done }} / {{ g.target }}</span>
+    <span class="bar-track goal-track" aria-hidden="true"><span class="bar" style="width: {{ [100, (100 * g.done / g.target) if g.target else 100] | min | round(1) }}%"></span></span></div>{% endfor %}
+  <a class="small" href="/settings#preferences">Change goals</a>
+</section>
+
 <section class="stats-section" aria-labelledby="h-applications">
   <h2 id="h-applications">Applications</h2>
   {% if due_n %}<p class="notice">{{ due_n }} follow-up{{ "s" if due_n != 1 }} due — applications at Applied with no reply for a while</p>{% endif %}
@@ -46,6 +53,7 @@
       {% endfor %}
     </ol>
     <dl class="facts">
+      <div class="benchmark"><dt>Typical reply rates</dt><dd>3–11% by channel; ~3 weeks to a first interview</dd></div>
       {% for stage, n in pipe.ended %}<div><dt>{{ stage_labels[stage] }}</dt><dd>{{ n }}</dd></div>{% endfor %}
       <div><dt>Reply rate</dt><dd>{{ "%d%%" % pipe.reply_rate if pipe.reply_rate is not none else "—" }}</dd></div>
       <div><dt>Median days to first reply</dt><dd>{{ "%g" % pipe.median_reply_days if pipe.median_reply_days is not none else "—" }}</dd></div>

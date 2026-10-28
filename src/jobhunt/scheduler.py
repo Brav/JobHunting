@@ -91,6 +91,9 @@ class RunCoordinator:
             self._lock.release()
 
     def trigger(self, trigger: str) -> bool:
+        if trigger != "manual" and self._paused():
+            logger.info("searches are paused; %s run skipped", trigger)
+            return False
         if not self._lock.acquire(blocking=False):
             logger.info("a run is already in progress; %s trigger ignored", trigger)
             return False
@@ -103,6 +106,11 @@ class RunCoordinator:
 
         threading.Thread(target=work, name=f"jobhunt-run-{trigger}", daemon=True).start()
         return True
+
+    def _paused(self) -> bool:
+        from jobhunt.preferences import is_paused, load_preferences
+        with self.session_factory() as s:
+            return is_paused(load_preferences(s), local_date(utcnow(), self.settings.tz))
 
     def catch_up_if_needed(self) -> bool:
         s = self.settings

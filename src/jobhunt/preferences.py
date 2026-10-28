@@ -2,7 +2,7 @@
 
 import json
 from dataclasses import asdict, dataclass, fields
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlmodel import Session
 
@@ -50,3 +50,11 @@ def save_preferences(session: Session, prefs: Preferences, now: datetime) -> Non
     row.value, row.updated_at = json.dumps(asdict(prefs)), now
     session.add(row)
     session.commit()
+
+
+def is_paused(prefs: Preferences, today: date) -> bool:
+    """Scheduled searches and pushes wait while today is on or before the pause date."""
+    try:
+        return bool(prefs.paused_until) and today <= date.fromisoformat(prefs.paused_until)
+    except ValueError:
+        return False

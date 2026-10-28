@@ -217,3 +217,20 @@ def hide_reasons(session: Session) -> list[tuple[str, int]]:
     for reason in session.exec(select(Job.hide_reason).where(Job.status == "hidden")).all():
         counts[HIDE_REASONS.get(reason, "No reason given")] += 1
     return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+
+
+@dataclass(frozen=True)
+class Goal:
+    label: str
+    done: int
+    target: int
+
+
+def weekly_goals(session: Session, apps: list[Application], prefs: Preferences, today: date, tz: ZoneInfo) -> list[Goal]:
+    """This week's applications and reviewed jobs against the user's weekly goals (effort, not outcomes)."""
+    week = _week_start(today)
+    applied = sum(1 for a in apps if a.applied_on and a.applied_on >= week)
+    reviewed = sum(1 for seen in session.exec(select(Job.seen_at).where(Job.seen_at.is_not(None))).all()
+                   if local_date(seen, tz) >= week)
+    return [Goal("Applied this week", applied, prefs.goal_applications_per_week),
+            Goal("Reviewed this week", reviewed, prefs.goal_reviews_per_week)]

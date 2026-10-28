@@ -14,6 +14,7 @@ from jobhunt.applications import CHANNELS, STAGE_LABELS, STAGES, stage_kind
 from jobhunt.blocks import HIDE_REASONS, SCOPES, company_key
 from jobhunt.eligibility import VERDICT_LABELS, VERDICT_SYMBOLS, VERDICTS, effective
 from jobhunt import salary
+from jobhunt.preferences import is_paused, load_preferences
 from jobhunt.language import language_name
 from jobhunt.reports import run_summary
 from jobhunt.timeutil import local_date, to_local, utcnow
@@ -111,9 +112,11 @@ def render(request: Request, name: str, status_code: int = 200, **ctx):
     coordinator = request.app.state.coordinator
     with session(request) as s:
         summary = run_summary(s)
+        prefs = load_preferences(s)
     now = utcnow()
+    paused = prefs.paused_until if is_paused(prefs, local_date(now, tz)) else ""
     base = {"tz": tz, "now": now, "today": local_date(now, tz), "summary": summary,
             "age": lambda job: job_age(job, now, tz),
             "running": coordinator.is_running, "next_run": coordinator.next_run_at(),
-            "results_cap": request.app.state.settings.results_per_listing}
+            "results_cap": request.app.state.settings.results_per_listing, "paused_until": paused}
     return templates.TemplateResponse(request, name, {**base, **ctx}, status_code=status_code)
