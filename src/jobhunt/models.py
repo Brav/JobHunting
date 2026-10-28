@@ -80,6 +80,12 @@ class Job(SQLModel, table=True):
     sent_cover_letter: bool | None = None
     sent_file: str | None = None  # relative to the data directory
     followed_up_on: date | None = None  # jobhunt.followups
+    # jobhunt.fit: stack terms the user has / lacks (JSON lists), percent matched, the user's 1–5 rating, best-first rank
+    fit_matched: str | None = None
+    fit_missing: str | None = None
+    fit_score: int | None = Field(default=None, index=True)
+    excitement: int | None = None
+    best_score: int | None = Field(default=None, index=True)
     auto_closed_on: date | None = None
 
 

@@ -16,7 +16,7 @@ from jobhunt.timeutil import local_day_bounds_utc
 from jobhunt.workplace import WORKPLACES
 
 TABS = ("active", "undecided", "saved", "applied", "hidden", "all")
-SORTS = ("found", "posted", "company")
+SORTS = ("found", "posted", "company", "best")
 WITHIN = {"24h": 1, "3d": 3, "7d": 7, "30d": 30}  # days
 WITHIN_LABELS = {"24h": "last 24 h", "3d": "last 3 days", "7d": "last 7 days", "30d": "last 30 days"}
 WORKPLACE_FILTERS = (*WORKPLACES, "unknown")
@@ -178,6 +178,8 @@ def ordered(stmt, sort: str):
         return stmt.order_by(Job.posted_at.is_(None), Job.posted_at.desc(), Job.id.desc())
     if sort == "company":
         return stmt.order_by(_lower(Job.company), Job.id)
+    if sort == "best":
+        return stmt.order_by(func.coalesce(Job.best_score, -1).desc(), Job.first_seen_at.desc(), Job.id.desc())
     return stmt.order_by(Job.first_seen_at.desc(), Job.id.desc())
 
 
@@ -192,6 +194,10 @@ def _after(stmt, sort: str, last: Job):
             return stmt.where(Job.posted_at.is_(None), Job.id < last.id)
         return stmt.where(or_(Job.posted_at.is_(None), Job.posted_at < last.posted_at,
                               (Job.posted_at == last.posted_at) & (Job.id < last.id)))
+    if sort == "best":
+        score, best = last.best_score if last.best_score is not None else -1, func.coalesce(Job.best_score, -1)
+        return stmt.where(or_(best < score, (best == score) & (Job.first_seen_at < last.first_seen_at),
+                              (best == score) & (Job.first_seen_at == last.first_seen_at) & (Job.id < last.id)))
     if sort == "company":
         key = last.company.lower()
         return stmt.where(or_(_lower(Job.company) > key, (_lower(Job.company) == key) & (Job.id > last.id)))

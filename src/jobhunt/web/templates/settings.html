@@ -39,6 +39,35 @@
   <div><button class="btn primary" type="submit">Save</button></div>
 </form>
 
+<section class="settings-section" id="preferences" aria-labelledby="h-prefs">
+  <h2 id="h-prefs">Preferences</h2>
+  {% if pref_errors %}<ul class="field-error" role="alert">{% for e in pref_errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+  <form class="stack settings-form" method="post" action="/settings/preferences">
+    <fieldset><legend>Your skills</legend>
+      <label>Stack you work with (comma-separated) — used for the fit checklist
+        <input name="skills" value="{{ prefs.skills | join(', ') }}" placeholder="PHP, Laravel, MySQL"></label>
+    </fieldset>
+    <fieldset><legend>Follow-ups</legend>
+      <label>Remind me after (days without a reply)<input type="number" name="follow_up_days" min="1" max="90" value="{{ prefs.follow_up_days }}"></label>
+      <label>Close as "No response" after (days)<input type="number" name="auto_close_days" min="7" max="365" value="{{ prefs.auto_close_days }}"></label>
+    </fieldset>
+    <fieldset><legend>Weekly goals</legend>
+      <label>Applications a week<input type="number" name="goal_applications_per_week" min="0" max="500" value="{{ prefs.goal_applications_per_week }}"></label>
+      <label>Jobs reviewed a week<input type="number" name="goal_reviews_per_week" min="0" max="5000" value="{{ prefs.goal_reviews_per_week }}"></label>
+      <label>Pause searches until<input type="date" name="paused_until" value="{{ prefs.paused_until }}"></label>
+    </fieldset>
+    <fieldset><legend>Job sources besides LinkedIn</legend>
+      {% for value, label in sources.items() %}
+      <label class="check"><input type="checkbox" name="sources" value="{{ value }}"{% if value in prefs.sources %} checked{% endif %}> {{ label }}</label>
+      {% endfor %}
+    </fieldset>
+    <fieldset><legend>Phone push for the daily digest</legend>
+      <label>ntfy address (leave empty to send nothing)<input name="ntfy_url" value="{{ prefs.ntfy_url }}" placeholder="https://ntfy.sh/your-private-topic"></label>
+    </fieldset>
+    <div><button class="btn primary" type="submit">Save preferences</button></div>
+  </form>
+</section>
+
 <section class="settings-section" id="blocks" aria-labelledby="h-blocks">
   <h2 id="h-blocks">Blocked companies</h2>
   <p class="muted small">New jobs from these companies are hidden (behind the "hidden by your rules" chip).</p>

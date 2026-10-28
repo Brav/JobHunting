@@ -51,7 +51,7 @@
   {% endfor %}
   {% if show_sort %}
   <select name="sort" aria-label="Sort">
-    {% for value, text in [("found", "Newest found"), ("posted", "Newest posted"), ("company", "Company A–Z")] %}
+    {% for value, text in [("found", "Newest found"), ("posted", "Newest posted"), ("company", "Company A–Z"), ("best", "Best match")] %}
     <option value="{{ value }}"{% if filters.sort == value %} selected{% endif %}>{{ text }}</option>
     {% endfor %}
   </select>

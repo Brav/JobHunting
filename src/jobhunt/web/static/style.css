@@ -280,3 +280,10 @@ form.inline { display: inline; }
 .sent-form input[type="text"] { flex: 1 1 160px; min-width: 0; }
 .tag.follow-up { background: var(--warning-tint); color: var(--warning); }
 .follow-up-notice { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+.pane-fit { margin: 0 0 var(--s2); color: var(--muted); }
+.fit-yes { color: var(--success); }
+.fit-no { color: var(--muted); }
+.rating { display: flex; align-items: center; gap: 2px; margin: 0 0 var(--s2); }
+.star { border: 0; background: none; font-size: 18px; color: var(--line-strong); cursor: pointer; padding: 0 2px; }
+.star.on { color: var(--warning); }
+.star:focus-visible { outline: 2px solid var(--accent); border-radius: 4px; }

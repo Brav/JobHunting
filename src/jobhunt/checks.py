@@ -10,7 +10,7 @@ from datetime import date
 
 from sqlmodel import Session, or_, select
 
-from jobhunt import blocks, eligibility, salary, scam, signals
+from jobhunt import blocks, eligibility, fit, salary, scam, signals
 from jobhunt.models import Job, Sighting
 from jobhunt.preferences import Preferences, load_preferences
 from jobhunt.timeutil import utcnow
@@ -44,6 +44,10 @@ def refresh(session: Session, job: Job, ctx: CheckContext) -> None:
                 if (found := salary.parse_salary(text))), None)
     job.salary_min_eur, job.salary_max_eur, job.salary_text = \
         (pay.min_eur, pay.max_eur, pay.text) if pay else (None, None, None)
+    matched, missing, score = fit.fit(" ".join(t for t in (job.title, job.description_en or job.description) if t),
+                                      ctx.prefs.skills)
+    job.fit_matched, job.fit_missing, job.fit_score = json.dumps(matched), json.dumps(missing), score
+    job.best_score = fit.rank(job)
     job.scam_flags = json.dumps(flags, ensure_ascii=False) if flags else None
 
 

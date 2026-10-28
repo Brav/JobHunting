@@ -14,6 +14,13 @@
   {% if job.blocked_by %}<p class="notice">Hidden by your rules: {{ job.blocked_by }}</p>{% endif %}
   {% if pane.signals.ghost %}<p class="notice">Likely ghost job: {{ pane.signals.reasons | join(" · ") }}</p>{% endif %}
   {% include "_eligibility.html" %}
+  {% if pane.fit %}<p class="pane-fit small">Fit: {{ pane.fit.matched | length }} of {{ (pane.fit.matched + pane.fit.missing) | length }} —
+    {% for t in pane.fit.matched %}<span class="fit-yes">{{ t }} ✓</span>{{ " · " if not loop.last or pane.fit.missing }}{% endfor %}
+    {%- for t in pane.fit.missing %}<span class="fit-no">{{ t }} ✗</span>{{ " · " if not loop.last }}{% endfor %}</p>{% endif %}
+  {% if not pane.focus %}<div class="rating" role="group" aria-label="How much do you want this job?"><span class="muted small">Want it:</span>
+    {% for n in range(1, 6) %}<button class="star{% if job.excitement and n <= job.excitement %} on{% endif %}" type="button"
+      hx-post="/jobs/{{ job.id }}/excitement" hx-vals='{"value": "{{ 0 if job.excitement == n else n }}"}' hx-target="#job-pane" hx-swap="innerHTML"
+      aria-label="{{ n }} of 5" aria-pressed="{{ 'true' if job.excitement == n else 'false' }}">★</button>{% endfor %}</div>{% endif %}
   {% if not pane.focus %}
   <div class="pane-actions" role="group" aria-label="Decide on this job">
     {% for status, action, label, done, icon_name, k in [

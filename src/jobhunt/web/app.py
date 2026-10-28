@@ -2,6 +2,7 @@
 
 import logging
 import time
+from dataclasses import replace
 from datetime import datetime
 from collections.abc import Callable
 from contextlib import asynccontextmanager
@@ -23,6 +24,26 @@ from jobhunt.web import settings as settings_page  # `settings` is create_app's 
 from jobhunt.web.common import render
 
 
+def _default_skills_from_cv(session_factory, settings: Settings) -> None:
+    """First start: the user's skills are the stack terms in their CV (read only); they edit them in Settings."""
+    from jobhunt import checks
+    from jobhunt.cv import read_cv_text
+    from jobhunt.fit import default_skills
+    from jobhunt.preferences import load_preferences, save_preferences
+    from jobhunt.timeutil import utcnow
+    with session_factory() as s:
+        prefs = load_preferences(s)
+        if prefs.skills:
+            return
+        try:
+            skills = default_skills(read_cv_text(settings.cv_path))
+        except Exception:
+            return  # no readable CV: fit stays empty until the user lists skills
+        if skills:
+            save_preferences(s, replace(prefs, skills=skills), utcnow())
+            checks.refresh_all(s)
+
+
 def create_app(settings: Settings, *, source: JobSource | None = None,
                fetch_page: Callable[[str], JobPage] | None = None, translator: Translator | None = None,
                start_scheduler: bool = True, sleep: Callable[[float], None] = time.sleep) -> FastAPI:
@@ -35,6 +56,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     engine = make_engine(settings.db_path)
     init_db(engine, settings.tz)
     session_factory = make_session_factory(engine)
+    _default_skills_from_cv(session_factory, settings)
     if source is None:
         from jobhunt.sources.linkedin import LinkedInSource
         source = LinkedInSource()
