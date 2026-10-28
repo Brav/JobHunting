@@ -85,14 +85,15 @@ def record_results(session: Session, run_id: int, listing_id: int,
                 job = Job(external_id=posting.external_id, match_key=key, first_seen_at=now,
                           title=posting.title, company=posting.company, location=posting.location,
                           url=posting.url, posted_at=posting.posted_at)
+        # New means first found now; a job kept after its listing was deleted has lost its matches but isn't new.
+        is_new = job.id is None
         session.add(job)
         session.flush()
         if job.id in matched:
             continue  # two postings resolved to the same job
         matched.add(job.id)
-        seen_before = session.exec(select(Match).where(Match.job_id == job.id)).first() is not None
-        session.add(Match(run_id=run_id, listing_id=listing_id, job_id=job.id, is_new=not seen_before))
-        new += not seen_before
+        session.add(Match(run_id=run_id, listing_id=listing_id, job_id=job.id, is_new=is_new))
+        new += is_new
     session.commit()
     return ListingResult(found=len(matched), new=new)
 

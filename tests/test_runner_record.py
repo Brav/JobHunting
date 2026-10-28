@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 from sqlmodel import select
 
 from fakes import add_listing, add_run, job_id, make_posting as p
+from jobhunt.actions import delete_listing
 from jobhunt.models import Job, Match, RunListing
 from jobhunt.runner import ListingResult, last_success_at, record_results, window_hours
 
@@ -133,3 +134,16 @@ def test_same_day_repost_keeps_first_link(session_factory):
         record_results(s, r1, a, [p("1", title="PHP Developer", posted_at=date(2026, 10, 27))], NOW)
         record_results(s, r2, a, [p("7", title="PHP Developer", posted_at=date(2026, 10, 27))], NOW + timedelta(days=1))
         assert s.exec(select(Job)).one().external_id == "1"
+
+
+def test_a_kept_job_is_not_new_again_after_its_listing_is_deleted(session_factory):
+    a, b = add_listing(session_factory, "A"), add_listing(session_factory, "B", keywords="go")
+    r1, r2 = add_run(session_factory, NOW), add_run(session_factory, NOW + timedelta(days=1))
+    with session_factory() as s:
+        record_results(s, r1, a, [p("1")], NOW)
+        job = s.exec(select(Job)).one()
+        job.status = "applied"
+        s.add(job)
+        s.commit()
+        delete_listing(s, a)
+        assert record_results(s, r2, b, [p("1")], NOW + timedelta(days=1)) == ListingResult(found=1, new=0)
