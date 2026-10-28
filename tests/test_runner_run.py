@@ -38,7 +38,7 @@ def test_happy_path(session_factory):
         run = s.get(Run, run_id)
     assert (run.status, run.trigger, run.started_at) == ("ok", "scheduled", NOW)
     assert run.finished_at >= NOW
-    assert rows(session_factory, run_id) == {a: (1, 2, 2, None), b: (1, 1, 1, None)}
+    assert rows(session_factory, run_id) == {a: (1, 2, 2, None), b: (1, 1, 0, None)}
     assert [c["keywords"] for c in src.calls] == ["python", "go"]
     assert (src.calls[0]["window_hours"], src.calls[0]["limit"], src.calls[0]["radius_km"]) == (168, 100, 25)
     assert len(clock.sleeps) == 1 and 3 <= clock.sleeps[0] <= 8

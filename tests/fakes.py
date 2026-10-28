@@ -10,8 +10,9 @@ from jobhunt.models import Job, Listing, Run
 from jobhunt.sources.base import JobPosting
 
 
-def make_posting(external_id: str, title: str = "Engineer", posted_at: date | None = None) -> JobPosting:
-    return JobPosting(external_id, title, "Acme", "Belgrade",
+def make_posting(external_id: str, title: str | None = None, posted_at: date | None = None) -> JobPosting:
+    # Default titles differ per ID: same title + company means the same job.
+    return JobPosting(external_id, title or f"Engineer {external_id}", "Acme", "Belgrade",
                       f"https://www.linkedin.com/jobs/view/{external_id}", posted_at)
 
 

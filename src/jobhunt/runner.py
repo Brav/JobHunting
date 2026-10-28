@@ -12,11 +12,12 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
+from jobhunt.dedup import match_key
 from jobhunt.models import Job, Listing, Match, Run, RunListing
 from jobhunt.sources.base import JobPosting, JobSource, SourceError
 from jobhunt.timeutil import utcnow
 
-WINDOW_MIN_HOURS = 24
+WINDOW_MIN_HOURS = 12
 WINDOW_MAX_HOURS = 168
 WINDOW_OVERLAP_HOURS = 2
 RETRY_DELAYS_SECONDS = (120, 600)
@@ -50,28 +51,41 @@ def last_success_at(session: Session, listing_id: int) -> datetime | None:
     return session.exec(query).one()
 
 
+def _unique_postings(postings: list[JobPosting]) -> list[JobPosting]:
+    by_id = {p.external_id: p for p in reversed(postings)}  # first occurrence wins
+    by_key: dict[str, JobPosting] = {}
+    for posting in reversed(list(by_id.values())):
+        by_key.setdefault(match_key(posting.title, posting.company), posting)
+    return list(by_key.values())
+
+
 def record_results(session: Session, run_id: int, listing_id: int,
                    postings: list[JobPosting], now: datetime) -> ListingResult:
-    unique = list({p.external_id: p for p in postings}.values())
+    """Record one listing's results. A job is new only the first time any listing finds it."""
+    matched: set[int] = set()
     new = 0
-    for posting in unique:
+    for posting in _unique_postings(postings):
+        key = match_key(posting.title, posting.company)
         job = session.exec(select(Job).where(Job.external_id == posting.external_id)).first()
-        if job is None:
-            job = Job(external_id=posting.external_id, first_seen_at=now, title=posting.title,
-                      company=posting.company, location=posting.location, url=posting.url,
-                      posted_at=posting.posted_at)
-        else:
+        if job is not None and job.id not in matched:
             job.title, job.company, job.location = posting.title, posting.company, posting.location
-            job.url, job.posted_at = posting.url, posting.posted_at
+            job.url, job.posted_at, job.match_key = posting.url, posting.posted_at, key
+        elif job is None:
+            job = session.exec(select(Job).where(Job.match_key == key).order_by(Job.id)).first()
+            if job is None:
+                job = Job(external_id=posting.external_id, match_key=key, first_seen_at=now,
+                          title=posting.title, company=posting.company, location=posting.location,
+                          url=posting.url, posted_at=posting.posted_at)
         session.add(job)
         session.flush()
-        seen_before = session.exec(
-            select(Match).where(Match.listing_id == listing_id, Match.job_id == job.id)
-        ).first() is not None
+        if job.id in matched:
+            continue  # two postings resolved to the same job
+        matched.add(job.id)
+        seen_before = session.exec(select(Match).where(Match.job_id == job.id)).first() is not None
         session.add(Match(run_id=run_id, listing_id=listing_id, job_id=job.id, is_new=not seen_before))
         new += not seen_before
     session.commit()
-    return ListingResult(found=len(unique), new=new)
+    return ListingResult(found=len(matched), new=new)
 
 
 def _save_attempt(session_factory, run_id: int, listing_id: int,

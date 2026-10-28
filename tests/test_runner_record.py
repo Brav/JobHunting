@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from sqlmodel import select
 
-from fakes import add_listing, add_run, make_posting as p
+from fakes import add_listing, add_run, job_id, make_posting as p
 from jobhunt.models import Job, Match, RunListing
 from jobhunt.runner import ListingResult, last_success_at, record_results, window_hours
 
@@ -12,7 +12,7 @@ NOW = datetime(2026, 10, 28, 9, 0)  # 10:00 in Belgrade
 def test_window_hours():
     assert window_hours(None, NOW) == 168
     assert window_hours(NOW - timedelta(hours=24), NOW) == 26
-    assert window_hours(NOW - timedelta(hours=5), NOW) == 24
+    assert window_hours(NOW - timedelta(hours=5), NOW) == 12
     assert window_hours(NOW - timedelta(hours=30, minutes=10), NOW) == 33
     assert window_hours(NOW - timedelta(days=10), NOW) == 168
 
@@ -39,13 +39,59 @@ def test_new_then_repeat(session_factory):
     assert new_in_r2 == {"2": False, "3": True}
 
 
-def test_newness_is_per_listing(session_factory):
+def test_newness_is_global(session_factory):
     a, b = add_listing(session_factory, "A"), add_listing(session_factory, "B", keywords="go")
     r1, r2 = add_run(session_factory, NOW), add_run(session_factory, NOW + timedelta(days=1))
     with session_factory() as s:
         record_results(s, r1, a, [p("1")], NOW)
-        assert record_results(s, r2, b, [p("1")], NOW + timedelta(days=1)) == ListingResult(found=1, new=1)
+        assert record_results(s, r2, b, [p("1")], NOW + timedelta(days=1)) == ListingResult(found=1, new=0)
         assert len(s.exec(select(Job)).all()) == 1
+
+
+def test_same_job_from_two_listings_in_one_run(session_factory):
+    a, b = add_listing(session_factory, "A"), add_listing(session_factory, "B", keywords="go")
+    r = add_run(session_factory, NOW)
+    with session_factory() as s:
+        assert record_results(s, r, a, [p("1")], NOW) == ListingResult(found=1, new=1)
+        assert record_results(s, r, b, [p("1")], NOW) == ListingResult(found=1, new=0)
+        assert {m.listing_id: m.is_new for m in s.exec(select(Match))} == {a: True, b: False}
+
+
+def test_repost_with_new_id_is_same_job(session_factory):
+    a = add_listing(session_factory, "A")
+    r1, r2 = add_run(session_factory, NOW), add_run(session_factory, NOW + timedelta(days=1))
+    with session_factory() as s:
+        record_results(s, r1, a, [p("1", title="PHP Developer")], NOW)
+        assert record_results(s, r2, a, [p("2", title="php developer!")], NOW + timedelta(days=1)) == ListingResult(1, 0)
+        job = s.exec(select(Job)).one()
+    assert (job.external_id, job.title) == ("1", "PHP Developer")
+
+
+def test_duplicates_within_one_result_collapse(session_factory):
+    a = add_listing(session_factory, "A")
+    r = add_run(session_factory, NOW)
+    with session_factory() as s:
+        postings = [p("1", title="PHP Dev"), p("2", title="PHP Dev"), p("1", title="PHP Dev")]
+        assert record_results(s, r, a, postings, NOW) == ListingResult(found=1, new=1)
+
+
+def test_two_postings_resolving_to_one_job_record_one_match(session_factory):
+    a = add_listing(session_factory, "A")
+    r1, r2 = add_run(session_factory, NOW), add_run(session_factory, NOW + timedelta(days=1))
+    with session_factory() as s:
+        record_results(s, r1, a, [p("1", title="PHP Developer")], NOW)
+        postings = [p("3", title="PHP Developer"), p("1", title="PHP Developer (Remote)")]
+        assert record_results(s, r2, a, postings, NOW + timedelta(days=1)) == ListingResult(found=1, new=0)
+        assert len(s.exec(select(Match).where(Match.run_id == r2)).all()) == 1
+
+
+def test_id_match_wins_over_key_match(session_factory):
+    a = add_listing(session_factory, "A")
+    r1, r2 = add_run(session_factory, NOW), add_run(session_factory, NOW + timedelta(days=1))
+    with session_factory() as s:
+        record_results(s, r1, a, [p("1", title="PHP Developer"), p("2", title="Go Developer")], NOW)
+        assert record_results(s, r2, a, [p("2", title="Go Lead")], NOW + timedelta(days=1)) == ListingResult(1, 0)
+        assert s.get(Job, job_id(session_factory, "2")).title == "Go Lead"
 
 
 def test_refresh_keeps_status_and_first_seen(session_factory):

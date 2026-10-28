@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlmodel import select
 
 from jobhunt.db import init_db, make_engine
-from jobhunt.models import Run
+from jobhunt.models import Job, Run
 
 
 def test_tables_and_wal(engine):
@@ -44,3 +44,12 @@ def test_init_db_adds_columns_missing_from_older_databases(tmp_path):
 def test_foreign_keys_enforced(engine):
     with engine.connect() as c:
         assert c.exec_driver_sql("PRAGMA foreign_keys").scalar() == 1
+
+
+def test_init_db_backfills_match_keys(engine, session_factory):
+    with session_factory() as s:
+        s.add(Job(external_id="1", title="PHP Dev", company="Acme", location="", url="u"))
+        s.commit()
+    init_db(engine)
+    with session_factory() as s:
+        assert s.exec(select(Job)).one().match_key == "php dev|acme"

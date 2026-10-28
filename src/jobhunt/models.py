@@ -30,6 +30,8 @@ class Job(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     external_id: str = Field(unique=True, index=True)
+    # Normalised title + company (jobhunt.dedup.match_key); reposts and other listings' finds map to this job.
+    match_key: str | None = Field(default=None, index=True)
     title: str
     company: str
     location: str
@@ -38,6 +40,8 @@ class Job(SQLModel, table=True):
     first_seen_at: NaiveDatetime = Field(default_factory=utcnow)
     status: str = "new"
     status_changed_at: NaiveDatetime | None = None
+    description: str | None = None  # Markdown, fetched when the CV prompt is first opened
+    description_fetched_at: NaiveDatetime | None = None
 
 
 class Run(SQLModel, table=True):

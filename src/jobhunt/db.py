@@ -4,9 +4,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 from sqlalchemy import Engine, event, update
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
-from jobhunt.models import Run
+from jobhunt.dedup import match_key
+from jobhunt.models import Job, Run
 from jobhunt.timeutil import utcnow
 
 
@@ -46,6 +47,13 @@ def init_db(engine: Engine) -> None:
     """Create tables and mark runs left 'running' by a crash or restart as interrupted."""
     SQLModel.metadata.create_all(engine)
     _add_missing_columns(engine)
+    with engine.begin() as conn:
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_jobs_match_key ON jobs (match_key)")
+    with Session(engine) as session:
+        for job in session.exec(select(Job).where(Job.match_key.is_(None))):
+            job.match_key = match_key(job.title, job.company)
+            session.add(job)
+        session.commit()
     with Session(engine) as session:
         session.exec(
             update(Run)

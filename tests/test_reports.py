@@ -33,17 +33,20 @@ def test_report_sections(session_factory):
         sections = report_for_date(s, date(2026, 10, 28), TZ)
     assert [(x.listing.name, [j.external_id for j in x.jobs], x.error) for x in sections] == [
         ("Python BG", ["2", "3"], None),
-        ("Go BG", ["2"], None),
+        ("Go BG", [], None),
         ("Data Eng Berlin", [], "rate limited by LinkedIn"),
     ]
 
 
-def test_shared_job_status_in_both_sections(session_factory):
+def test_job_found_by_two_listings_appears_once(session_factory):
     run_at(session_factory, three_listings(session_factory), NOW)
     with session_factory() as s:
-        set_job_status(s, job_id(session_factory, "2"), "applied", NOW)
         sections = report_for_date(s, date(2026, 10, 28), TZ)
-    assert [j.status for x in sections[:2] for j in x.jobs if j.external_id == "2"] == ["applied", "applied"]
+        go_listing = sections[1].listing.id
+        tracked = [j.external_id for j in tracker_jobs(s, listing_id=go_listing)[0]]
+    shown = [j.external_id for x in sections for j in x.jobs]
+    assert shown.count("2") == 1 and sections[0].listing.name == "Python BG" and "2" in [j.external_id for j in sections[0].jobs]
+    assert tracked == ["2"]
 
 
 def test_only_new_matches_count(session_factory):
@@ -106,4 +109,4 @@ def test_run_summary_and_listing_rows(session_factory):
     assert (summary.run.status, summary.total, summary.ok) == ("partial", 3, 2)
     assert summary.failures == [("Data Eng Berlin", "rate limited by LinkedIn")]
     assert [(r.listing.name, r.last and (r.last.found, r.last.new)) for r in rows] == [
-        ("Python BG", (3, 3)), ("Go BG", (1, 1)), ("Data Eng Berlin", (0, 0)), ("Later", None)]
+        ("Python BG", (3, 3)), ("Go BG", (1, 0)), ("Data Eng Berlin", (0, 0)), ("Later", None)]
