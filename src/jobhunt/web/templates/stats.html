@@ -91,4 +91,14 @@
   </div>
   {% endif %}
 </section>
+
+{% if hid %}
+<section class="stats-section" aria-labelledby="h-hid">
+  <h2 id="h-hid">Why I hid</h2>
+  <div class="table-scroll"><table class="narrow-table">
+    <thead><tr><th>Reason</th><th class="num">Jobs</th></tr></thead>
+    <tbody>{% for label, n in hid %}<tr><td>{{ label }}</td><td class="num">{{ n }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endif %}
 {% endblock %}

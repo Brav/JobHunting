@@ -108,6 +108,6 @@ def test_report_hides_not_eligible_jobs(app_factory):
             s.commit()
         html = c.get("/report/2026-10-28").text
         assert "Flask Dev" not in html and "Django Dev" in html
-        assert "1 not eligible hidden · Show" in html
+        assert "1 hidden by your rules · Show" in html
         shown = c.get("/report/2026-10-28?eligibility=eligible&eligibility=relocate&eligibility=check&eligibility=not_eligible").text
         assert "Flask Dev" in shown

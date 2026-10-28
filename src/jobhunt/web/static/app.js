@@ -4,11 +4,17 @@ const hasModifier = (e) => e.ctrlKey || e.metaKey || e.altKey;
 
 document.addEventListener("alpine:init", () => {
   Alpine.store("toast", {
-    open: false, message: "", undo: null, timer: null,
-    show(message, undo = null) {
-      Object.assign(this, { message, undo, open: true });
+    open: false, message: "", undo: null, timer: null, hideJobId: null,
+    show(message, undo = null, hideJobId = null) {
+      Object.assign(this, { message, undo, hideJobId, open: true });
       clearTimeout(this.timer);
-      this.timer = setTimeout(() => { this.open = false; }, 6000);
+      this.timer = setTimeout(() => { this.open = false; }, hideJobId ? 10000 : 6000);
+    },
+    // After a hide: record why (the "Company" reason also blocks the company's other jobs).
+    reason(key) {
+      const id = this.hideJobId;
+      this.open = false;
+      if (id) fetch(`/jobs/${id}/hide-reason`, { method: "POST", body: new URLSearchParams({ reason: key }) });
     },
     runUndo() { const undo = this.undo; this.open = false; if (undo) undo(); },
   });
@@ -127,7 +133,7 @@ document.addEventListener("alpine:init", () => {
       if (row && status === "hidden" && this.list().dataset.hideHidden === "true") row.classList.add("is-removed");
       if (status !== previous) {
         this.last = { jobId: id, previous };
-        Alpine.store("toast").show(label, () => this.undo());
+        Alpine.store("toast").show(label, () => this.undo(), status === "hidden" ? id : null);
       }
       if (row && id === this.selectedId && status !== "new" && i >= 0) {
         const next = rows[i + 1] || rows[i - 1];

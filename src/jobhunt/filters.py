@@ -27,8 +27,16 @@ _QUERY_KEYS = {"listing_id": "listing"}  # URL name when it differs from the fie
 
 # The verdict that counts (jobhunt.eligibility.effective, as SQL): the user's override, else the automatic one.
 EFFECTIVE_ELIGIBILITY = func.coalesce(Job.eligibility_override, Job.eligibility, "check")
-# Undecided jobs the user can't take are left out unless the eligibility filter asks for them.
-HIDDEN_BY_DEFAULT = and_(Job.status == "new", EFFECTIVE_ELIGIBILITY == "not_eligible")
+# Undecided jobs the user can't take, or that their own rules block, are left out unless the filters ask for them.
+NOT_ELIGIBLE = EFFECTIVE_ELIGIBILITY == "not_eligible"
+BLOCKED = Job.blocked_by.is_not(None)
+HIDDEN_BY_DEFAULT = and_(Job.status == "new", or_(NOT_ELIGIBLE, BLOCKED))
+
+
+def _hidden(f: "JobFilters"):
+    """What these filters leave out by default: not-eligible jobs unless asked for, blocked ones unless shown."""
+    parts = ([] if f.eligibility else [NOT_ELIGIBLE]) + ([] if f.blocked == "show" else [BLOCKED])
+    return and_(Job.status == "new", or_(*parts)) if parts else None
 
 
 def _lower(column):
@@ -43,6 +51,7 @@ class JobFilters:
     workplace: tuple[str, ...] = ()
     eligibility: tuple[str, ...] = ()  # none = everything except jobs hidden by default
     ghost: str = ""  # "hide" leaves out likely ghost jobs
+    blocked: str = ""  # "show" includes jobs the user's block rules hide
     language: str = ""  # "", "en", "non-en" or an ISO 639-1 code
     seniority: str = ""
     employment_type: str = ""
@@ -65,6 +74,7 @@ class JobFilters:
             workplace=tuple(dict.fromkeys(v for v in params.getlist("workplace") if v in WORKPLACE_FILTERS)),
             eligibility=tuple(dict.fromkeys(v for v in params.getlist("eligibility") if v in VERDICTS)),
             ghost="hide" if get("ghost") == "hide" else "",
+            blocked="show" if get("blocked") == "show" else "",
             language=get("language"), seniority=get("seniority"), employment_type=get("employment_type"),
             company=get("company"),
             found_within=get("found_within") if get("found_within") in WITHIN else "",
@@ -92,6 +102,8 @@ class JobFilters:
                   for v in self.eligibility]
         if self.ghost:
             chips.append(("Hiding likely ghost jobs", self.query(ghost="")))
+        if self.blocked:
+            chips.append(("Showing blocked jobs", self.query(blocked="")))
         if self.language:
             label = {"en": "English", "non-en": "Not English"}.get(self.language) or language_name(self.language)
             chips.append((label, self.query(language="")))
@@ -124,8 +136,8 @@ def apply_filters(stmt, f: JobFilters, now: datetime, *, include_tab: bool = Tru
         stmt = stmt.where(or_(*conditions))
     if f.eligibility:
         stmt = stmt.where(EFFECTIVE_ELIGIBILITY.in_(f.eligibility))
-    else:
-        stmt = stmt.where(not_(HIDDEN_BY_DEFAULT))
+    if (hidden := _hidden(f)) is not None:
+        stmt = stmt.where(not_(hidden))
     if f.ghost == "hide":
         stmt = stmt.where(or_(Job.ghost_risk.is_(None), Job.ghost_risk < LIKELY_GHOST))
     if f.language == "non-en":
@@ -193,11 +205,15 @@ def ordered_ids(session: Session, f: JobFilters, now: datetime) -> list[tuple[in
     return [(job_id, status) for job_id, status in session.exec(ordered(stmt, f.sort)).all()]
 
 
-def hidden_ineligible_count(session: Session, f: JobFilters, now: datetime) -> int:
-    """How many jobs matching these filters the default leaves out (0 once the eligibility filter is set)."""
-    if f.eligibility:
-        return 0
-    return _count(session, apply_filters(select(Job), replace(f, eligibility=VERDICTS), now).where(HIDDEN_BY_DEFAULT))
+def reveal_all(f: JobFilters) -> JobFilters:
+    """The same filters with nothing hidden by default (the "Show" link)."""
+    return replace(f, eligibility=f.eligibility or VERDICTS, blocked="show")
+
+
+def hidden_count(session: Session, f: JobFilters, now: datetime) -> int:
+    """How many jobs matching these filters are left out by default (not eligible, or blocked by the user's rules)."""
+    hidden = _hidden(f)
+    return 0 if hidden is None else _count(session, apply_filters(select(Job), reveal_all(f), now).where(hidden))
 
 
 def tab_counts(session: Session, f: JobFilters, now: datetime) -> dict[str, int]:
@@ -288,11 +304,12 @@ def unseen_count(session: Session, day: date, tz: ZoneInfo) -> int:
     return _count(session, _new_jobs(run_ids).where(Job.seen_at.is_(None))) if run_ids else 0
 
 
-def report_hidden_ineligible(session: Session, day: date, tz: ZoneInfo, f: JobFilters, now: datetime) -> int:
+def report_hidden_count(session: Session, day: date, tz: ZoneInfo, f: JobFilters, now: datetime) -> int:
     """How many of the day's new jobs (under these filters) the default leaves out."""
     run_ids = _run_ids(session, day, tz)
-    if f.eligibility or not run_ids:
+    if not run_ids:
         return 0
     stmt = apply_filters(_new_jobs(run_ids, f.listing_id, include_ineligible=True),
-                         replace(f, listing_id=None, eligibility=VERDICTS), now, include_tab=False)
-    return _count(session, stmt.where(HIDDEN_BY_DEFAULT))
+                         replace(reveal_all(f), listing_id=None), now, include_tab=False)
+    hidden = _hidden(f)
+    return 0 if hidden is None else _count(session, stmt.where(hidden))

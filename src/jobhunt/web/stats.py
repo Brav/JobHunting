@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from jobhunt.stats import activity, application_rows, breakdowns, load_applications, overview, pipeline
+from jobhunt.stats import activity, application_rows, breakdowns, hide_reasons, load_applications, overview, pipeline
 from jobhunt.timeutil import local_date, utcnow
 from jobhunt.web.common import render, session
 
@@ -22,8 +22,9 @@ def stats_page(request: Request, apps: str = "open"):
         applications = load_applications(s)
         tiles = overview(s, today, tz)
         weeks = activity(s, applications, today, tz)
+        hid = hide_reasons(s)
     rows, counts = application_rows(applications, today, which)
     week_max = {key: max(getattr(w, key) for w in weeks) for key, _ in ACTIVITY_COLUMNS}
     return render(request, "stats.html", active="stats", tiles=tiles, rows=rows, counts=counts, which=which,
                   app_tabs=APP_TABS, pipe=pipeline(applications), weeks=weeks, columns=ACTIVITY_COLUMNS,
-                  week_max=week_max, quiet=not any(week_max.values()), breakdowns=breakdowns(applications))
+                  week_max=week_max, quiet=not any(week_max.values()), breakdowns=breakdowns(applications), hid=hid)

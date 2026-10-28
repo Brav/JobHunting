@@ -67,6 +67,8 @@ class Job(SQLModel, table=True):
     reposts: int | None = None
     ghost_risk: int | None = Field(default=None, index=True)  # 0–3; 2+ = likely ghost
     ghost_reasons: str | None = None  # JSON list of short reasons
+    blocked_by: str | None = None  # jobhunt.blocks: why the user's rules hide it ("Company blocked")
+    hide_reason: str | None = None  # why the user hid it (jobhunt.blocks.HIDE_REASONS)
 
 
 class Run(SQLModel, table=True):
@@ -133,3 +135,25 @@ class Sighting(SQLModel, table=True):
     seen_at: NaiveDatetime
     external_id: str
     posted_at: date | None = None
+
+
+class BlockedCompany(SQLModel, table=True):
+    """A company whose new jobs the user never wants to see."""
+
+    __tablename__ = "blocked_companies"
+
+    key: str = Field(primary_key=True)  # jobhunt.blocks.company_key
+    name: str
+    created_at: NaiveDatetime = Field(default_factory=utcnow)
+
+
+class NegativeRule(SQLModel, table=True):
+    """A word or phrase that hides new jobs: in the title only, or anywhere in the title and description."""
+
+    __tablename__ = "negative_rules"
+
+    id: int | None = Field(default=None, primary_key=True)
+    phrase: str
+    scope: str = "title"  # "title" or "anywhere"
+    active: bool = True
+    created_at: NaiveDatetime = Field(default_factory=utcnow)

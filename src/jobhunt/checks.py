@@ -10,7 +10,7 @@ from datetime import date
 
 from sqlmodel import Session, or_, select
 
-from jobhunt import eligibility, signals
+from jobhunt import blocks, eligibility, signals
 from jobhunt.models import Job, Sighting
 from jobhunt.preferences import Preferences, load_preferences
 from jobhunt.timeutil import utcnow
@@ -27,7 +27,8 @@ class CheckContext:
 
 
 def load_context(session: Session) -> CheckContext:
-    return CheckContext(eligibility.load_profile(session), load_preferences(session))
+    return CheckContext(eligibility.load_profile(session), load_preferences(session),
+                        blocked=blocks.blocked_keys(session), rules=blocks.active_rules(session))
 
 
 def refresh(session: Session, job: Job, ctx: CheckContext) -> None:
@@ -37,6 +38,7 @@ def refresh(session: Session, job: Job, ctx: CheckContext) -> None:
     job.reposts = signals.reposts(sightings)
     score, reasons = signals.ghost(job, sightings, ctx.today)
     job.ghost_risk, job.ghost_reasons = score, json.dumps(reasons, ensure_ascii=False)
+    job.blocked_by = blocks.blocked_reason(job, ctx.blocked, ctx.rules)
 
 
 def refresh_job(session_factory, job_id: int) -> None:

@@ -37,6 +37,8 @@
   <div class="toast" x-data x-cloak x-show="$store.toast.open" x-transition.opacity role="status">
     <span x-text="$store.toast.message"></span>
     <button class="btn small" type="button" x-show="!!$store.toast.undo" @click="$store.toast.runUndo()">Undo</button>
+    <span class="toast-reasons" x-show="!!$store.toast.hideJobId"><span class="muted small">Why?</span>
+      {% for key, label in hide_reasons.items() %}<button class="btn ghost small" type="button" @click="$store.toast.reason('{{ key }}')">{{ label }}</button>{% endfor %}</span>
   </div>
   {% include "_shortcuts.html" %}
 </body>

@@ -38,4 +38,28 @@
   </fieldset>
   <div><button class="btn primary" type="submit">Save</button></div>
 </form>
+
+<section class="settings-section" id="blocks" aria-labelledby="h-blocks">
+  <h2 id="h-blocks">Blocked companies</h2>
+  <p class="muted small">New jobs from these companies are hidden (behind the "hidden by your rules" chip).</p>
+  {% if blocked %}<ul class="plain-list">{% for b in blocked %}
+    <li>{{ b.name }} <form class="inline" method="post" action="/blocks/companies/remove"><input type="hidden" name="name" value="{{ b.name }}">
+      <button class="btn ghost small" type="submit" aria-label="Unblock {{ b.name }}">Unblock</button></form></li>{% endfor %}</ul>
+  {% else %}<p class="empty">None yet. Use "Block company" on a job, or add one here.</p>{% endif %}
+  <form class="inline-form" method="post" action="/blocks/companies">
+    <input name="name" placeholder="Company name" aria-label="Company to block" required>
+    <button class="btn small" type="submit">Block</button>
+  </form>
+  <h2>Blocked keywords</h2>
+  <p class="muted small">New jobs whose title (or title and description) contains a keyword are hidden. Whole words only: "Java" doesn't hide "JavaScript".</p>
+  {% if rules %}<ul class="plain-list">{% for r in rules %}
+    <li>“{{ r.phrase }}” <span class="muted small">{{ rule_scopes[r.scope] }}</span>
+      <form class="inline" method="post" action="/blocks/rules/{{ r.id }}/remove"><button class="btn ghost small" type="submit" aria-label="Remove {{ r.phrase }}">Remove</button></form></li>{% endfor %}</ul>
+  {% else %}<p class="empty">None yet.</p>{% endif %}
+  <form class="inline-form" method="post" action="/blocks/rules">
+    <input name="phrase" placeholder="Keyword, e.g. Magento" aria-label="Keyword to block" required>
+    <select name="scope" aria-label="Where to look">{% for value, label in rule_scopes.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+    <button class="btn small" type="submit">Add</button>
+  </form>
+</section>
 {% endblock %}

@@ -9,6 +9,7 @@
     · {{ age(job)[1] | lower }}{% if pane.found_by %} · found by {{ pane.found_by | join(", ") }}{% endif %}</p>
   {% if pane.signals.line %}<p class="pane-signals muted small">{{ pane.signals.line[:1] | upper }}{{ pane.signals.line[1:] }}</p>{% endif %}
   {% if pane.signals.closed_at %}<p class="notice error-notice">No longer accepting applications (seen {{ pane.signals.closed_at | local_dt(tz) }})</p>{% endif %}
+  {% if job.blocked_by %}<p class="notice">Hidden by your rules: {{ job.blocked_by }}</p>{% endif %}
   {% if pane.signals.ghost %}<p class="notice">Likely ghost job: {{ pane.signals.reasons | join(" · ") }}</p>{% endif %}
   {% include "_eligibility.html" %}
   {% if not pane.focus %}
@@ -27,6 +28,8 @@
     {% endif %}
     <a class="btn" data-action="cv" href="/jobs/{{ job.id }}/cv-prompt" target="_blank" rel="noopener">{{ icon("file-text") }} CV prompt {{ key("C") }}</a>
     <a class="btn" data-action="linkedin" href="{{ job.url }}" target="_blank" rel="noopener">{{ icon("external-link") }} LinkedIn {{ key("O") }}</a>
+    <button class="btn ghost" type="button" hx-post="/jobs/{{ job.id }}/{{ 'unblock' if pane.company_blocked else 'block' }}-company"
+            hx-target="#job-pane" hx-swap="innerHTML">{{ "Unblock company" if pane.company_blocked else "Block company" }}</button>
   </div>
   {% if job.status == "applied" %}{% include "_application.html" %}
   {% elif pane.step_error %}<p class="notice error-notice" role="alert">{{ pane.step_error }}</p>{% endif %}

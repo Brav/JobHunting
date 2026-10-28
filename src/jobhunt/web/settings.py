@@ -4,8 +4,10 @@ from zoneinfo import ZoneInfo, available_timezones
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlmodel import select
 
 from jobhunt.eligibility import Profile, load_profile, refresh_all, save_profile
+from jobhunt.models import BlockedCompany, NegativeRule
 from jobhunt.places import COUNTRIES
 from jobhunt.timeutil import utcnow
 from jobhunt.web.common import render, session
@@ -31,7 +33,11 @@ def _form_languages(languages: tuple[str, ...]) -> list[str]:
 
 
 def _page(request: Request, profile: Profile, errors: list[str], saved: str = "", status_code: int = 200):
+    with session(request) as s:
+        blocked = list(s.exec(select(BlockedCompany).order_by(BlockedCompany.name)).all())
+        rules = list(s.exec(select(NegativeRule).order_by(NegativeRule.phrase)).all())
     return render(request, "settings.html", status_code=status_code, active="settings", profile=profile,
+                  blocked=blocked, rules=rules,
                   languages=_form_languages(profile.languages), errors=errors, saved=saved,
                   regions=REGION_CHOICES, language_choices=LANGUAGE_CHOICES, contract_choices=CONTRACT_CHOICES,
                   countries=COUNTRY_CHOICES, zones=ZONES)

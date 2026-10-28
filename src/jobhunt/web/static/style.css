@@ -267,3 +267,9 @@ caption { text-align: left; font-weight: 600; font-size: var(--t2); padding: 0 0
 .actions-row { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; margin: var(--s3) 0; }
 .item-age .reposts { color: var(--warning); font-variant-numeric: tabular-nums; }
 .pane-signals { margin: 0 0 var(--s2); }
+.toast-reasons { display: inline-flex; flex-wrap: wrap; gap: 2px; align-items: center; }
+.settings-section { margin-top: var(--s5); }
+.plain-list { list-style: none; padding: 0; margin: var(--s2) 0; }
+.plain-list li { display: flex; gap: var(--s2); align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.inline-form { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; margin: var(--s2) 0; }
+form.inline { display: inline; }

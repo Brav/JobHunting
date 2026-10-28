@@ -198,3 +198,12 @@ def breakdowns(apps: list[Application]) -> dict[str, list[BreakdownRow]]:
                 for label, group in groups.items()]
         result[name] = sorted(rows, key=lambda r: (-r.applied, r.label))
     return result
+
+
+def hide_reasons(session: Session) -> list[tuple[str, int]]:
+    """Hidden jobs by the reason the user gave, most common first."""
+    from jobhunt.blocks import HIDE_REASONS
+    counts = defaultdict(int)
+    for reason in session.exec(select(Job.hide_reason).where(Job.status == "hidden")).all():
+        counts[HIDE_REASONS.get(reason, "No reason given")] += 1
+    return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
