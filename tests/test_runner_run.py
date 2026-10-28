@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 from sqlmodel import select
 
 from fakes import FakeClock, FakeSource, add_listing, make_posting as p
-from jobhunt.models import Run, RunListing
+from jobhunt.actions import delete_listing
+from jobhunt.models import Job, Listing, Match, Run, RunListing
 from jobhunt.runner import run_daily
 from jobhunt.sources.base import SourceBlocked, SourceError
 
@@ -94,3 +95,55 @@ def test_unexpected_exception_fails_run(session_factory):
         run = s.get(Run, run_id)
     assert (run.status, run.error) == ("failed", "RuntimeError: kaboom")
     assert run.finished_at is not None
+
+
+def test_window_restarts_after_search_change(session_factory):
+    a = add_listing(session_factory, "A", keywords="python")
+    src = FakeSource({"python": [[p("1")]]})
+    _, clock = go(session_factory, src)
+    clock.now = NOW + timedelta(hours=24)
+    with session_factory() as s:
+        listing = s.get(Listing, a)
+        listing.search_changed_at = NOW + timedelta(hours=1)
+        s.add(listing)
+        s.commit()
+    go(session_factory, src, clock)
+    assert src.calls[1]["window_hours"] == 168
+
+
+def test_listing_deleted_before_its_turn_is_skipped(session_factory):
+    a = add_listing(session_factory, "A", keywords="python")
+    b = add_listing(session_factory, "B", keywords="go")
+    src = FakeSource({"python": [[p("1")]], "go": [[p("2")]]})
+    search = src.search
+
+    def deleting_search(**kw):
+        if kw["keywords"] == "python":
+            with session_factory() as s:
+                delete_listing(s, b)
+        return search(**kw)
+
+    src.search = deleting_search
+    run_id, _ = go(session_factory, src)
+    assert status(session_factory, run_id) == "ok"
+    assert rows(session_factory, run_id) == {a: (1, 1, 1, None)}
+    assert [c["keywords"] for c in src.calls] == ["python"]
+
+
+def test_listing_deleted_during_its_search_leaves_no_rows(session_factory):
+    b = add_listing(session_factory, "B", keywords="go")
+    src = FakeSource({"go": [[p("2")]]})
+    search = src.search
+
+    def search_then_delete(**kw):
+        result = search(**kw)
+        with session_factory() as s:
+            delete_listing(s, b)
+        return result
+
+    src.search = search_then_delete
+    run_id, _ = go(session_factory, src)
+    assert status(session_factory, run_id) == "ok"
+    assert rows(session_factory, run_id) == {}
+    with session_factory() as s:
+        assert s.exec(select(Match)).all() == [] and s.exec(select(Job)).all() == []

@@ -21,6 +21,8 @@ class Listing(SQLModel, table=True):
     radius_km: int = 25
     active: bool = True
     created_at: NaiveDatetime = Field(default_factory=utcnow)
+    # Set when keywords, location or radius change, so the next run searches the full 7 days again.
+    search_changed_at: NaiveDatetime | None = None
 
 
 class Job(SQLModel, table=True):

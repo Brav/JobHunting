@@ -9,6 +9,7 @@ from sqlmodel import Session, select
 from jobhunt.actions import delete_listing
 from jobhunt.models import Listing
 from jobhunt.reports import listing_rows
+from jobhunt.timeutil import utcnow
 from jobhunt.web.common import render, session
 
 router = APIRouter()
@@ -85,6 +86,8 @@ def update_listing(request: Request, listing_id: int, name: str = Form(""), keyw
         if errors:
             return render(request, "listing_form.html", status_code=400, listing=listing,
                           values=values, errors=errors)
+        if any(getattr(listing, key) != values[key] for key in ("keywords", "location", "radius_km")):
+            listing.search_changed_at = utcnow()
         for key, value in values.items():
             setattr(listing, key, value)
         s.add(listing)

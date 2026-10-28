@@ -24,15 +24,28 @@ def make_engine(db_path: Path) -> Engine:
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
         dbapi_conn.create_function("py_lower", 1, _py_lower, deterministic=True)
 
     return engine
 
 
+def _add_missing_columns(engine: Engine) -> None:
+    # No migration tool: columns added to a model after a database was created are added here (nullable only).
+    with engine.begin() as conn:
+        for table in SQLModel.metadata.sorted_tables:
+            existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table.name})")}
+            for column in table.columns:
+                if column.name not in existing and column.nullable:
+                    ddl_type = column.type.compile(dialect=engine.dialect)
+                    conn.exec_driver_sql(f"ALTER TABLE {table.name} ADD COLUMN {column.name} {ddl_type}")
+
+
 def init_db(engine: Engine) -> None:
     """Create tables and mark runs left 'running' by a crash or restart as interrupted."""
     SQLModel.metadata.create_all(engine)
+    _add_missing_columns(engine)
     with Session(engine) as session:
         session.exec(
             update(Run)

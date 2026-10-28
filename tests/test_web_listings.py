@@ -59,3 +59,13 @@ def test_special_characters_escaped_and_passed_through(app_factory):
         app.state.coordinator.run_blocking("manual")
     assert "C++ &amp; &#34;Go&#34; &lt;dev&gt;" in page and "<dev>" not in page
     assert src.calls[0]["keywords"] == '"програмер" NOT senior'
+
+
+def test_editing_search_fields_restarts_window(app_factory):
+    app = app_factory()
+    lid = add_listing(app.state.session_factory, "Python BG")
+    with TestClient(app) as c:
+        c.post(f"/listings/{lid}", data={**FORM, "name": "Renamed"})
+        assert listings(app)[0].search_changed_at is None
+        c.post(f"/listings/{lid}", data={**FORM, "name": "Renamed", "radius_km": "100"})
+        assert listings(app)[0].search_changed_at is not None

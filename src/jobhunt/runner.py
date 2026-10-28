@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from jobhunt.models import Job, Listing, Match, Run, RunListing
@@ -39,11 +40,14 @@ def window_hours(last_success: datetime | None, now: datetime) -> int:
 
 
 def last_success_at(session: Session, listing_id: int) -> datetime | None:
-    return session.exec(
-        select(func.max(Run.started_at))
-        .join(RunListing, RunListing.run_id == Run.id)
-        .where(RunListing.listing_id == listing_id, RunListing.error.is_(None))
-    ).one()
+    """Start of the listing's last successful run, ignoring runs from before its search was last edited."""
+    query = (select(func.max(Run.started_at))
+             .join(RunListing, RunListing.run_id == Run.id)
+             .where(RunListing.listing_id == listing_id, RunListing.error.is_(None)))
+    listing = session.get(Listing, listing_id)
+    if listing is not None and listing.search_changed_at is not None:
+        query = query.where(Run.started_at >= listing.search_changed_at)
+    return session.exec(query).one()
 
 
 def record_results(session: Session, run_id: int, listing_id: int,
@@ -83,19 +87,30 @@ def _save_attempt(session_factory, run_id: int, listing_id: int,
 
 
 def _attempt(session_factory, source: JobSource, run_id: int, listing: Listing,
-             window: int, limit: int, clock: Callable[[], datetime]) -> bool:
-    try:
-        postings = source.search(keywords=listing.keywords, location=listing.location,
-                                 radius_km=listing.radius_km, window_hours=window, limit=limit)
-    except SourceError as e:
-        logger.warning("listing %r failed: %s", listing.name, e)
-        _save_attempt(session_factory, run_id, listing.id, error=str(e))
-        return False
+             window: int, limit: int, clock: Callable[[], datetime]) -> str:
+    """Search one listing. Returns "ok", "failed", or "skipped" (deleted or switched off meanwhile)."""
     with session_factory() as s:
-        result = record_results(s, run_id, listing.id, postings, clock())
-    logger.info("listing %r: found %d, new %d", listing.name, result.found, result.new)
-    _save_attempt(session_factory, run_id, listing.id, result=result)
-    return True
+        current = s.get(Listing, listing.id)
+    if current is None or not current.active:
+        logger.info("listing %r was deleted or switched off; skipping", listing.name)
+        return "skipped"
+    try:
+        try:
+            postings = source.search(keywords=current.keywords, location=current.location,
+                                     radius_km=current.radius_km, window_hours=window, limit=limit)
+        except SourceError as e:
+            logger.warning("listing %r failed: %s", current.name, e)
+            _save_attempt(session_factory, run_id, current.id, error=str(e))
+            return "failed"
+        with session_factory() as s:
+            result = record_results(s, run_id, current.id, postings, clock())
+        _save_attempt(session_factory, run_id, current.id, result=result)
+    except IntegrityError:
+        # The listing was deleted while it was being searched; foreign keys stop orphan rows.
+        logger.info("listing %r was deleted during its search; skipping", current.name)
+        return "skipped"
+    logger.info("listing %r: found %d, new %d", current.name, result.found, result.new)
+    return "ok"
 
 
 def run_daily(session_factory: Callable[[], Session], source: JobSource, *, trigger: str,
@@ -115,6 +130,7 @@ def run_daily(session_factory: Callable[[], Session], source: JobSource, *, trig
         with session_factory() as s:
             listings = s.exec(select(Listing).where(Listing.active == True).order_by(Listing.id)).all()  # noqa: E712
         windows: dict[int, int] = {}
+        succeeded = 0
         pending = list(listings)
         for pass_no in range(1 + len(RETRY_DELAYS_SECONDS)):
             if pass_no:
@@ -128,14 +144,16 @@ def run_daily(session_factory: Callable[[], Session], source: JobSource, *, trig
                 if listing.id not in windows:
                     with session_factory() as s:
                         windows[listing.id] = window_hours(last_success_at(s, listing.id), clock())
-                if not _attempt(session_factory, source, run_id, listing,
-                                windows[listing.id], results_per_listing, clock):
+                outcome = _attempt(session_factory, source, run_id, listing,
+                                   windows[listing.id], results_per_listing, clock)
+                if outcome == "failed":
                     failed.append(listing)
+                succeeded += outcome == "ok"
             pending = failed
         if not pending:
             status = "ok"
         else:
-            status = "partial" if len(pending) < len(listings) else "failed"
+            status = "partial" if succeeded else "failed"
     except Exception as e:
         logger.exception("run %d crashed", run_id)
         status, error = "failed", f"{type(e).__name__}: {e}"
