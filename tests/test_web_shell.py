@@ -40,3 +40,13 @@ def test_days_ago():
     today = date(2026, 10, 28)
     assert [days_ago(d, today) for d in (date(2026, 10, 28), date(2026, 10, 27), date(2026, 10, 25), None)] == [
         "today", "yesterday", "3 days ago", "—"]
+
+
+def test_translator_choice(tmp_path):
+    from jobhunt.config import load_settings
+    from jobhunt.translate import DeepLTranslator, NoTranslator
+    from jobhunt.web.app import create_app
+    base = {"JOBHUNT_DB_PATH": str(tmp_path / "t.db")}
+    assert isinstance(create_app(load_settings(base), start_scheduler=False).state.translator, NoTranslator)
+    app = create_app(load_settings({**base, "DEEPL_AUTH_KEY": "abc:fx"}), start_scheduler=False)
+    assert isinstance(app.state.translator, DeepLTranslator)

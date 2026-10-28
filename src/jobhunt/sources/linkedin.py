@@ -129,7 +129,3 @@ def fetch_job_page(external_id: str, get: Callable[..., Any] | None = None) -> J
         if label and value:
             details.append((label.get_text(strip=True), value.get_text(strip=True)))
     return JobPage(description=description, details=details)
-
-
-def fetch_description(external_id: str, get: Callable[..., Any] | None = None) -> str:
-    return fetch_job_page(external_id, get).description

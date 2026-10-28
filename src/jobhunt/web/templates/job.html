@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title_en or job.title }}{% endblock %}
+{% block content %}
+<h1>{{ job.title_en or job.title }}{% if job.language and job.language != "en" %} <span class="lang">{{ job.language | language_name }}</span>{% endif %}</h1>
+{% if job.title_en %}<p class="muted">Original title: {{ job.title }}</p>{% endif %}
+<p>{{ job.company }} · {{ job.location }} · posted {{ job.posted_at | days_ago(today) }}</p>
+{% include "_job_actions.html" %}
+{% if download_error %}
+<p class="error">Couldn't load the job listing: {{ download_error }}</p>
+<div class="actions">
+  <a class="button" href="{{ job.url }}" target="_blank" rel="noopener">Open on LinkedIn</a>
+  <form class="inline" method="post" action="/jobs/{{ job.id }}/description">
+    <input type="hidden" name="next" value="/jobs/{{ job.id }}"><button type="submit">Try again</button>
+  </form>
+</div>
+{% endif %}
+{% if details %}
+<dl class="details">
+  {% for label, value in details %}<div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>{% endfor %}
+</dl>
+{% endif %}
+{% if translation_error %}<p class="error">{{ translation_error }}</p>{% endif %}
+{% if job.description %}
+<div class="listing">
+  {% if job.description_en %}
+  {{ job.description_en | markdown }}
+  <details>
+    <summary>Show original ({{ job.language | language_name }})</summary>
+    {{ job.description | markdown }}
+  </details>
+  {% else %}
+  {{ job.description | markdown }}
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

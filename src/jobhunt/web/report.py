@@ -46,7 +46,7 @@ def report_for_day(request: Request, day: date):
 
 
 @router.post("/jobs/{job_id}/status", response_class=HTMLResponse)
-def change_status(request: Request, job_id: int, status: str = Form("")):
+def change_status(request: Request, job_id: int, status: str = Form(""), view: str = ""):
     with session(request) as s:
         try:
             job = set_job_status(s, job_id, status, utcnow())
@@ -54,6 +54,8 @@ def change_status(request: Request, job_id: int, status: str = Form("")):
             raise HTTPException(status_code=400, detail="Unknown status")
         except LookupError:
             raise HTTPException(status_code=404, detail="Job not found")
+    if view == "page":
+        return render(request, "_job_actions.html", job=job)
     if job.status == "hidden":
         return HTMLResponse("")  # htmx swaps the row out
     return render(request, "_job_row.html", job=job)

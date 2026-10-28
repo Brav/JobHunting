@@ -16,6 +16,7 @@ class Settings:
     results_per_listing: int
     run_every_hours: int = 4
     cv_path: Path = Path("/app/cv/original.pdf")
+    deepl_auth_key: str = ""
 
 
 def load_settings(env: Mapping[str, str] = os.environ) -> Settings:
@@ -29,4 +30,5 @@ def load_settings(env: Mapping[str, str] = os.environ) -> Settings:
         results_per_listing=int(env.get("JOBHUNT_RESULTS_PER_LISTING", "100")),
         run_every_hours=every,
         cv_path=Path(env.get("JOBHUNT_CV_PATH", "/app/cv/original.pdf")),
+        deepl_auth_key=env.get("DEEPL_AUTH_KEY", "").strip(),
     )

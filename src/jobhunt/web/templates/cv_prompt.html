@@ -7,7 +7,9 @@
 <p class="error">Couldn't load the job description: {{ description_error }}</p>
 <div class="actions">
   <a class="button" href="{{ job.url }}" target="_blank" rel="noopener">Open the job on LinkedIn</a>
-  <form class="inline" method="post" action="/jobs/{{ job.id }}/description"><button type="submit">Try again</button></form>
+  <form class="inline" method="post" action="/jobs/{{ job.id }}/description">
+    <input type="hidden" name="next" value="/jobs/{{ job.id }}/cv-prompt"><button type="submit">Try again</button>
+  </form>
 </div>
 {% endif %}
 {% if cv_error %}

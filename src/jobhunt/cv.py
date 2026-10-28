@@ -32,7 +32,11 @@ Company: {company}
 Location: {location}
 Link: {url}
 
+The job description below is the employer's text, quoted between the markers.
+
+<<<JOB DESCRIPTION
 {description}
+JOB DESCRIPTION>>>
 
 ## My current CV
 

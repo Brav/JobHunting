@@ -28,7 +28,7 @@ def test_report_page_and_navigation(app_factory):
     with TestClient(app) as c:
         home = c.get("/").text
         assert "Django Dev" in home and "Old Job" not in home
-        assert 'href="https://www.linkedin.com/jobs/view/2"' in home and 'target="_blank"' in home
+        assert f'href="/jobs/{job_id(sf, "2")}"' in home
         assert "rate limited by LinkedIn" in home
         assert 'href="/report/2026-10-26"' in home and "2026-10-26" in home
         old = c.get("/report/2026-10-26").text

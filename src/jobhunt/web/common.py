@@ -6,8 +6,11 @@ from zoneinfo import ZoneInfo
 
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
+from markdown_it import MarkdownIt
+from markupsafe import Markup
 from sqlmodel import Session
 
+from jobhunt.language import language_name
 from jobhunt.reports import run_summary
 from jobhunt.timeutil import local_date, to_local, utcnow
 
@@ -35,7 +38,16 @@ def days_ago(d: date | None, today: date) -> str:
     return f"{days} days ago"
 
 
-templates.env.filters.update(local_dt=local_dt, when=when, days_ago=days_ago)
+# Listings are third-party text: raw HTML is shown as text and unsafe links (javascript:) are not linked.
+_markdown = MarkdownIt("commonmark", {"html": False})
+
+
+def markdown(text: str | None) -> Markup:
+    return Markup(_markdown.render(text or ""))
+
+
+templates.env.filters.update(local_dt=local_dt, when=when, days_ago=days_ago, markdown=markdown,
+                             language_name=language_name)
 
 
 def session(request: Request) -> Session:

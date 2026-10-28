@@ -38,6 +38,7 @@ def test_prompt_contains_rules_job_and_cv():
                  "Link: https://www.linkedin.com/jobs/view/123", "downloadable PDF (or Word)"):
         assert text in prompt
     assert prompt.endswith("Jane Doe\nPHP")
+    assert "<<<JOB DESCRIPTION\nBuild Laravel APIs.\nJOB DESCRIPTION>>>" in prompt and "the employer's text" in prompt
 
 
 def test_prompt_without_description():

@@ -12,23 +12,30 @@ from fastapi.staticfiles import StaticFiles
 from jobhunt.config import Settings
 from jobhunt.db import init_db, make_engine, make_session_factory
 from jobhunt.scheduler import RunCoordinator
-from jobhunt.sources.base import JobSource
-from jobhunt.web import cv, listings, report, tracker
+from jobhunt.job_listing import clear_translation_errors
+from jobhunt.sources.base import JobPage, JobSource
+from jobhunt.translate import NO_KEY_MESSAGE, DeepLTranslator, NoTranslator, Translator
+from jobhunt.web import cv, job, listings, report, tracker
 from jobhunt.web.common import render
 
 
 def create_app(settings: Settings, *, source: JobSource | None = None,
-               describe: Callable[[str], str] | None = None, start_scheduler: bool = True,
-               sleep: Callable[[float], None] = time.sleep) -> FastAPI:
+               fetch_page: Callable[[str], JobPage] | None = None, translator: Translator | None = None,
+               start_scheduler: bool = True, sleep: Callable[[float], None] = time.sleep) -> FastAPI:
     engine = make_engine(settings.db_path)
     init_db(engine)
     session_factory = make_session_factory(engine)
     if source is None:
         from jobhunt.sources.linkedin import LinkedInSource
         source = LinkedInSource()
-    if describe is None:
-        from jobhunt.sources.linkedin import fetch_description as describe
-    coordinator = RunCoordinator(session_factory, source, settings, sleep=sleep)
+    if fetch_page is None:
+        from jobhunt.sources.linkedin import fetch_job_page as fetch_page
+    if translator is None:
+        translator = DeepLTranslator(settings.deepl_auth_key) if settings.deepl_auth_key else NoTranslator()
+    if isinstance(translator, DeepLTranslator):
+        clear_translation_errors(session_factory, NO_KEY_MESSAGE)  # a key was added since those failed
+    coordinator = RunCoordinator(session_factory, source, settings, sleep=sleep, fetch_page=fetch_page,
+                                 translator=translator)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -43,11 +50,13 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     app.state.settings = settings
     app.state.session_factory = session_factory
     app.state.coordinator = coordinator
-    app.state.describe = describe
+    app.state.fetch_page = fetch_page
+    app.state.translator = translator
     app.include_router(report.router)
     app.include_router(listings.router)
     app.include_router(tracker.router)
     app.include_router(cv.router)
+    app.include_router(job.router)
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
     @app.post("/runs", response_class=HTMLResponse)

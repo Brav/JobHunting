@@ -49,3 +49,8 @@ def test_schedule_and_cv_settings():
 def test_bad_run_interval(bad):
     with pytest.raises(ValueError):
         load_settings({"JOBHUNT_RUN_EVERY_HOURS": bad})
+
+
+def test_deepl_key_setting():
+    assert load_settings({}).deepl_auth_key == ""
+    assert load_settings({"DEEPL_AUTH_KEY": "  abc:fx\n"}).deepl_auth_key == "abc:fx"

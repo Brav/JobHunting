@@ -1,17 +1,11 @@
 <tr id="job-{{ job.id }}">
-  <td><a href="{{ job.url }}" target="_blank" rel="noopener">{{ job.title }}</a></td>
+  <td><a href="/jobs/{{ job.id }}"{% if job.title_en %} title="{{ job.title }}"{% endif %}>{{ job.title_en or job.title }}</a>{% if job.language and job.language != "en" %} <span class="lang">{{ job.language | language_name }}</span>{% endif %}</td>
   <td>{{ job.company }}</td>
   <td>{{ job.location }}</td>
   <td>{{ job.posted_at | days_ago(today) }}</td>
   <td class="actions">
-    {% for value, label in [("interested", "Interested"), ("applied", "Applied"), ("hidden", "Hide")] %}
-    <button class="{{ 'current' if job.status == value }}" hx-post="/jobs/{{ job.id }}/status"
-            hx-vals='{"status": "{{ value }}"}' hx-target="closest tr" hx-swap="outerHTML">{{ label }}</button>
-    {% endfor %}
-    {% if job.status != "new" %}
-    <button hx-post="/jobs/{{ job.id }}/status" hx-vals='{"status": "new"}'
-            hx-target="closest tr" hx-swap="outerHTML">Reset</button>
-    {% endif %}
+    {% set target, view = "closest tr", "" %}
+    {% include "_status_buttons.html" %}
     <a class="button" href="/jobs/{{ job.id }}/cv-prompt" target="_blank" rel="noopener">CV prompt</a>
   </td>
 </tr>

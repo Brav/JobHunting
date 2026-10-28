@@ -97,8 +97,8 @@ def tracker_jobs(session: Session, *, status: str = "default", listing_id: int |
     needle = q.strip().lower()
     if needle:
         # py_lower is registered in db.make_engine; SQLite's own lower() ignores non-ASCII letters.
-        query = query.where(or_(func.py_lower(Job.title, type_=String).contains(needle, autoescape=True),
-                                func.py_lower(Job.company, type_=String).contains(needle, autoescape=True)))
+        query = query.where(or_(*(func.py_lower(column, type_=String).contains(needle, autoescape=True)
+                                  for column in (Job.title, Job.title_en, Job.company))))
     total = session.exec(select(func.count()).select_from(query.subquery())).one()
     jobs = session.exec(
         query.order_by(Job.first_seen_at.desc(), Job.id.desc()).offset((page - 1) * per_page).limit(per_page)

@@ -1,10 +1,11 @@
 """The CV prompt page: the job's description plus the original CV, as a prompt for Claude.ai."""
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from sqlmodel import Session
 
 from jobhunt.cv import CVError, build_cv_prompt, read_cv_text
+from jobhunt.job_listing import download_listing
 from jobhunt.models import Job
 from jobhunt.sources.base import SourceError
 from jobhunt.timeutil import utcnow
@@ -20,30 +21,18 @@ def _job(s: Session, job_id: int) -> Job:
     return job
 
 
-def _ensure_description(request: Request, job_id: int) -> str | None:
-    """Fetch and store the description if it's missing. Returns the failure reason, if any."""
-    with session(request) as s:
-        job = _job(s, job_id)
-        if job.description:
-            return None
-        external_id = job.external_id
-    try:
-        description = request.app.state.describe(external_id)  # network call, outside any transaction
-    except SourceError as e:
-        return str(e)
-    with session(request) as s:
-        job = _job(s, job_id)
-        job.description, job.description_fetched_at = description, utcnow()
-        s.add(job)
-        s.commit()
-    return None
-
-
 @router.get("/jobs/{job_id}/cv-prompt", response_class=HTMLResponse)
 def cv_prompt(request: Request, job_id: int):
-    description_error = _ensure_description(request, job_id)
     with session(request) as s:
         job = _job(s, job_id)
+    description_error = None
+    if not job.description:
+        try:
+            download_listing(request.app.state.session_factory, job_id, request.app.state.fetch_page, utcnow())
+        except SourceError as e:
+            description_error = str(e)
+        with session(request) as s:
+            job = _job(s, job_id)
     prompt, cv_error = None, None
     try:
         cv_text = read_cv_text(request.app.state.settings.cv_path)
@@ -53,9 +42,3 @@ def cv_prompt(request: Request, job_id: int):
         prompt = build_cv_prompt(job, job.description, cv_text)
     return render(request, "cv_prompt.html", job=job, prompt=prompt, cv_error=cv_error,
                   description_error=description_error)
-
-
-@router.post("/jobs/{job_id}/description")
-def retry_description(request: Request, job_id: int):
-    _ensure_description(request, job_id)
-    return RedirectResponse(f"/jobs/{job_id}/cv-prompt", status_code=303)
