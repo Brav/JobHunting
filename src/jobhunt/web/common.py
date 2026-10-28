@@ -15,6 +15,7 @@ from jobhunt.blocks import HIDE_REASONS, SCOPES, company_key
 from jobhunt.eligibility import VERDICT_LABELS, VERDICT_SYMBOLS, VERDICTS, effective
 from jobhunt import salary
 from jobhunt.preferences import is_paused, load_preferences
+from jobhunt.prompts import KINDS as PROMPT_KINDS
 from jobhunt.language import language_name
 from jobhunt.reports import run_summary
 from jobhunt.timeutil import local_date, to_local, utcnow
@@ -95,7 +96,7 @@ templates.env.globals.update(status_labels=STATUS_LABELS, workplace_labels=WORKP
                              stage_labels=STAGE_LABELS, verdicts=VERDICTS,
                              verdict_labels=VERDICT_LABELS, verdict_symbols=VERDICT_SYMBOLS,
                              hide_reasons=HIDE_REASONS, rule_scopes=SCOPES, channels=CHANNELS,
-                             company_key=company_key,
+                             company_key=company_key, prompt_kinds=PROMPT_KINDS,
                              contact_relations={"referral": "Referral", "recruiter": "Recruiter", "interviewer": "Interviewer", "other": "Other"})
 
 

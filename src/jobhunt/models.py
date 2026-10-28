@@ -201,3 +201,15 @@ class ContactJob(SQLModel, table=True):
     contact_id: int = Field(foreign_key="contacts.id", primary_key=True, ondelete="CASCADE")
     job_id: int = Field(foreign_key="jobs.id", primary_key=True, index=True, ondelete="CASCADE")
     relation: str = "other"
+
+
+class Question(SQLModel, table=True):
+    """An interview question to practise: for one company, or for any (company empty)."""
+
+    __tablename__ = "questions"
+
+    id: int | None = Field(default=None, primary_key=True)
+    text: str
+    company: str = ""
+    tags: str = ""
+    created_at: NaiveDatetime = Field(default_factory=utcnow)

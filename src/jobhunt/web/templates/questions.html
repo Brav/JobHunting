@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Question bank{% endblock %}
+{% block content %}
+<h1>Question bank</h1>
+<p class="muted">Interview questions to practise. The interview prompt includes the ones for that company and those for any company.</p>
+<form class="inline-form" method="post" action="/questions">
+  <input name="text" placeholder="Question" aria-label="Question" required size="50">
+  <input name="company" placeholder="Company (empty = any)" aria-label="Company">
+  <button class="btn small" type="submit">Add</button>
+</form>
+{% if questions %}<ul class="plain-list">{% for q in questions %}
+  <li>{{ q.text }} <span class="muted small">{{ q.company or "Any company" }}</span>
+    <form class="inline" method="post" action="/questions/{{ q.id }}/delete"><button class="btn ghost small" type="submit" aria-label="Delete question">✕</button></form></li>{% endfor %}</ul>
+{% else %}<p class="empty">No questions yet.</p>{% endif %}
+{% endblock %}

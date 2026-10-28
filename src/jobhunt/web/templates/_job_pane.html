@@ -44,6 +44,8 @@
   {% if job.status == "applied" %}{% include "_application.html" %}
   {% elif pane.step_error %}<p class="notice error-notice" role="alert">{{ pane.step_error }}</p>{% endif %}
   {% endif %}
+  {% if not pane.focus %}<p class="pane-prompts small"><span class="muted">Prompts for Claude:</span>
+    {% for kind, label in prompt_kinds.items() %}<a href="/jobs/{{ job.id }}/prompts/{{ kind }}" target="_blank" rel="noopener">{{ label }}</a>{{ " · " if not loop.last }}{% endfor %}</p>{% endif %}
   {% if not pane.focus %}
   <section class="people" aria-label="People">
     <h2 class="application-title">People</h2>
