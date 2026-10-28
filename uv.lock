@@ -286,10 +286,13 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "apscheduler" },
+    { name = "beautifulsoup4" },
     { name = "fastapi" },
     { name = "jinja2" },
+    { name = "markdownify" },
     { name = "python-jobspy" },
     { name = "python-multipart" },
+    { name = "requests" },
     { name = "sqlmodel" },
     { name = "tzdata" },
     { name = "uvicorn" },
@@ -304,10 +307,13 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "apscheduler", specifier = ">=3.10,<4" },
+    { name = "beautifulsoup4", specifier = ">=4.15.0" },
     { name = "fastapi", specifier = ">=0.162.0" },
     { name = "jinja2", specifier = ">=3.1.6" },
+    { name = "markdownify", specifier = ">=1.2.3" },
     { name = "python-jobspy", specifier = ">=1.4.1" },
     { name = "python-multipart", specifier = ">=0.0.32" },
+    { name = "requests", specifier = ">=2.34.2" },
     { name = "sqlmodel", specifier = ">=0.0.48" },
     { name = "tzdata", specifier = ">=2026.6" },
     { name = "uvicorn", specifier = ">=0.54.0" },

@@ -1,10 +1,12 @@
 from datetime import date
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
+import requests
 
 from jobhunt.sources.base import JobPosting, SourceBlocked, SourceError
-from jobhunt.sources.linkedin import LinkedInSource, km_to_miles, postings_from_frame
+from jobhunt.sources.linkedin import LinkedInSource, fetch_description, km_to_miles, postings_from_frame
 
 COLUMNS = ["id", "site", "job_url", "title", "company", "location", "date_posted"]
 GOOD = {"id": "li-4012345678", "site": "linkedin",
@@ -72,3 +74,48 @@ def test_exception_is_wrapped():
 
     with pytest.raises(SourceError, match="boom"):
         LinkedInSource(scrape=scrape).search("python", "Berlin", 25, 48, 100)
+
+
+JOB_HTML = ('<html><body><div class="show-more-less-html__markup show-more-less-html__markup--clamp">'
+            '<p>Build <strong>PHP</strong> APIs.</p><ul><li>Laravel</li><li>Vue</li></ul></div></body></html>')
+
+
+def page(status=200, url="https://www.linkedin.com/jobs/view/123", text=JOB_HTML):
+    return SimpleNamespace(status_code=status, url=url, text=text)
+
+
+def test_fetch_description_returns_markdown():
+    urls = []
+
+    def get(url, **kw):
+        urls.append(url)
+        return page()
+
+    text = fetch_description("123", get=get)
+    assert urls == ["https://www.linkedin.com/jobs/view/123"]
+    assert "Build **PHP** APIs." in text and "Laravel" in text and "<p>" not in text
+
+
+@pytest.mark.parametrize("status", [403, 429])
+def test_fetch_description_blocked(status):
+    with pytest.raises(SourceBlocked, match="rate limited by LinkedIn"):
+        fetch_description("123", get=lambda url, **kw: page(status=status))
+
+
+@pytest.mark.parametrize("response, message", [
+    (page(status=404), "status 404"),
+    (page(url="https://www.linkedin.com/jobs/search?x=1"), "not available"),
+    (page(text="<html></html>"), "no description"),
+])
+def test_fetch_description_errors(response, message):
+    with pytest.raises(SourceError, match=message) as exc:
+        fetch_description("123", get=lambda url, **kw: response)
+    assert not isinstance(exc.value, SourceBlocked)
+
+
+def test_fetch_description_network_error():
+    def get(url, **kw):
+        raise requests.ConnectionError("connection reset")
+
+    with pytest.raises(SourceError, match="connection reset"):
+        fetch_description("123", get=get)

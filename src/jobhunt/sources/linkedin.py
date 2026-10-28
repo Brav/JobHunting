@@ -1,11 +1,16 @@
-"""LinkedIn job search through JobSpy. The only module that imports jobspy or pandas."""
+"""LinkedIn job search (through JobSpy) and job descriptions. The only module that imports jobspy or pandas."""
 
 import logging
 import re
 from collections.abc import Callable
 from datetime import date, datetime
+from typing import Any
+from urllib.parse import urlparse
 
 import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+from markdownify import markdownify
 
 from jobhunt.sources.base import JobPosting, SourceBlocked, SourceError
 
@@ -14,6 +19,11 @@ BLOCKED_MESSAGE = "rate limited by LinkedIn"
 logger = logging.getLogger(__name__)
 
 _VIEW_ID = re.compile(r"/jobs/view/(\d+)")
+_BLANK_LINES = re.compile(r"\n{3,}")
+_PAGE_HEADERS = {
+    "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+    "accept-language": "en-US,en;q=0.9",
+}
 
 
 def km_to_miles(km: int) -> int:
@@ -92,3 +102,22 @@ class LinkedInSource:
                 raise SourceBlocked(BLOCKED_MESSAGE)
             raise SourceError(error)
         return postings_from_frame(df)
+
+
+def fetch_description(external_id: str, get: Callable[..., Any] | None = None) -> str:
+    """The job's description from its public LinkedIn page, as Markdown (one request)."""
+    get = get or requests.get
+    try:
+        response = get(f"https://www.linkedin.com/jobs/view/{external_id}", headers=_PAGE_HEADERS, timeout=15)
+    except requests.RequestException as e:
+        raise SourceError(f"LinkedIn request failed: {e}") from e
+    if response.status_code in (403, 429):
+        raise SourceBlocked(BLOCKED_MESSAGE)
+    if response.status_code != 200:
+        raise SourceError(f"LinkedIn returned status {response.status_code}")
+    if not urlparse(response.url).path.startswith("/jobs/view/"):
+        raise SourceError("job page not available on LinkedIn")
+    element = BeautifulSoup(response.text, "html.parser").find("div", class_="show-more-less-html__markup")
+    if element is None:
+        raise SourceError("no description on the job page")
+    return _BLANK_LINES.sub("\n\n", markdownify(str(element))).strip()
