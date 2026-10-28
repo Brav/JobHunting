@@ -24,7 +24,7 @@
   </main>
   <div class="toast" x-data x-cloak x-show="$store.toast.open" x-transition.opacity role="status">
     <span x-text="$store.toast.message"></span>
-    <button class="btn small" type="button" x-show="$store.toast.undo" @click="$store.toast.runUndo()">Undo</button>
+    <button class="btn small" type="button" x-show="!!$store.toast.undo" @click="$store.toast.runUndo()">Undo</button>
   </div>
   {% include "_shortcuts.html" %}
 </body>

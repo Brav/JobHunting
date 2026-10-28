@@ -1,34 +1,38 @@
 {% extends "base.html" %}
 {% set active = "report" %}
+{% from "_macros.html" import icon, key %}
 {% block title %}Report{% endblock %}
+{% block main_class %}page-wide{% endblock %}
 {% block content %}
 {% if day is none %}
+<section class="page">
   <h1>Report</h1>
-  <p class="muted">No reports yet. The first search runs at 10:00, or press Run now.</p>
+  <p class="muted">No reports yet. The first search runs at {{ next_run.strftime("%H:%M") if next_run else "the next scheduled time" }}, or press Run now.</p>
   {% if not has_listings %}<p><a href="/listings">Add a listing</a> to get started.</p>{% endif %}
+</section>
 {% else %}
-  <h1>New jobs · {{ day.isoformat() }}{% if day == today %} (today){% endif %}</h1>
-  <div class="date-nav">
-    {% if prev_day %}<a href="/report/{{ prev_day.isoformat() }}">← {{ prev_day.isoformat() }}</a>{% endif %}
-    {% if next_day %}<a href="/report/{{ next_day.isoformat() }}">{{ next_day.isoformat() }} →</a>{% endif %}
-    <form method="get" action="/report">
-      <input type="date" name="day" value="{{ day.isoformat() }}">
-      <button type="submit">Go</button>
-    </form>
-  </div>
-  {% if not ran %}<p class="muted">No search ran on this day.</p>{% endif %}
-  {% for section in sections %}
-    <h2>{{ section.listing.name }} <span class="muted">· {{ section.jobs | length }} new</span></h2>
-    {% if section.error %}<p class="error">Search failed: {{ section.error }}</p>{% endif %}
-    {% if section.found >= results_cap %}<p class="hint">This search hit the limit of {{ results_cap }} jobs, so some may be missing. Narrow it to see them all.</p>{% endif %}
-    {% if section.jobs %}
-    <table>
-      {% include "_job_table_head.html" %}
-      <tbody>{% for job in section.jobs %}{% include "_job_row.html" %}{% endfor %}</tbody>
-    </table>
-    {% elif not section.error %}
-    <p class="muted">No new jobs.</p>
-    {% endif %}
+<div class="toolbar">
+  <h1>{{ day.strftime("%a %-d %b") }}{% if day == today %} <span class="muted">· today</span>{% endif %}</h1>
+  <span class="day-nav">
+    {% if prev_day %}<a class="btn ghost small" href="/report/{{ prev_day.isoformat() }}" title="{{ prev_day.isoformat() }}" aria-label="Previous day">{{ icon("chevron-left") }}</a>{% endif %}
+    {% if next_day %}<a class="btn ghost small" href="/report/{{ next_day.isoformat() }}" title="{{ next_day.isoformat() }}" aria-label="Next day">{{ icon("chevron-right") }}</a>{% endif %}
+  </span>
+  <form method="get" action="/report" class="inline">
+    <input type="date" name="day" value="{{ day.isoformat() }}" aria-label="Go to day" onchange="this.form.submit()">
+  </form>
+  <span class="spacer"></span>
+  <a class="chip{% if unseen %} on{% endif %}" href="/report/{{ day.isoformat() }}?{{ filters.query() }}{% if not unseen %}{{ '&' if filters.query() }}unseen=1{% endif %}">{{ unseen_n }} unseen</a>
+  <a class="btn" href="{{ focus_url }}">{{ icon("zap") }} Focus mode {{ key("F") }}</a>
+</div>
+<nav class="toolbar chips listing-tabs" aria-label="Listings">
+  {% for tab in tabs %}
+  {% set tab_id = tab.listing.id if tab.listing else none %}
+  <a class="chip{% if filters.listing_id == tab_id %} on{% endif %}" {% if filters.listing_id == tab_id %}aria-current="true"{% endif %}
+     href="/report/{{ day.isoformat() }}?{{ filters.query(listing_id=tab_id) }}{% if unseen %}&unseen=1{% endif %}"
+     {% if tab.error %}title="{{ tab.error }}"{% endif %}><span>{{ tab.listing.name if tab.listing else "All" }}</span> <span class="count">{{ tab.count }}</span>{% if tab.error %} <span class="error">!</span>{% endif %}</a>
   {% endfor %}
+  {% for tab in tabs if tab.error %}<span class="error small">{{ tab.listing.name }}: {{ tab.error }}</span>{% endfor %}
+</nav>
+{% include "_split_view.html" %}
 {% endif %}
 {% endblock %}

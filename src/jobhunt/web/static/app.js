@@ -60,7 +60,7 @@ document.addEventListener("alpine:init", () => {
     closePane() { this.$el.classList.remove("has-selection"); },
     act(name) { const el = document.querySelector(`#job-pane [data-action="${name}"]`); if (el) el.click(); },
 
-    // Sent by the server (HX-Trigger-After-Swap) after a status change from the pane.
+    // Sent by the server (HX-Trigger-After-Settle) after a status change from the pane.
     onStatus({ jobId, status, previous, label }) {
       const id = String(jobId);
       const row = this.row(id);

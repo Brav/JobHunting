@@ -89,10 +89,9 @@ def test_job_rows_show_translated_title_and_language(app_factory):
         s.add(job)
         s.commit()
     with TestClient(app) as c:
-        for url in ("/", "/jobs"):
-            page = c.get(url).text
-            assert f'href="/jobs/{jid}" title="Backend-Entwickler">Backend Developer</a>' in page
-            assert '<span class="lang">German</span>' in page
+        page = c.get("/").text
+        assert 'class="item-title" title="Backend-Entwickler">Backend Developer</span>' in page
+        assert '<span class="tag lang">German</span>' in page
         assert "Backend Developer" in c.get("/jobs", params={"q": "backend developer"}).text
         assert c.get("/jobs/9999").status_code == 404
 

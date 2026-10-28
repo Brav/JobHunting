@@ -76,6 +76,6 @@ def test_job_rows_link_to_cv_prompt_and_unknown_job_404(app_factory):
     app = app_factory()
     jid = seed_job(app)
     with TestClient(app) as c:
-        assert f'href="/jobs/{jid}/cv-prompt"' in c.get("/").text
+        assert f'href="/jobs/{jid}/cv-prompt"' in c.get(f"/jobs/{jid}/pane").text
         assert f'href="/jobs/{jid}/cv-prompt"' in c.get("/jobs").text
         assert c.get("/jobs/9999/cv-prompt").status_code == 404
