@@ -7,6 +7,13 @@ services:
       - "127.0.0.1:8765:8000"
     restart: unless-stopped
     volumes:
-      - ./data:/app/data
+      - type: bind
+        source: ./data
+        target: /app/data
+      # The original CV, read-only: the container can't change it.
+      - type: bind
+        source: ${JOBHUNT_CV_FILE:?Set JOBHUNT_CV_FILE in .env}
+        target: /app/cv/original.pdf
+        read_only: true
     environment:
       TZ: Europe/Belgrade
