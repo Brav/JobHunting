@@ -3,7 +3,7 @@
 {% block content %}
 <p><a href="/companies">‹ Companies</a></p>
 <h1>{{ company_name }}</h1>
-<p class="muted">{{ jobs | length }} job{{ "s" if jobs | length != 1 }} found{% if reposts %} · reposted {{ reposts }}× in total{% endif %} · seen in {{ sightings }} search result{{ "s" if sightings != 1 }}{% if outcome %} · <strong>{{ outcome }}</strong>{% endif %}</p>
+<p class="muted">{{ jobs | length }} job{{ "s" if jobs | length != 1 }} found{% if reposts %} · reposted {{ reposts }}× in total{% endif %}{% if sightings %} · seen in {{ sightings }} search result{{ "s" if sightings != 1 }}{% endif %}{% if outcome %} · <strong>{{ outcome }}</strong>{% endif %}</p>
 <div class="actions-row">
   <form method="post" action="/blocks/companies{{ '/remove' if is_blocked }}"><input type="hidden" name="name" value="{{ company_name }}">
     <input type="hidden" name="next" value="/companies/{{ key | urlencode }}">

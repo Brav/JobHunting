@@ -72,3 +72,22 @@ def test_capture_without_details(app_factory):
         token = r.text.split('name="token" value="')[1].split('"')[0]
         r = c.post("/capture/save", data={"token": token, "title": "Python Developer", "url": "https://example.com/job"})
         assert r.status_code == 422 and "Fill in the company." in r.text
+
+
+def test_greenhouse_pages_are_read_from_its_api():
+    from jobhunt.capture import fetch_and_parse
+
+    calls = []
+    data = {"absolute_url": "https://job-boards.greenhouse.io/gitlab/jobs/8638232002", "title": "Backend Engineer",
+            "company_name": "GitLab", "location": {"name": "Remote, EMEA"}, "first_published": "2026-07-22T13:38:40-04:00",
+            "content": "&lt;p&gt;Build &lt;b&gt;Rails&lt;/b&gt; services.&lt;/p&gt;"}
+
+    def get(url, **kw):
+        calls.append(url)
+        return type("R", (), {"status_code": 200, "json": lambda self: data, "text": ""})()
+    job, error = fetch_and_parse("https://job-boards.greenhouse.io/gitlab/jobs/8638232002?gh_src=abc", get)
+    assert calls == ["https://boards-api.greenhouse.io/v1/boards/gitlab/jobs/8638232002"] and error is None
+    assert (job["title"], job["company"], job["location"], job["posted_at"]) == \
+        ("Backend Engineer", "GitLab", "Remote, EMEA", "2026-07-22")
+    assert job["remote"] and "Build **Rails** services." in job["description"]
+    assert job["url"] == "https://job-boards.greenhouse.io/gitlab/jobs/8638232002?gh_src=abc"

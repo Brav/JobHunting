@@ -1,9 +1,11 @@
 from urllib.parse import quote
 
 from fastapi.testclient import TestClient
+from sqlmodel import delete
 
 from fakes import FakeClock, FakeSource, add_listing, job_id, make_posting as p
 from jobhunt.blocks import company_key
+from jobhunt.models import Sighting
 from jobhunt.runner import run_daily
 from jobhunt.timeutil import utcnow
 
@@ -30,7 +32,11 @@ def test_company_pages(app_factory):
         assert f'href="{url}"' in listing
         page = c.get(url).text
         assert "Backend Dev" in page and "Frontend Dev" in page and "Other Dev" not in page
-        assert "Applied 1× · 0 replies" in page and "Block company" in page
+        assert "Applied 1× · 0 replies" in page and "Block company" in page and "seen in 2 search results" in page
+        with app.state.session_factory() as s:  # jobs found before sightings were recorded have none
+            s.exec(delete(Sighting))
+            s.commit()
+        assert "search result" not in c.get(url).text
         assert c.get("/companies/nobody-here").status_code == 404
         assert f'href="{url}"' in c.get(f"/jobs/{two}/pane").text
         assert 'href="/companies"' in c.get("/").text

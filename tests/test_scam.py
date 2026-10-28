@@ -37,6 +37,9 @@ def test_rules(text, flag):
     "Integrations: Gmail, Outlook and Slack.",
     "No experience needed with Kubernetes; we will teach you.",
     "Build a crypto payments platform used by banks.",
+    "* Paid CPD Days\n* Professional Registration Fees Paid\n* RAVE Awards",  # a benefit, from a real job
+    "We cover your training fees and certification costs.",
+    "Registration fees are reimbursed in full.",
 ])
 def test_look_alikes(text):
     assert flags(text) == []

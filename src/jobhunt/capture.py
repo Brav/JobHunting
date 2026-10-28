@@ -1,5 +1,6 @@
 """Jobs from any site: the schema.org JobPosting that most job pages carry as JSON-LD, read into the job's fields."""
 
+import html
 import json
 import re
 from datetime import date
@@ -10,6 +11,8 @@ from jobhunt.places import place_name
 from jobhunt.sources.feeds import USER_AGENT, pay_text
 
 _JSONLD = re.compile(r"<script[^>]*type\s*=\s*[\"']?application/ld\+json[\"']?[^>]*>(.*?)</script>", re.I | re.S)
+# Greenhouse's job boards carry no JSON-LD; its public API has the same job.
+_GREENHOUSE = re.compile(r"https?://(?:job-)?boards(\.eu)?\.greenhouse\.io/([\w-]+)/jobs/(\d+)")
 _PERIODS = {"YEAR": "a year", "MONTH": "a month", "WEEK": "a week", "DAY": "a day", "HOUR": "an hour"}
 
 
@@ -100,6 +103,9 @@ def fetch_and_parse(url: str, get) -> tuple[dict | None, str | None]:
     """Download the page and read its JobPosting; (fields, None) or (None, why not)."""
     if not re.match(r"https?://", url):
         return None, "Only web addresses (http or https) can be fetched."
+    greenhouse = _GREENHOUSE.match(url)
+    if greenhouse:
+        return _from_greenhouse(url, *greenhouse.groups(), get)
     try:
         response = get(url, headers={"User-Agent": USER_AGENT}, timeout=20)
     except Exception as e:  # requests raises many kinds; the user only needs to know it failed
@@ -108,3 +114,20 @@ def fetch_and_parse(url: str, get) -> tuple[dict | None, str | None]:
         return None, f"The site answered {response.status_code} — fill the job in by hand."
     job = job_from_jsonld(extract_jsonld(response.text), url)
     return (job, None) if job else (None, "No job details on that page — fill them in by hand.")
+
+
+def _from_greenhouse(url: str, eu: str | None, board: str, job_id: str, get) -> tuple[dict | None, str | None]:
+    api = f"https://boards-api{eu or ''}.greenhouse.io/v1/boards/{board}/jobs/{job_id}"
+    try:
+        response = get(api, headers={"User-Agent": USER_AGENT}, timeout=20)
+        data = response.json() if response.status_code == 200 else None
+    except Exception as e:  # network errors and a body that isn't JSON alike
+        return None, f"Couldn't fetch the job from Greenhouse ({type(e).__name__})."
+    if not data:
+        return None, f"Greenhouse answered {response.status_code} — the job may be closed; fill it in by hand."
+    location = (data.get("location") or {}).get("name") or ""
+    description = re.sub(r"\n{3,}", "\n\n", markdownify(html.unescape(data.get("content") or ""))).strip()
+    return {"title": " ".join(str(data.get("title") or "").split()), "company": data.get("company_name") or board,
+            "location": location, "remote": "remote" in location.casefold(), "url": url,
+            "apply_url": data.get("absolute_url") or "", "description": description,
+            "posted_at": str(data.get("first_published") or data.get("updated_at") or "")[:10], "salary_text": ""}, None

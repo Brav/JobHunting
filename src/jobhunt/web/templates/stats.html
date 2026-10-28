@@ -91,7 +91,7 @@
     {% for name, table_rows in breakdowns.items() %}
     <div class="table-scroll">
       <table>
-        <caption>By {{ name | lower }}</caption>
+        <caption>By {{ name if name == "CV" else name | lower }}</caption>
         <thead><tr><th>{{ name }}</th><th class="num">Applied</th><th class="num">Replied</th><th class="num">Interviews</th><th class="num">Offers</th></tr></thead>
         <tbody>{% for r in table_rows %}<tr><td>{{ r.label }}</td><td class="num">{{ r.applied }}</td><td class="num">{{ r.replied }}</td>
           <td class="num">{{ r.interviews }}</td><td class="num">{{ r.offers }}</td></tr>{% endfor %}</tbody>

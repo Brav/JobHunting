@@ -53,3 +53,5 @@ def test_what_i_sent(app_factory):
         assert rows["Channel"] == [("Company site", 1), ("Not recorded", 1)]
         assert rows["CV"] == [("Not recorded", 1), ("Tailored", 1)]
         assert rows["Cover letter"] == [("Not recorded", 1), ("With cover letter", 1)]
+        stats_page = c.get("/stats").text
+        assert "<caption>By CV</caption>" in stats_page and "<caption>By cover letter</caption>" in stats_page

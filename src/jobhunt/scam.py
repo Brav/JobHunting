@@ -32,6 +32,10 @@ RULES = [
 NO_EXPERIENCE = re.compile(r"\bno\s+experience\s+(?:needed|required|necessary)\s*[!.]", _I)
 HIGH_PAY = re.compile(r"\bearn\s+up\s+to\b|[$€£]\s?\d{3,}\s*(?:per|/|a)\s*(?:day|week)\b", _I)
 NEGATION = re.compile(r"\b(?:no|not|never|without|free\s+of)\b", _I)
+# A perk, not a demand: "Registration Fees Paid", "we cover your training fees", "fees are reimbursed".
+PAID_FOR_YOU = re.compile(r"\s*(?:(?:are|is|will\s+be|get)\s+)?(?:paid|covered|reimbursed|funded|included)\b", _I)
+PAYS_FOR_YOU = re.compile(r"\b(?:we|company|employer)\s+(?:will\s+)?(?:pay|pays|cover|covers|reimburse|reimburses|fund|funds)"
+                          r"\s+(?:for\s+)?(?:your|all|any)?\s*$", _I)
 
 
 def _sentence(text: str, start: int, end: int) -> str:
@@ -47,7 +51,9 @@ def scam_flags(job: Job) -> list[dict]:
     for label, patterns in RULES:
         for pattern in patterns:
             m = pattern.search(text)
-            if m and not NEGATION.search(text[max(0, m.start() - 25):m.start()]):  # "no registration fee"
+            before = text[max(0, m.start() - 25):m.start()] if m else ""
+            if m and not (NEGATION.search(before) or PAYS_FOR_YOU.search(before)  # "no registration fee"
+                          or PAID_FOR_YOU.match(text, m.end())):
                 found.append({"text": label, "quote": _sentence(text, *m.span())})
                 break
     no_experience = NO_EXPERIENCE.search(text)

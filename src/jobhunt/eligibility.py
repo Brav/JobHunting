@@ -19,7 +19,7 @@ from jobhunt.places import REGIONS, place_name, place_of, places_in
 VERDICTS = ("eligible", "relocate", "check", "not_eligible")
 VERDICT_LABELS = {"eligible": "Eligible", "relocate": "Relocate", "check": "Check", "not_eligible": "Not eligible"}
 VERDICT_SYMBOLS = {"eligible": "✓", "relocate": "↗", "check": "?", "not_eligible": "✕"}
-RULES_VERSION = 9  # bump when the rules change: every job is checked again on the next start
+RULES_VERSION = 10  # bump when the rules change: every job is checked again on the next start
 
 
 @dataclass(frozen=True)

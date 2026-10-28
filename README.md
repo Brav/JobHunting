@@ -101,12 +101,12 @@ Start the web app once after each update first: it updates the database, and the
 
 ```bash
 uv run pytest
-JOBHUNT_DB_PATH=./data/dev.db JOBHUNT_CV_PATH="/path/to/CV.pdf" \
+JOBHUNT_DB_PATH=./data/dev/jobhunt.db JOBHUNT_CV_PATH="/path/to/CV.pdf" \
   uv run uvicorn --factory jobhunt.main:build_app --reload --port 8766
 ```
 
-Use a separate database (as above) while the container is running: two schedulers on one database would run every
-search twice.
+Use a separate database in its own folder (as above) while the container is running: two schedulers on one database
+would run every search twice, and backups go to a `backups` folder beside the database.
 
 ## Check the LinkedIn scraper
 
