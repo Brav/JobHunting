@@ -73,6 +73,13 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
             with session_factory() as s:
                 return [(w.ats, w.token, w.name) for w in s.exec(select(WatchedCompany)).all()]
         source = CombinedSource(LinkedInSource(), get=requests.get, enabled=enabled_feeds, watched=watched_boards)
+    if hasattr(source, "on_errors"):  # the extra feeds: keep their failures for Settings and the report
+        def keep_feed_errors(errors: dict[str, str]) -> None:
+            from jobhunt.preferences import save_feed_errors
+            from jobhunt.timeutil import utcnow
+            with session_factory() as s:
+                save_feed_errors(s, errors, utcnow())
+        source.on_errors = keep_feed_errors
     if fetch_page is None:
         from jobhunt.sources.linkedin import fetch_job_page as fetch_page
     if translator is None:

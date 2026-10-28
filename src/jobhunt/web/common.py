@@ -15,7 +15,7 @@ from jobhunt.applications import CHANNELS, STAGE_LABELS, STAGES, stage_kind
 from jobhunt.blocks import HIDE_REASONS, SCOPES, company_key
 from jobhunt.eligibility import VERDICT_LABELS, VERDICT_SYMBOLS, VERDICTS, effective
 from jobhunt import salary
-from jobhunt.preferences import is_paused, load_preferences
+from jobhunt.preferences import is_paused, load_feed_errors, load_preferences
 from jobhunt.prompts import KINDS as PROMPT_KINDS
 from jobhunt.sources.feeds import SOURCE_LABELS
 from jobhunt.language import language_name
@@ -116,12 +116,15 @@ def render(request: Request, name: str, status_code: int = 200, **ctx):
     with session(request) as s:
         summary = run_summary(s)
         prefs = load_preferences(s)
+        feed_errors = {name: {**e, "since": datetime.fromisoformat(e["since"])}
+                       for name, e in load_feed_errors(s).items() if name in prefs.sources}
     now = utcnow()
     paused = prefs.paused_until if is_paused(prefs, local_date(now, tz)) else ""
     base = {"tz": tz, "now": now, "today": local_date(now, tz), "summary": summary,
             "age": lambda job: job_age(job, now, tz),
             "running": coordinator.is_running, "next_run": coordinator.next_run_at(),
-            "results_cap": request.app.state.settings.results_per_listing, "paused_until": paused}
+            "results_cap": request.app.state.settings.results_per_listing, "paused_until": paused,
+            "feed_errors": feed_errors}
     return templates.TemplateResponse(request, name, {**base, **ctx}, status_code=status_code)
 
 

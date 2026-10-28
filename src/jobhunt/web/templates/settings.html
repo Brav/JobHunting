@@ -59,6 +59,7 @@
     <fieldset><legend>Job sources besides LinkedIn</legend>
       {% for value, label in sources.items() %}
       <label class="check"><input type="checkbox" name="sources" value="{{ value }}"{% if value in prefs.sources %} checked{% endif %}> {{ label }}</label>
+      {% if feed_errors[value] %}<span class="field-error">Failing since {{ feed_errors[value].since | local_dt(tz) }}: {{ feed_errors[value].error }}</span>{% endif %}
       {% endfor %}
     </fieldset>
     <fieldset><legend>Phone push for the daily digest</legend>

@@ -9,6 +9,7 @@ from sqlmodel import Session
 from jobhunt.models import Setting
 
 PREFERENCES_KEY = "preferences"
+FEED_ERRORS_KEY = "feed_errors"
 SOURCES = {"remoteok": "Remote OK", "himalayas": "Himalayas", "hn": "Hacker News “Who is hiring”"}
 
 
@@ -58,3 +59,23 @@ def is_paused(prefs: Preferences, today: date) -> bool:
         return bool(prefs.paused_until) and today <= date.fromisoformat(prefs.paused_until)
     except ValueError:
         return False
+
+
+def load_feed_errors(session: Session) -> dict[str, dict]:
+    """The extra job sources failing now: {name: {"error": message, "since": ISO time (UTC)}}."""
+    row = session.get(Setting, FEED_ERRORS_KEY)
+    try:
+        data = json.loads(row.value) if row else {}
+    except ValueError:
+        data = {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_feed_errors(session: Session, errors: dict[str, str], now: datetime) -> None:
+    before = load_feed_errors(session)
+    data = {name: {"error": message, "since": before.get(name, {}).get("since") or now.isoformat(timespec="minutes")}
+            for name, message in errors.items()}
+    row = session.get(Setting, FEED_ERRORS_KEY) or Setting(key=FEED_ERRORS_KEY, value="")
+    row.value, row.updated_at = json.dumps(data), now
+    session.add(row)
+    session.commit()

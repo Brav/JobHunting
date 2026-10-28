@@ -1,9 +1,10 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from sqlmodel import select
 
 from fakes import FakeClock, FakeSource, add_listing, make_posting as p
 from jobhunt.models import Job, Match
+from jobhunt.preferences import load_feed_errors
 from jobhunt.runner import run_daily
 from jobhunt.sources.base import SourceError
 from jobhunt.sources.feeds import CombinedSource, hn_whos_hiring, himalayas, matches_keywords, remoteok
@@ -134,3 +135,31 @@ def test_keywords_must_be_near_the_top_and_not_in_links():
     assert not matches_keywords(feed("Senior UI Designer", blurb), "php remote")
     assert not matches_keywords(feed("Finance Manager", "Apply at https://example.com/index.php today."), "php remote")
     assert matches_keywords(feed("Backend Engineer", "You will build PHP 8 services with Laravel."), "php remote")
+
+
+def test_feed_failures_are_kept_and_shown(app_factory):
+    from fastapi.testclient import TestClient
+
+    state = {"down": True}
+
+    def flaky(url, **kw):
+        if state["down"]:
+            raise SourceError("Remote OK answered 503")
+        return fake_get()(url, **kw)
+    combined = CombinedSource(FakeSource({"php remote": [[p("1")]]}), get=flaky, enabled=lambda: ("remoteok",),
+                              clock=lambda: NOW, ttl=timedelta(0))
+    app = app_factory(source=combined)
+    with TestClient(app) as c:
+        sf = app.state.session_factory
+        add_listing(sf, "A", keywords="php remote")
+        clock = FakeClock(NOW)
+        run_daily(sf, combined, trigger="manual", clock=clock, sleep=clock.sleep)
+        with sf() as s:
+            assert load_feed_errors(s)["remoteok"]["error"] == "Remote OK answered 503"
+        assert "Remote OK answered 503" in c.get("/settings").text
+        assert "Remote OK isn't answering" in c.get("/").text
+        state["down"] = False
+        run_daily(sf, combined, trigger="manual", clock=clock, sleep=clock.sleep)
+        with sf() as s:
+            assert load_feed_errors(s) == {}
+        assert "Remote OK isn't answering" not in c.get("/").text

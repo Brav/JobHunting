@@ -184,6 +184,7 @@ class CombinedSource:
         self.watched = watched  # (ats, board token, company name) of each watched company
         self._cache: dict[tuple, tuple[datetime, list[FeedPosting]]] = {}
         self.errors: dict[str, str] = {}
+        self.on_errors: Callable[[dict[str, str]], None] | None = None  # told whenever the failing feeds change
 
     def _feed(self, name: str, keywords: str) -> list[FeedPosting]:
         key = (name, keywords) if name in _PER_KEYWORDS else (name,)
@@ -203,6 +204,7 @@ class CombinedSource:
         postings = list(self.primary.search(keywords, location, radius_km, window_hours, limit))
         oldest = (self.clock() - timedelta(days=MAX_AGE_DAYS)).date()
         boards = [f"{ats}:{token}:{company}" for ats, token, company in self.watched()]
+        before = dict(self.errors)
         for name in [*self.enabled(), *boards]:
             if name not in FETCHERS and ":" not in name:
                 continue
@@ -215,4 +217,9 @@ class CombinedSource:
                 continue
             postings += [f.posting for f in feed if matches_keywords(f, keywords)
                          and (f.posting.posted_at is None or f.posting.posted_at >= oldest)]
+        if self.errors != before and self.on_errors:
+            try:
+                self.on_errors(dict(self.errors))
+            except Exception:
+                logger.exception("couldn't save the feed errors")
         return postings
