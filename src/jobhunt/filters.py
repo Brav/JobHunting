@@ -188,12 +188,13 @@ def _run_ids(session: Session, day: date, tz: ZoneInfo) -> list[int]:
                              .order_by(Run.started_at, Run.id)).all())
 
 
-def _new_jobs(run_ids: list[int], listing_id: int | None = None):
-    """Jobs first found (is_new) by these runs, optionally by one listing; hidden jobs left out."""
+def _new_jobs(run_ids: list[int], listing_id: int | None = None, include_hidden: bool = False):
+    """Jobs first found (is_new) by these runs, optionally by one listing; hidden jobs left out unless asked."""
     matches = select(Match.job_id).where(Match.run_id.in_(run_ids), Match.is_new == True)  # noqa: E712
     if listing_id is not None:
         matches = matches.where(Match.listing_id == listing_id)
-    return select(Job).where(Job.id.in_(matches), Job.status != "hidden")
+    stmt = select(Job).where(Job.id.in_(matches))
+    return stmt if include_hidden else stmt.where(Job.status != "hidden")
 
 
 def report_tabs(session: Session, day: date, tz: ZoneInfo) -> list[ReportTab]:
@@ -213,11 +214,12 @@ def report_tabs(session: Session, day: date, tz: ZoneInfo) -> list[ReportTab]:
 
 
 def report_jobs(session: Session, day: date, tz: ZoneInfo, f: JobFilters, now: datetime, *,
-                unseen_only: bool = False) -> list[Job]:
+                unseen_only: bool = False, include_hidden: bool = False) -> list[Job]:
     run_ids = _run_ids(session, day, tz)
     if not run_ids:
         return []
-    stmt = apply_filters(_new_jobs(run_ids, f.listing_id), replace(f, listing_id=None), now, include_tab=False)
+    stmt = apply_filters(_new_jobs(run_ids, f.listing_id, include_hidden), replace(f, listing_id=None), now,
+                         include_tab=False)
     if unseen_only:
         stmt = stmt.where(Job.seen_at.is_(None))
     return list(session.exec(stmt.order_by(Job.posted_at.is_(None), Job.posted_at.desc(), Job.title)).all())

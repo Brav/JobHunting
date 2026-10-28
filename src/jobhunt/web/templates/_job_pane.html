@@ -1,12 +1,13 @@
 {% from "_macros.html" import icon, key %}
 {% set job = pane.job %}
 <article class="pane-body" aria-labelledby="pane-title-{{ job.id }}">
-  {% if not pane.standalone %}<button class="btn ghost small back-to-list" type="button" @click="$dispatch('back-to-list')">{{ icon("chevron-left") }} Back to list</button>{% endif %}
+  {% if not pane.standalone and not pane.focus %}<button class="btn ghost small back-to-list" type="button" @click="$dispatch('back-to-list')">{{ icon("chevron-left") }} Back to list</button>{% endif %}
   <h1 id="pane-title-{{ job.id }}" class="pane-title">{{ job.title_en or job.title }}
     {% if job.language and job.language != "en" %}<span class="tag lang">{{ job.language | language_name }}</span>{% endif %}</h1>
   {% if job.title_en and job.title_en != job.title %}<p class="muted small">Original title: {{ job.title }}</p>{% endif %}
   <p class="pane-meta">{{ job.company }}{% if job.location %} · {{ job.location }}{% endif %}
     · {{ age(job)[1] | lower }}{% if pane.found_by %} · found by {{ pane.found_by | join(", ") }}{% endif %}</p>
+  {% if not pane.focus %}
   <div class="pane-actions" role="group" aria-label="Decide on this job">
     {% for status, action, label, done, icon_name, k in [
          ("interested", "save", "Save", "Saved", "bookmark", "S"),
@@ -23,6 +24,7 @@
     <a class="btn" data-action="cv" href="/jobs/{{ job.id }}/cv-prompt" target="_blank" rel="noopener">{{ icon("file-text") }} CV prompt {{ key("C") }}</a>
     <a class="btn" data-action="linkedin" href="{{ job.url }}" target="_blank" rel="noopener">{{ icon("external-link") }} LinkedIn {{ key("O") }}</a>
   </div>
+  {% endif %}
   {% if pane.download_error %}
   <div class="notice error-notice">
     <p>Couldn't load the job listing: {{ pane.download_error }}</p>

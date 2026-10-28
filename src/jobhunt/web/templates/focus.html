@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% set active = "report" %}
+{% from "_macros.html" import icon, key %}
+{% block title %}Focus mode{% endblock %}
+{% block content %}
+<div class="focus" x-data="focusPage" @keydown.window="onKey($event)">
+  <div class="focus-progress">
+    <a id="focus-back" href="{{ back_url }}">{{ icon("chevron-left") }} Back {{ key("Esc") }}</a>
+    {% if pane %}<span>{{ position }} of {{ total }} · {{ list_name }}</span>{% endif %}
+  </div>
+  {% if pane %}
+  {% include "_job_pane.html" %}
+  <div class="focus-actions" role="group" aria-label="Decide on this job">
+    {% for action, label, icon_name, k in [("hide", "Hide", "eye-off", "X"), ("later", "Later", "chevron-right", "L"),
+                                            ("save", "Save", "bookmark", "S"), ("applied", "Applied", "send", "A")] %}
+    <form method="post" action="/focus/act" data-focus-action="{{ action }}" class="inline">
+      <input type="hidden" name="job_id" value="{{ pane.job.id }}">
+      <input type="hidden" name="action" value="{{ action }}">
+      <input type="hidden" name="back" value="{{ back_query }}">
+      {% for name, value in counters.items() %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+      <button class="btn{% if action == 'save' %} primary{% endif %}" type="submit">{{ icon(icon_name) }} {{ label }} {{ key(k) }}</button>
+    </form>
+    {% endfor %}
+    <a class="btn ghost" data-action="cv" href="/jobs/{{ pane.job.id }}/cv-prompt" target="_blank" rel="noopener">{{ icon("file-text") }} CV prompt {{ key("C") }}</a>
+    <a class="btn ghost" data-action="linkedin" href="{{ pane.job.url }}" target="_blank" rel="noopener">{{ icon("external-link") }} LinkedIn {{ key("O") }}</a>
+  </div>
+  {% else %}
+  <section class="focus-summary">
+    <h1>All done</h1>
+    <p>Saved {{ counters.n_saved }} · Applied {{ counters.n_applied }} · Hidden {{ counters.n_hidden }} · Later {{ counters.n_later }}</p>
+    <p><a class="btn primary" href="{{ back_url }}">Back to the list</a></p>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}
