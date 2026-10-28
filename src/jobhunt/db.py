@@ -10,6 +10,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 
 from jobhunt.applications import backfill_applied_steps
 from jobhunt.dedup import match_key
+from jobhunt.eligibility import load_profile, refresh_all
 from jobhunt.workplace import details_text, details_value, workplace_from
 from jobhunt.models import Job, Run
 from jobhunt.timeutil import utcnow
@@ -55,7 +56,8 @@ def init_db(engine: Engine, tz: ZoneInfo = ZoneInfo("UTC")) -> None:
     with engine.begin() as conn:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_jobs_match_key ON jobs (match_key)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_matches_job_id ON matches (job_id)")
-        for column in ("workplace", "language", "seniority", "employment_type", "company", "first_seen_at", "stage"):
+        for column in ("workplace", "language", "seniority", "employment_type", "company", "first_seen_at", "stage",
+                       "eligibility"):
             conn.exec_driver_sql(f"CREATE INDEX IF NOT EXISTS ix_jobs_{column} ON jobs ({column})")
     with Session(engine) as session:
         for job in session.exec(select(Job).where(Job.match_key.is_(None))):
@@ -76,6 +78,8 @@ def init_db(engine: Engine, tz: ZoneInfo = ZoneInfo("UTC")) -> None:
     if steps_are_new:  # once, when upgrading: later, an applied job without steps is the user's choice
         with Session(engine) as session:
             backfill_applied_steps(session, tz)
+    with Session(engine) as session:  # jobs never checked, or checked by older rules
+        refresh_all(session, load_profile(session), stale_only=True)
     with Session(engine) as session:
         session.exec(
             update(Run)

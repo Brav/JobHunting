@@ -53,6 +53,11 @@ class Job(SQLModel, table=True):
     employment_type: str | None = Field(default=None, index=True)
     seen_at: NaiveDatetime | None = None  # first time it was shown in a detail pane or focus mode
     stage: str | None = Field(default=None, index=True)  # current application stage; None unless applied
+    # jobhunt.eligibility: the automatic verdict, its reasons (JSON), the user's override, the rules version used
+    eligibility: str | None = Field(default=None, index=True)
+    eligibility_reasons: str | None = None
+    eligibility_override: str | None = None
+    eligibility_rules: int | None = None
 
 
 class Run(SQLModel, table=True):
@@ -97,3 +102,13 @@ class ApplicationStep(SQLModel, table=True):
     on_date: date
     note: str = ""
     created_at: NaiveDatetime = Field(default_factory=utcnow)
+
+
+class Setting(SQLModel, table=True):
+    """App settings as JSON values, e.g. the eligibility profile."""
+
+    __tablename__ = "settings"
+
+    key: str = Field(primary_key=True)
+    value: str
+    updated_at: NaiveDatetime = Field(default_factory=utcnow)

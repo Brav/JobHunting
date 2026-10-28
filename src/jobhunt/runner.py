@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from jobhunt.dedup import is_matchable, match_key
+from jobhunt.eligibility import load_profile, refresh
 from jobhunt.workplace import details_text, workplace_from
 from jobhunt.models import Job, Listing, Match, Run, RunListing
 from jobhunt.sources.base import JobPosting, JobSource, SourceError
@@ -76,6 +77,7 @@ def record_results(session: Session, run_id: int, listing_id: int,
     """
     matched: set[int] = set()
     new = 0
+    profile = load_profile(session)
     for posting in _unique_postings(postings):
         key = match_key(posting.title, posting.company)
         job = session.exec(select(Job).where(Job.external_id == posting.external_id)).first()
@@ -100,6 +102,8 @@ def record_results(session: Session, run_id: int, listing_id: int,
                       workplace=workplace_from(posting.title, posting.location, is_remote=posting.is_remote))
         # New means first found now; a job kept after its listing was deleted has lost its matches but isn't new.
         is_new = job.id is None
+        if job.id not in matched:
+            refresh(session, job, profile)  # its title, location or texts may have changed
         session.add(job)
         session.flush()
         if job.id in matched:

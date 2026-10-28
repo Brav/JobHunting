@@ -4,12 +4,16 @@ The rules read the English text (the translation when there is one) and, for lan
 Each phrase family below is a named list with an example, so a miss found by an override can be added by hand.
 """
 
+import json
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from sqlmodel import Session, or_, select
+
 from jobhunt.language import language_name
+from jobhunt.models import Job, Setting
 from jobhunt.places import REGIONS, place_name, place_of, places_in
 
 VERDICTS = ("eligible", "relocate", "check", "not_eligible")
@@ -329,3 +333,59 @@ def assess(job, profile: Profile) -> Assessment:
             seen.add(reason["text"])
             reasons.append(reason)
     return Assessment(verdict, reasons)
+
+
+PROFILE_KEY = "eligibility_profile"
+
+
+def load_profile(session: Session) -> Profile:
+    """The saved profile, or the default when none is saved (or it can't be read)."""
+    row = session.get(Setting, PROFILE_KEY)
+    if row is None:
+        return DEFAULT_PROFILE
+    try:
+        data = json.loads(row.value)
+        values = {f.name: data[f.name] for f in fields(Profile)}
+        return Profile(**{k: tuple(v) if isinstance(v, list) else v for k, v in values.items()})
+    except (ValueError, KeyError, TypeError):
+        return DEFAULT_PROFILE
+
+
+def save_profile(session: Session, profile: Profile, now: datetime) -> None:
+    row = session.get(Setting, PROFILE_KEY) or Setting(key=PROFILE_KEY, value="")
+    row.value, row.updated_at = json.dumps(asdict(profile)), now
+    session.add(row)
+    session.commit()
+
+
+def effective(job) -> str:
+    """The verdict that counts: the user's override, else the automatic one, else Check."""
+    return job.eligibility_override or job.eligibility or "check"
+
+
+def refresh(session: Session, job: Job, profile: Profile) -> None:
+    """Decide the job again from its current texts; the user's override is left alone."""
+    result = assess(job, profile)
+    job.eligibility, job.eligibility_reasons = result.verdict, json.dumps(result.reasons, ensure_ascii=False)
+    job.eligibility_rules = RULES_VERSION
+    session.add(job)
+
+
+def refresh_job(session_factory, job_id: int) -> None:
+    with session_factory() as s:
+        job = s.get(Job, job_id)
+        if job is not None:
+            refresh(s, job, load_profile(s))
+            s.commit()
+
+
+def refresh_all(session: Session, profile: Profile, *, stale_only: bool = False) -> int:
+    """Check every job (or only those checked by older rules); returns how many were checked."""
+    stmt = select(Job)
+    if stale_only:
+        stmt = stmt.where(or_(Job.eligibility_rules.is_(None), Job.eligibility_rules < RULES_VERSION))
+    jobs = session.exec(stmt).all()
+    for job in jobs:
+        refresh(session, job, profile)
+    session.commit()
+    return len(jobs)

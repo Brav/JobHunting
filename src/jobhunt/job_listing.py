@@ -7,6 +7,7 @@ from datetime import datetime
 from sqlalchemy import update
 
 from jobhunt.language import detect_language
+from jobhunt.eligibility import refresh_job
 from jobhunt.workplace import details_value, workplace_from
 from jobhunt.models import Job
 from jobhunt.sources.base import JobPage, SourceBlocked, SourceError, SourceUnavailable
@@ -42,6 +43,7 @@ def download_listing(session_factory, job_id: int, fetch_page: Callable[[str], J
             seniority=details_value(page.details, "Seniority level"),
             employment_type=details_value(page.details, "Employment type"),
             workplace=workplace_from(title, location, details_values, page.description) or workplace)
+    refresh_job(session_factory, job_id)
 
 
 def _needs_translation(job: Job | None) -> bool:
@@ -82,6 +84,7 @@ def translate_description(session_factory, job_id: int, translator: Translator) 
         return str(e)
     _update(session_factory, job_id, Job.description == description, description_en=description_en,
             translation_error=None)
+    refresh_job(session_factory, job_id)
     return None
 
 
