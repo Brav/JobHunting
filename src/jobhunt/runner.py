@@ -1,18 +1,27 @@
 """The daily run: search each active listing, record jobs, work out what is new."""
 
+import logging
 import math
+import random
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from jobhunt.models import Job, Match, Run, RunListing
-from jobhunt.sources.base import JobPosting
+from jobhunt.models import Job, Listing, Match, Run, RunListing
+from jobhunt.sources.base import JobPosting, JobSource, SourceError
+from jobhunt.timeutil import utcnow
 
 WINDOW_MIN_HOURS = 24
 WINDOW_MAX_HOURS = 168
 WINDOW_OVERLAP_HOURS = 2
+RETRY_DELAYS_SECONDS = (120, 600)
+PAUSE_RANGE_SECONDS = (3, 8)
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -59,3 +68,82 @@ def record_results(session: Session, run_id: int, listing_id: int,
         new += not seen_before
     session.commit()
     return ListingResult(found=len(unique), new=new)
+
+
+def _save_attempt(session_factory, run_id: int, listing_id: int,
+                  result: ListingResult | None = None, error: str | None = None) -> None:
+    with session_factory() as s:
+        row = s.get(RunListing, (run_id, listing_id)) or RunListing(run_id=run_id, listing_id=listing_id)
+        row.attempts += 1
+        row.error = error
+        if result is not None:
+            row.found, row.new = result.found, result.new
+        s.add(row)
+        s.commit()
+
+
+def _attempt(session_factory, source: JobSource, run_id: int, listing: Listing,
+             window: int, limit: int, clock: Callable[[], datetime]) -> bool:
+    try:
+        postings = source.search(keywords=listing.keywords, location=listing.location,
+                                 radius_km=listing.radius_km, window_hours=window, limit=limit)
+    except SourceError as e:
+        logger.warning("listing %r failed: %s", listing.name, e)
+        _save_attempt(session_factory, run_id, listing.id, error=str(e))
+        return False
+    with session_factory() as s:
+        result = record_results(s, run_id, listing.id, postings, clock())
+    logger.info("listing %r: found %d, new %d", listing.name, result.found, result.new)
+    _save_attempt(session_factory, run_id, listing.id, result=result)
+    return True
+
+
+def run_daily(session_factory: Callable[[], Session], source: JobSource, *, trigger: str,
+              results_per_listing: int = 100, clock: Callable[[], datetime] = utcnow,
+              sleep: Callable[[float], None] = time.sleep, rng: random.Random | None = None) -> int:
+    """Run every active listing, retrying failures; returns the run ID. Never raises."""
+    rng = rng or random.Random()
+    with session_factory() as s:
+        run = Run(trigger=trigger, started_at=clock())
+        s.add(run)
+        s.commit()
+        run_id = run.id
+    logger.info("run %d started (%s)", run_id, trigger)
+
+    error = None
+    try:
+        with session_factory() as s:
+            listings = s.exec(select(Listing).where(Listing.active == True).order_by(Listing.id)).all()  # noqa: E712
+        windows: dict[int, int] = {}
+        pending = list(listings)
+        for pass_no in range(1 + len(RETRY_DELAYS_SECONDS)):
+            if pass_no:
+                if not pending:
+                    break
+                sleep(RETRY_DELAYS_SECONDS[pass_no - 1])
+            failed = []
+            for i, listing in enumerate(pending):
+                if i:
+                    sleep(rng.uniform(*PAUSE_RANGE_SECONDS))
+                if listing.id not in windows:
+                    with session_factory() as s:
+                        windows[listing.id] = window_hours(last_success_at(s, listing.id), clock())
+                if not _attempt(session_factory, source, run_id, listing,
+                                windows[listing.id], results_per_listing, clock):
+                    failed.append(listing)
+            pending = failed
+        if not pending:
+            status = "ok"
+        else:
+            status = "partial" if len(pending) < len(listings) else "failed"
+    except Exception as e:
+        logger.exception("run %d crashed", run_id)
+        status, error = "failed", f"{type(e).__name__}: {e}"
+
+    with session_factory() as s:
+        run = s.get(Run, run_id)
+        run.status, run.error, run.finished_at = status, error, clock()
+        s.add(run)
+        s.commit()
+    logger.info("run %d finished: %s", run_id, status)
+    return run_id

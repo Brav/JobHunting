@@ -1,0 +1,96 @@
+import random
+from datetime import datetime, timedelta
+
+from sqlmodel import select
+
+from fakes import FakeClock, FakeSource, add_listing, make_posting as p
+from jobhunt.models import Run, RunListing
+from jobhunt.runner import run_daily
+from jobhunt.sources.base import SourceBlocked, SourceError
+
+NOW = datetime(2026, 10, 28, 9, 0)
+
+
+def go(sf, src, clock=None):
+    clock = clock or FakeClock(NOW)
+    return run_daily(sf, src, trigger="scheduled", clock=clock, sleep=clock.sleep, rng=random.Random(0)), clock
+
+
+def rows(sf, run_id):
+    with sf() as s:
+        return {r.listing_id: (r.attempts, r.found, r.new, r.error)
+                for r in s.exec(select(RunListing).where(RunListing.run_id == run_id))}
+
+
+def status(sf, run_id):
+    with sf() as s:
+        return s.get(Run, run_id).status
+
+
+def test_happy_path(session_factory):
+    a = add_listing(session_factory, "A", keywords="python")
+    b = add_listing(session_factory, "B", keywords="go")
+    add_listing(session_factory, "C", keywords="rust", active=False)
+    src = FakeSource({"python": [[p("1"), p("2")]], "go": [[p("2")]]})
+    run_id, clock = go(session_factory, src)
+    with session_factory() as s:
+        run = s.get(Run, run_id)
+    assert (run.status, run.trigger, run.started_at) == ("ok", "scheduled", NOW)
+    assert run.finished_at >= NOW
+    assert rows(session_factory, run_id) == {a: (1, 2, 2, None), b: (1, 1, 1, None)}
+    assert [c["keywords"] for c in src.calls] == ["python", "go"]
+    assert (src.calls[0]["window_hours"], src.calls[0]["limit"], src.calls[0]["radius_km"]) == (168, 100, 25)
+    assert len(clock.sleeps) == 1 and 3 <= clock.sleeps[0] <= 8
+
+
+def test_second_run_window(session_factory):
+    add_listing(session_factory, "A", keywords="python")
+    src = FakeSource({"python": [[p("1")]]})
+    _, clock = go(session_factory, src)
+    clock.now = NOW + timedelta(hours=24)
+    go(session_factory, src, clock)
+    assert src.calls[1]["window_hours"] == 26
+
+
+def test_retry_then_success(session_factory):
+    a = add_listing(session_factory, "A", keywords="python")
+    add_listing(session_factory, "B", keywords="go")
+    src = FakeSource({"python": [SourceBlocked("rate limited by LinkedIn"), [p("1")]], "go": [[p("2")]]})
+    run_id, clock = go(session_factory, src)
+    assert status(session_factory, run_id) == "ok"
+    assert rows(session_factory, run_id)[a] == (2, 1, 1, None)
+    assert 120 in clock.sleeps and 600 not in clock.sleeps
+    python_calls = [c for c in src.calls if c["keywords"] == "python"]
+    assert python_calls[0]["window_hours"] == python_calls[1]["window_hours"]
+
+
+def test_three_failures_make_partial(session_factory):
+    a = add_listing(session_factory, "A", keywords="python")
+    b = add_listing(session_factory, "B", keywords="go")
+    src = FakeSource({"python": [SourceBlocked("rate limited by LinkedIn")], "go": [[p("2")]]})
+    run_id, clock = go(session_factory, src)
+    assert status(session_factory, run_id) == "partial"
+    assert rows(session_factory, run_id) == {a: (3, 0, 0, "rate limited by LinkedIn"), b: (1, 1, 1, None)}
+    assert 120 in clock.sleeps and 600 in clock.sleeps
+
+
+def test_all_failed(session_factory):
+    a = add_listing(session_factory, "A", keywords="python")
+    run_id, _ = go(session_factory, FakeSource({"python": [SourceError("network down")]}))
+    assert status(session_factory, run_id) == "failed"
+    assert rows(session_factory, run_id)[a][3] == "network down"
+
+
+def test_no_active_listings_is_ok(session_factory):
+    src = FakeSource({})
+    run_id, _ = go(session_factory, src)
+    assert status(session_factory, run_id) == "ok" and src.calls == []
+
+
+def test_unexpected_exception_fails_run(session_factory):
+    add_listing(session_factory, "A", keywords="python")
+    run_id, _ = go(session_factory, FakeSource({"python": [RuntimeError("kaboom")]}))
+    with session_factory() as s:
+        run = s.get(Run, run_id)
+    assert (run.status, run.error) == ("failed", "RuntimeError: kaboom")
+    assert run.finished_at is not None
