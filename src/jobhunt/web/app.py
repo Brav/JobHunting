@@ -13,7 +13,7 @@ from jobhunt.config import Settings
 from jobhunt.db import init_db, make_engine, make_session_factory
 from jobhunt.scheduler import RunCoordinator
 from jobhunt.sources.base import JobSource
-from jobhunt.web import listings, report
+from jobhunt.web import listings, report, tracker
 from jobhunt.web.common import render
 
 
@@ -42,6 +42,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None, start_sch
     app.state.coordinator = coordinator
     app.include_router(report.router)
     app.include_router(listings.router)
+    app.include_router(tracker.router)
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
     @app.post("/runs", response_class=HTMLResponse)

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Tracker{% endblock %}
+{% block content %}
+<h1>Tracker</h1>
+<form class="filters" method="get" action="/jobs">
+  <label>Status
+    <select name="status">
+      {% for value, label in status_options %}
+      <option value="{{ value }}"{% if value == status %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Listing
+    <select name="listing">
+      <option value="">All listings</option>
+      {% for l in listings %}
+      <option value="{{ l.id }}"{% if l.id == listing_id %} selected{% endif %}>{{ l.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Search
+    <input type="search" name="q" value="{{ q }}" placeholder="Title or company">
+  </label>
+  <button type="submit">Filter</button>
+</form>
+<p class="muted">{{ total }} job{{ "" if total == 1 else "s" }}</p>
+{% if jobs %}
+<table>
+  {% include "_job_table_head.html" %}
+  <tbody>{% for job in jobs %}{% include "_job_row.html" %}{% endfor %}</tbody>
+</table>
+{% else %}
+<p class="muted">No jobs match these filters.</p>
+{% endif %}
+{% if pages > 1 %}
+<div class="pager">
+  {% if prev_url %}<a href="{{ prev_url }}">← Previous</a>{% endif %}
+  <span class="muted">Page {{ page }} of {{ pages }}</span>
+  {% if next_url %}<a href="{{ next_url }}">Next →</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}
