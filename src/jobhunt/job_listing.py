@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import update
 
 from jobhunt.language import detect_language
-from jobhunt.eligibility import refresh_job
+from jobhunt.checks import refresh_job
 from jobhunt.workplace import details_value, workplace_from
 from jobhunt.models import Job
 from jobhunt.sources.base import JobPage, SourceBlocked, SourceError, SourceUnavailable

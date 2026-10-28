@@ -10,7 +10,7 @@ from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlmodel import Session, or_, select
+from sqlmodel import Session
 
 from jobhunt.language import language_name
 from jobhunt.models import Job, Setting
@@ -466,20 +466,13 @@ def refresh(session: Session, job: Job, profile: Profile) -> None:
 
 
 def refresh_job(session_factory, job_id: int) -> None:
-    with session_factory() as s:
-        job = s.get(Job, job_id)
-        if job is not None:
-            refresh(s, job, load_profile(s))
-            s.commit()
+    from jobhunt import checks  # every per-job check runs together; see jobhunt.checks
+    checks.refresh_job(session_factory, job_id)
 
 
 def refresh_all(session: Session, profile: Profile, *, stale_only: bool = False) -> int:
-    """Check every job (or only those checked by older rules); returns how many were checked."""
-    stmt = select(Job)
-    if stale_only:
-        stmt = stmt.where(or_(Job.eligibility_rules.is_(None), Job.eligibility_rules < RULES_VERSION))
-    jobs = session.exec(stmt).all()
-    for job in jobs:
-        refresh(session, job, profile)
-    session.commit()
-    return len(jobs)
+    """Check every job (or only those checked by older rules) with this profile; returns how many were checked."""
+    from jobhunt import checks
+    ctx = checks.load_context(session)
+    ctx.profile = profile
+    return checks.refresh_all(session, ctx, stale_only=stale_only)

@@ -10,7 +10,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 
 from jobhunt.applications import backfill_applied_steps
 from jobhunt.dedup import match_key
-from jobhunt.eligibility import load_profile, refresh_all
+from jobhunt import checks
 from jobhunt.workplace import details_text, details_value, workplace_from
 from jobhunt.models import Job, Run
 from jobhunt.timeutil import utcnow
@@ -79,7 +79,7 @@ def init_db(engine: Engine, tz: ZoneInfo = ZoneInfo("UTC")) -> None:
         with Session(engine) as session:
             backfill_applied_steps(session, tz)
     with Session(engine) as session:  # jobs never checked, or checked by older rules
-        refresh_all(session, load_profile(session), stale_only=True)
+        checks.refresh_all(session, stale_only=True)
     with Session(engine) as session:
         session.exec(
             update(Run)
