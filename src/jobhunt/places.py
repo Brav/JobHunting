@@ -41,7 +41,7 @@ CITIES = {
     "Vilnius": "LT", "Riga": "LV", "Tallinn": "EE", "Helsinki": "FI", "Stockholm": "SE", "Copenhagen": "DK",
     "Oslo": "NO", "Athens": "GR", "Thessaloniki": "GR",
 }
-REGION_WORDS = {"European Union": "EU", "Europe": "EUROPE", "European": "EUROPE", "Western Balkans": "BALKANS",
+REGION_WORDS = {"European Union": "EU", "European Economic Area": "EU", "Europe": "EUROPE", "European": "EUROPE", "Western Balkans": "BALKANS",
                 "Balkans": "BALKANS"}
 
 _EU = {"AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU",

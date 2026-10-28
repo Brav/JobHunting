@@ -50,3 +50,15 @@ def test_override_and_back_to_automatic(app_factory):
 def test_row_tags_lead_with_eligibility(values, tags):
     job = Job(external_id="x", title="t", company="c", location="", url="u", **values)
     assert job_tags(job) == tags
+
+
+def test_focus_mode_shows_the_verdict_without_dead_buttons(app_factory):
+    app = app_factory()
+    with TestClient(app) as c:
+        sf = app.state.session_factory
+        add_listing(sf, "A", keywords="python")
+        clock = FakeClock(utcnow())
+        run_daily(sf, FakeSource({"python": [[p("1", location="Belgrade, Serbia", is_remote=True)]]}),
+                  trigger="manual", clock=clock, sleep=clock.sleep)
+        html = c.get("/focus?source=jobs").text
+        assert 'id="eligibility-' in html and "Not right?" not in html

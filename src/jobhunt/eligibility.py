@@ -19,7 +19,7 @@ from jobhunt.places import REGIONS, place_name, place_of, places_in
 VERDICTS = ("eligible", "relocate", "check", "not_eligible")
 VERDICT_LABELS = {"eligible": "Eligible", "relocate": "Relocate", "check": "Check", "not_eligible": "Not eligible"}
 VERDICT_SYMBOLS = {"eligible": "✓", "relocate": "↗", "check": "?", "not_eligible": "✕"}
-RULES_VERSION = 3  # bump when the rules change: every job is checked again on the next start
+RULES_VERSION = 4  # bump when the rules change: every job is checked again on the next start
 
 
 @dataclass(frozen=True)
@@ -50,17 +50,30 @@ RESIDENCE = [re.compile(p, re.IGNORECASE) for p in (
     r"(?:based|located|living|residing|reside|live|resident)\s+(?:in|within)\s+" + _PLACE,
     r"\b(?:candidates|applicants|people|engineers|developers)\s+(?:who\s+are\s+)?(?:based|located|residing|living)\s+"
     r"(?:in|within)\s+" + _PLACE,
-    r"(?P<place>\b[\w .]{2,30}?)[- ]based\s+(?:candidates|applicants|only)\b",
     r"\b(?:remote|fully remote|100% remote|work remotely)\s+(?:within|in|from|across)\s+" + _PLACE,
+    r"\b(?:remote|fully remote|100% remote)\s*(?:\(|:|,|\s[-–—]\s)\s*" + _PLACE,  # "Remote (Europe)", "Remote - EMEA"
     r"\b(?P<anywhere>anywhere)\s+(?:in|within|across)\s+" + _PLACE,
     r"\b(?:based|located)\s+in\s+(?P<place>[^.;:\n()|*!?]{1,40}?)\s+only\b",
     r"\b(?:hire|hiring|recruit|recruiting|accepting candidates|open to candidates)\s+(?:remotely\s+)?(?:in|from|across)\s+"
     + _PLACE,
     r"\b(?:tax\s+)?resident\s+(?:in|of)\s+" + _PLACE,
+)] + [re.compile(p) for p in (  # capitalised names only: "EU-based", "UK / EU based", "Lisbon-based candidates"
+    r"(?P<place>\b[A-Z][\w.]*(?:(?:\s*(?:/|,|or|and)\s*|\s+)[A-Z][\w.]*){0,3})[- ]based\b(?!\s+(?:company|companies|startup|team|"
+    r"teams|business|firm|agency|clients?|customers?|organi[sz]ation|SaaS|solutions?|platform|products?|services?|approach)\b)",
+    r"\b(?P<place>EU|EEA|UK|US)\s+residents?\b",
 )]
+# A job title ending in a region: "Full Stack Engineer - EMEA", "Backend Developer (Europe)"
+TITLE_REGION = re.compile(r"[-–—|(]\s*(?P<place>EMEA|Europe|European Union|EU)\s*\)?\s*$", re.IGNORECASE)
+# Where a list of places ends: "Spain to support our European customers", "Portugal and willing to travel", "home, with trips"
+CLAUSE_END = re.compile(r"(?:^|\s+)(?:with|to|who|for|where|while|but|so|as|since|because|when|that|which|will|would|should|must|"
+                        r"may|can|could|is|are|and\s+(?:be|have|willing|able|speak))\b|,\s*(?!(?:and|or)\b)(?-i:[a-z])",
+                        re.IGNORECASE)
+# … and where it turns out to be an option, not a rule: "candidates living in London may use our office"
+OPTIONAL = re.compile(r"\s+(?:may|can|could|are\s+(?:also\s+)?welcome)\b", re.IGNORECASE)
 # "right to work in the EU", "eligible to work in the UK", "work permit for Germany"
 WORK_RIGHTS = [re.compile(p, re.IGNORECASE) for p in (
-    r"\b(?:right|eligible|eligibility|authori[sz]ed|authori[sz]ation|permitted|entitled)\s+to\s+(?:live\s+and\s+)?work\s+in\s+"
+    r"\b(?:right|eligible|eligibility|authori[sz]ed|authori[sz]ation|permitted|entitled)\s+to\s+(?:live\s+and\s+)?work\s+"
+    r"(?:in|within)\s+"
     + _PLACE,
     r"\bwork\s+(?:permit|authori[sz]ation|visa)\s+(?:for|in)\s+" + _PLACE,
 )]
@@ -126,8 +139,13 @@ LANGUAGE_EN = [re.compile(p, re.IGNORECASE) for p in (
     r"\bbusiness[- ](?:fluent|level)\s+" + _L + r"\b",
     r"\b(?:excellent|very\s+good|strong|good|solid|professional|fluent)\s+(?:written\s+and\s+(?:spoken|verbal)\s+|"
     r"spoken\s+and\s+written\s+)?" + _L + r"(?:\s+language)?\s+(?:skills|knowledge|proficiency|communication)\b",
-    r"\b(?:command|knowledge|proficiency)\s+of\s+(?:the\s+)?" + _L + r"\b",
-    r"\b" + _L + r"(?:\s+language)?\s+(?:skills\s+)?(?:is|are)\s+(?:required|mandatory|essential|a\s+must)\b",
+    r"\b(?:command|knowledge|proficiency|fluency|communication)\s+(?:of|in)\s+(?:the\s+)?(?:English\s+(?:and|&)\s+)?"
+    + _L + r"\b(?!\s+(?:market|customers?|clients?|law|legal|tax|system|culture|landscape|business|regulations?|"
+    r"accounting|economy|healthcare|public|companies|data))",
+    r"\b" + _L + r"(?:\s+language)?\s+(?:skills\s+)?(?:is\s+|are\s+)?(?:required|mandatory|essential|a\s+must)\b",
+    r"\b(?:very\s+good|excellent|good|strong|fluent|solid)\s+" + _L + r"\s+(?:and|&)\s+(?:\w+\s+){0,2}English\s+"
+    r"(?:language\s+)?(?:skills|knowledge)\b",
+    r"\b(?:main|working|business|company|team|daily)\s+language\s+(?:is|will\s+be)\s+" + _L + r"\b",
     r"\b" + _L + r"[- ]speaking\s+(?:candidate|engineer|developer|person|professional)\b",
     r"\b" + _L + r"\s+speaker\b",
 )]
@@ -135,15 +153,22 @@ LANGUAGE_EN = [re.compile(p, re.IGNORECASE) for p in (
 LANGUAGE_ORIGINAL = [
     ("de", re.compile(r"\b(?:Deutschkenntnisse|deutsche\s+Sprachkenntnisse|Deutsch\s*[(-]?\s*(?:C1|C2|B2|fließend|"
                       r"verhandlungssicher|Muttersprache)|(?:fließend\w*|verhandlungssicher\w*|sehr\s+gute\w*|"
-                      r"exzellente\w*)\s+Deutsch\w*|Deutsch\s+als\s+Muttersprache)", re.IGNORECASE)),
+                      r"exzellente\w*)\s+Deutsch\w*|Deutsch\s+als\s+Muttersprache|gute\w*\s+Deutsch-\s*(?:und|sowie)|"
+                      r"Deutsch\w*\s+(?:auf\s+)?(?:Level|Niveau)\s+[BC][12]|Deutsch\s+beherrsch\w*|"
+                      r"(?:sprichst|schreibst)\s+(?:und\s+(?:sprichst|schreibst)\s+)?(?:fließend\s+)?Deutsch|"
+                      r"Kommunikations\w*\s+in\s+Deutsch)", re.IGNORECASE)),
     ("fr", re.compile(r"\b(?:maîtrise\s+(?:du|de\s+la\s+langue)\s+français\w*|français\s+(?:courant|natif|C1|C2|B2)|"
                       r"francophone)\b", re.IGNORECASE)),
     ("es", re.compile(r"\b(?:español\s+(?:nativo|fluido|C1|C2|B2)|nivel\s+(?:alto|avanzado|nativo)\s+de\s+español|"
-                      r"dominio\s+del\s+español|castellano\s+nativo)\b", re.IGNORECASE)),
-    ("it", re.compile(r"\b(?:italiano\s+(?:fluente|madrelingua|C1|C2|B2)|ottima\s+conoscenza\s+(?:della\s+lingua\s+)?"
-                      r"italiana|madrelingua\s+italian[ao])\b", re.IGNORECASE)),
+                      r"dominio\s+del\s+español|castellano\s+nativo|fluidez\s+en\s+(?:inglés\s+y\s+)?español|"
+                      r"domin\w*\s+(?:el\s+|del\s+)?español)\b", re.IGNORECASE)),
+    ("it", re.compile(r"\b(?:italiano\s+(?:almeno\s+|minimo\s+)?(?:fluente|madrelingua|C1|C2|B2)|"
+                      r"(?:ottima|buona)\s+conoscenza\s+(?:della\s+lingua\s+)?italiana|madrelingua\s+italian[ao])\b",
+                      re.IGNORECASE)),
     ("nl", re.compile(r"\b(?:vloeiend\s+Nederlands|Nederlands\s+(?:vloeiend|C1|C2|B2)|uitstekende\s+beheersing\s+van\s+"
-                      r"(?:de\s+)?Nederlandse?\s+taal|Nederlandstalig)\b", re.IGNORECASE)),
+                      r"(?:de\s+)?Nederlandse?\s+taal|Nederlandstalig|beheers\w*\s+(?:het\s+)?Nederlands|"
+                      r"(?:spreekt|schrijft)\s+(?:en\s+(?:spreekt|schrijft)\s+)?(?:uitstekend|vloeiend|goed)\s+Nederlands|"
+                      r"(?:communicatie\w*|vaardigheden)\s+in\s+het\s+Nederlands)\b", re.IGNORECASE)),
     ("pl", re.compile(r"\b(?:biegł\w+\s+(?:znajomość\s+)?(?:języka\s+)?polsk\w+)\b", re.IGNORECASE)),
     ("pt", re.compile(r"\b(?:português\s+(?:fluente|nativo|C1|C2)|fluência\s+em\s+português)\b", re.IGNORECASE)),
 ]
@@ -161,6 +186,14 @@ CONDITIONAL = re.compile(r"\b(?:for\s+(?:positions|roles|candidates)\s+(?:\w+\s+
                          r"(?:do\s+not|don't|doesn't|does\s+not)\s+(?:yet\s+)?(?:have|speak)|"  # "who do not have a good knowledge of"
                          r"training\s+(?:is\s+)?(?:offered|provided|available))\b", re.IGNORECASE)
 
+# "No German required", "Keine Deutschkenntnisse", "Deutsch … nicht erforderlich": near the match, in the same clause
+NEGATION = re.compile(r"\b(?:no|not|without|never|don't|do\s+not|does\s+not|doesn't|kein\w*|nicht|ohne|pas|sin|non|"
+                      r"geen|niet)\b", re.IGNORECASE)
+# "German or English": either will do, so neither is required
+_ENGLISH = r"(?:English|Englisch\w*|anglais|ingl[eé]s|Engels|inglese)"
+ALTERNATIVE_AFTER = re.compile(r"^\W{0,3}\s*(?:\(\s*[ABC][12]\s*\)\s*)?(?:or|oder|ou|o|of)\s+" + _ENGLISH + r"\b", re.IGNORECASE)
+ALTERNATIVE_BEFORE = re.compile(_ENGLISH + r"\s+(?:or|oder|ou|o|of)\s+$", re.IGNORECASE)
+
 _STANDING_ORDER = {"open": 0, "relocate": 1, "rights": 2, "closed": 3}
 
 
@@ -177,6 +210,35 @@ def _quote(text: str, start: int, end: int) -> str:
         left = max(left, start - 80)
         right = min(right, left + 200)
     return re.sub(r"\s+", " ", re.sub(r"[*_`#|]+", "", text[left:right])).strip(" -•")
+
+
+def _clause(text: str, start: int, end: int, before: int = 40, after: int = 30) -> tuple[str, str]:
+    """The words just before and after a match, within its clause."""
+    left = max([text.rfind(c, 0, start) for c in ".!?\n;:,"] + [start - before - 1]) + 1
+    rights = [i for i in (text.find(c, end) for c in ".!?\n;:,") if i != -1] + [end + after]
+    return text[left:start], text[end:min(rights)]
+
+
+def _negated(text: str, start: int, end: int) -> bool:
+    before, after = _clause(text, start, end)
+    return bool(NEGATION.search(before) or NEGATION.search(after))
+
+
+def _either_or_english(text: str, start: int, end: int) -> bool:
+    return bool(ALTERNATIVE_AFTER.search(text[end:end + 40]) or ALTERNATIVE_BEFORE.search(text[max(0, start - 30):start]))
+
+
+def _not_a_requirement(text: str, start: int, end: int) -> bool:
+    return _sentence_is_a_wish(text, start, end) or _negated(text, start, end) or _either_or_english(text, start, end)
+
+
+def _place_list(text: str) -> list[str]:
+    """The places a rule names: the list right after "based in", up to where the sentence moves on."""
+    cut = CLAUSE_END.search(text)
+    if cut and OPTIONAL.match(text, cut.start()):
+        return []  # "candidates living in London may use our office": an option, not a rule
+    head = text[:cut.start()] if cut else text
+    return places_in(re.sub(r"\bfrom\s+home\b|\bhome\b", " ", head))
 
 
 def _sentence_is_a_wish(text: str, start: int, end: int) -> bool:
@@ -237,14 +299,14 @@ def _language_requirements(english: str, original: str) -> list[tuple[str, str]]
     for pattern in LANGUAGE_EN:
         for m in pattern.finditer(english):
             word = next(w for w in LANGUAGES if w.casefold() == m.group("lang").casefold())
-            if not _sentence_is_a_wish(english, *m.span()):
+            if not _not_a_requirement(english, *m.span()):
                 found.append((LANGUAGES[word], _quote(english, *m.span())))
     for code, pattern in LANGUAGE_ORIGINAL:
         for m in pattern.finditer(original):
-            if not _sentence_is_a_wish(original, *m.span()):
+            if not _not_a_requirement(original, *m.span()):
                 found.append((code, _quote(original, *m.span())))
     for m in POLISH_LANGUAGE.finditer(original):
-        if not _sentence_is_a_wish(original, *m.span()):
+        if not _not_a_requirement(original, *m.span()):
             found.append((_POLISH[m.group("lang").casefold()], _quote(original, *m.span())))
     return found
 
@@ -258,10 +320,12 @@ def _first_match(patterns, text: str):
 
 
 def assess(job, profile: Profile) -> Assessment:
-    english = "\n".join(t for t in (job.title, job.description_en or job.description) if t)
-    original = job.description or ""
+    # Markdown emphasis splits phrases ("Sehr gute **Deutsch**-…"); it carries no meaning for the rules.
+    english = re.sub(r"[*`]+", "", "\n".join(t for t in (job.title, job.description_en or job.description) if t))
+    original = re.sub(r"[*`]+", "", job.description or "")
     home = place_name(profile.home_country)
     blockers, opens, relocates, downgrades, notes = [], [], [], [], []
+    closed_residence = []  # "must be based in the UK": blocks only if no other residence rule lets the user in
 
     for code, quote in _language_requirements(english, original):
         if code not in profile.languages:
@@ -269,7 +333,7 @@ def assess(job, profile: Profile) -> Assessment:
     location = place_of(job.location)
     for pattern in RESIDENCE:
         for m in pattern.finditer(english):
-            places = places_in(m.group("place"))
+            places = _place_list(m.group("place"))
             if not places or _is_perk(english, *m.span()):
                 continue
             state, place = _best(places, profile, prefer=location)
@@ -281,12 +345,18 @@ def assess(job, profile: Profile) -> Assessment:
             elif state == "relocate":
                 relocates.append(_reason("relocate", f"Must be based in {place_name(place)}", quote))
             elif state == "closed":
-                blockers.append(_reason("blocker", f"Must be based in {place_name(place)}", quote))
+                closed_residence.append(_reason("blocker", f"Must be based in {place_name(place)}", quote))
             else:
                 notes.append(_reason("note", f"Must be based in {place_name(place)}", quote))
+    if job.title and (m := TITLE_REGION.search(job.title)):
+        state, place = _best(places_in(m.group("place")), profile)
+        if state == "open":
+            opens.append(_reason("open", f"Open to {place_name(place)}", job.title))
+        elif state == "relocate":
+            relocates.append(_reason("relocate", f"Must be based in {place_name(place)}", job.title))
     for pattern in WORK_RIGHTS:
         for m in pattern.finditer(english):
-            places = places_in(m.group("place"))
+            places = _place_list(m.group("place"))
             if not places:
                 continue
             state, place = _best(places, profile)
@@ -301,7 +371,7 @@ def assess(job, profile: Profile) -> Assessment:
             if m.group("nat") in NATIONALITIES:
                 blockers.append(_reason("blocker", f"Requires {NATIONALITIES[m.group('nat')]} citizenship",
                                         _quote(english, *m.span())))
-    if m := _first_match(CLEARANCE, english):
+    if (m := _first_match(CLEARANCE, english)) and not _negated(english, *m.span()):
         blockers.append(_reason("blocker", "Requires security clearance", _quote(english, *m.span())))
     for m in (m for pattern in WORLDWIDE for m in pattern.finditer(english)):
         quote = _quote(english, *m.span())
@@ -329,14 +399,16 @@ def assess(job, profile: Profile) -> Assessment:
         opens.append(_reason("open", f"Job in {home}", where))
     located = standing(location, profile) if location else None
 
+    if not opens and not relocates:
+        blockers += closed_residence  # "UK-based" in the title, "EU-based required" in the text: the EU rule wins
     if blockers:
         verdict, first = "not_eligible", blockers[0]
-    elif located == "closed" and not opens:
-        verdict, first = "not_eligible", _reason("blocker", f"Job in {place_name(location)} — no work rights there", where)
     elif opens:
         verdict, first = ("check", downgrades[0]) if downgrades else ("eligible", opens[0])
-    elif relocates:
+    elif relocates:  # a stated residence rule says more than where the employer happens to be
         verdict, first = "relocate", relocates[0]
+    elif located == "closed":
+        verdict, first = "not_eligible", _reason("blocker", f"Job in {place_name(location)} — no work rights there", where)
     elif location == "EU" and located == "relocate":
         verdict, first = "relocate", _reason("relocate", "Remote within the EU", where)
     elif job.workplace in ("hybrid", "on-site") and located == "relocate":
@@ -350,7 +422,7 @@ def assess(job, profile: Profile) -> Assessment:
         verdict, first = "check", _reason("note", "Location policy not stated", where)
 
     reasons, seen = [], set()
-    for reason in (first, *blockers, *opens, *relocates, *downgrades, *notes):
+    for reason in (first, *blockers, *opens, *relocates, *closed_residence, *downgrades, *notes):
         if reason["text"] not in seen:
             seen.add(reason["text"])
             reasons.append(reason)
