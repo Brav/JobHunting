@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import delete
+from sqlalchemy import delete, update
 from sqlmodel import Session, select
 
 from jobhunt.models import JOB_STATUSES, Job, Listing, Match, RunListing
@@ -15,6 +15,7 @@ def set_job_status(session: Session, job_id: int, status: str, now: datetime) ->
     if job is None:
         raise LookupError(f"no job with id {job_id}")
     job.status, job.status_changed_at = status, now
+    job.seen_at = job.seen_at or now
     session.add(job)
     session.commit()
     return job
@@ -28,3 +29,10 @@ def delete_listing(session: Session, listing_id: int) -> None:
     session.exec(delete(Job).where(Job.status == "new",
                                    ~select(Match.job_id).where(Match.job_id == Job.id).exists()))
     session.commit()
+
+
+def mark_seen(session_factory, job_id: int, now: datetime) -> None:
+    """Record the first time a job was shown; later views change nothing."""
+    with session_factory() as s:
+        s.exec(update(Job).where(Job.id == job_id, Job.seen_at.is_(None)).values(seen_at=now))
+        s.commit()

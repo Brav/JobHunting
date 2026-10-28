@@ -59,6 +59,12 @@ def _posted(value) -> date | None:
         return None
 
 
+def _flag(value) -> bool | None:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    return bool(value)
+
+
 def postings_from_frame(df: pd.DataFrame) -> list[JobPosting]:
     postings = []
     for row in df.to_dict("records"):
@@ -73,6 +79,7 @@ def postings_from_frame(df: pd.DataFrame) -> list[JobPosting]:
             location=_text(row.get("location")),
             url=f"https://www.linkedin.com/jobs/view/{job_id}",
             posted_at=_posted(row.get("date_posted")),
+            is_remote=_flag(row.get("is_remote")),
         ))
     return postings
 

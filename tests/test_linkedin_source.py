@@ -8,7 +8,7 @@ import requests
 from jobhunt.sources.base import JobPage, JobPosting, SourceBlocked, SourceError, SourceUnavailable
 from jobhunt.sources.linkedin import LinkedInSource, fetch_job_page, km_to_miles, postings_from_frame
 
-COLUMNS = ["id", "site", "job_url", "title", "company", "location", "date_posted"]
+COLUMNS = ["id", "site", "job_url", "title", "company", "location", "date_posted", "is_remote"]
 GOOD = {"id": "li-4012345678", "site": "linkedin",
         "job_url": "https://www.linkedin.com/jobs/view/4012345678", "title": "Python Developer",
         "company": "Acme", "location": "Berlin, BE, Germany", "date_posted": date(2026, 10, 27)}
@@ -153,3 +153,8 @@ def test_server_and_network_errors_are_temporary():
 
     with pytest.raises(SourceUnavailable, match="timed out"):
         fetch_job_page("123", get=get)
+
+
+def test_postings_carry_is_remote():
+    rows = [{**GOOD, "id": f"li-{n}", "is_remote": value} for n, value in ((1, True), (2, False), (3, float("nan")))]
+    assert [p.is_remote for p in postings_from_frame(frame(*rows))] == [True, False, None]

@@ -10,10 +10,11 @@ from jobhunt.models import Job, Listing, Run
 from jobhunt.sources.base import JobPosting
 
 
-def make_posting(external_id: str, title: str | None = None, posted_at: date | None = None) -> JobPosting:
+def make_posting(external_id: str, title: str | None = None, posted_at: date | None = None,
+                 is_remote: bool | None = None, company: str = "Acme", location: str = "Belgrade") -> JobPosting:
     # Default titles differ per ID: same title + company means the same job.
-    return JobPosting(external_id, title or f"Engineer {external_id}", "Acme", "Belgrade",
-                      f"https://www.linkedin.com/jobs/view/{external_id}", posted_at)
+    return JobPosting(external_id, title or f"Engineer {external_id}", company, location,
+                      f"https://www.linkedin.com/jobs/view/{external_id}", posted_at, is_remote)
 
 
 class FakeClock:

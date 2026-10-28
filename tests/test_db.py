@@ -64,3 +64,18 @@ def test_init_db_indexes_matches_by_job(tmp_path):
     init_db(engine)
     with engine.connect() as c:
         assert "ix_matches_job_id" in {row[1] for row in c.exec_driver_sql("PRAGMA index_list(matches)")}
+
+
+def test_init_db_backfills_new_job_columns(engine, session_factory):
+    with session_factory() as s:
+        s.add(Job(external_id="1", title="PHP Developer", company="Acme", location="Berlin", url="u",
+                  details='[["Seniority level", "Associate"], ["Employment type", "Contract"]]',
+                  description="Fully remote team."))
+        s.commit()
+    init_db(engine)
+    with session_factory() as s:
+        job = s.exec(select(Job)).one()
+    assert (job.seniority, job.employment_type, job.workplace) == ("Associate", "Contract", "remote")
+    with engine.connect() as c:
+        names = {r[1] for r in c.exec_driver_sql("PRAGMA index_list(jobs)")}
+    assert {"ix_jobs_workplace", "ix_jobs_language", "ix_jobs_company", "ix_jobs_first_seen_at"} <= names

@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from jobhunt.dedup import is_matchable, match_key
+from jobhunt.workplace import details_text, workplace_from
 from jobhunt.models import Job, Listing, Match, Run, RunListing
 from jobhunt.sources.base import JobPosting, JobSource, SourceError
 from jobhunt.timeutil import utcnow
@@ -83,6 +84,8 @@ def record_results(session: Session, run_id: int, listing_id: int,
                 job.title_en = job.translation_error = None  # the background pass translates the new title
             job.title, job.company, job.location = posting.title, posting.company, posting.location
             job.url, job.posted_at, job.match_key = posting.url, posting.posted_at, key
+            job.workplace = workplace_from(posting.title, posting.location, details_text(job.details), job.description,
+                                           is_remote=posting.is_remote) or job.workplace
         elif job is None and is_matchable(key):
             job = session.exec(select(Job).where(Job.match_key == key).order_by(Job.id)).first()
             if job is not None and _is_newer(posting, job):
@@ -93,7 +96,8 @@ def record_results(session: Session, run_id: int, listing_id: int,
         if job is None:
             job = Job(external_id=posting.external_id, match_key=key, first_seen_at=now,
                       title=posting.title, company=posting.company, location=posting.location,
-                      url=posting.url, posted_at=posting.posted_at)
+                      url=posting.url, posted_at=posting.posted_at,
+                      workplace=workplace_from(posting.title, posting.location, is_remote=posting.is_remote))
         # New means first found now; a job kept after its listing was deleted has lost its matches but isn't new.
         is_new = job.id is None
         session.add(job)

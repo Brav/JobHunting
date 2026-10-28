@@ -13,6 +13,7 @@ class JobPosting:
     location: str
     url: str
     posted_at: date | None
+    is_remote: bool | None = None  # JobSpy's own remote guess from title and location
 
 
 @dataclass(frozen=True)

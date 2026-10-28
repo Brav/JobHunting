@@ -48,6 +48,10 @@ class Job(SQLModel, table=True):
     title_en: str | None = None
     description_en: str | None = None
     translation_error: str | None = None
+    workplace: str | None = Field(default=None, index=True)  # remote / hybrid / on-site; None = unknown
+    seniority: str | None = Field(default=None, index=True)  # from LinkedIn's details box
+    employment_type: str | None = Field(default=None, index=True)
+    seen_at: NaiveDatetime | None = None  # first time it was shown in a detail pane or focus mode
 
 
 class Run(SQLModel, table=True):

@@ -7,6 +7,7 @@ from datetime import datetime
 from sqlalchemy import update
 
 from jobhunt.language import detect_language
+from jobhunt.workplace import details_value, workplace_from
 from jobhunt.models import Job
 from jobhunt.sources.base import JobPage, SourceBlocked, SourceError, SourceUnavailable
 from jobhunt.translate import TranslationError, TranslationUnavailable, Translator
@@ -25,7 +26,7 @@ def download_listing(session_factory, job_id: int, fetch_page: Callable[[str], J
         job = s.get(Job, job_id)
         if job is None:
             return
-        external_id = job.external_id
+        external_id, title, location, workplace = job.external_id, job.title, job.location, job.workplace
     same_posting = Job.external_id == external_id
     try:
         page = fetch_page(external_id)
@@ -35,8 +36,12 @@ def download_listing(session_factory, job_id: int, fetch_page: Callable[[str], J
         _update(session_factory, job_id, same_posting, description_error=str(e))
         raise
     # A job deleted or reposted meanwhile simply updates no row.
+    details_values = ", ".join(value for _, value in page.details)
     _update(session_factory, job_id, same_posting, description=page.description, details=json.dumps(page.details),
-            description_fetched_at=now, language=detect_language(page.description), description_error=None)
+            description_fetched_at=now, language=detect_language(page.description), description_error=None,
+            seniority=details_value(page.details, "Seniority level"),
+            employment_type=details_value(page.details, "Employment type"),
+            workplace=workplace_from(title, location, details_values, page.description) or workplace)
 
 
 def _needs_translation(job: Job | None) -> bool:

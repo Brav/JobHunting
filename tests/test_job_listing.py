@@ -170,3 +170,16 @@ def test_translate_title_drops_a_translation_of_a_replaced_title(session_factory
 
     translate_title(session_factory, jid, RetitlingTranslator())
     assert job(session_factory, jid).title_en is None
+
+
+def test_download_listing_extracts_seniority_type_and_workplace(session_factory):
+    a, b = seed(session_factory, "PHP Developer", "Go Developer")
+    details = [("Seniority level", "Mid-Senior level"), ("Employment type", "Full-time")]
+    download_listing(session_factory, a, lambda eid: JobPage("We work hybrid from Berlin.", details), NOW)
+    with session_factory() as s:
+        s.get(Job, b).workplace = "remote"
+        s.commit()
+    download_listing(session_factory, b, lambda eid: JobPage(ENGLISH, []), NOW)
+    ja, jb = job(session_factory, a), job(session_factory, b)
+    assert (ja.seniority, ja.employment_type, ja.workplace) == ("Mid-Senior level", "Full-time", "hybrid")
+    assert (jb.seniority, jb.employment_type, jb.workplace) == (None, None, "remote")

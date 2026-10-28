@@ -192,3 +192,13 @@ def test_same_title_keeps_its_translation(session_factory):
         s.commit()
         record_results(s, r2, a, [p("1", title="PHP-Entwickler")], NOW + timedelta(days=1))
         assert s.exec(select(Job)).one().title_en == "PHP Developer"
+
+
+def test_new_job_gets_workplace(session_factory):
+    a = add_listing(session_factory, "A")
+    r = add_run(session_factory, NOW)
+    with session_factory() as s:
+        record_results(s, r, a, [p("1", title="PHP Developer (Remote)"), p("2", title="PHP Lead", is_remote=True),
+                                 p("3", title="PHP Engineer")], NOW)
+        workplaces = {j.external_id: j.workplace for j in s.exec(select(Job))}
+    assert workplaces == {"1": "remote", "2": "remote", "3": None}
