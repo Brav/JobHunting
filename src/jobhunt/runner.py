@@ -52,10 +52,13 @@ def last_success_at(session: Session, listing_id: int) -> datetime | None:
 
 
 def _unique_postings(postings: list[JobPosting]) -> list[JobPosting]:
-    by_id = {p.external_id: p for p in reversed(postings)}  # first occurrence wins
+    """One posting per LinkedIn ID, then per match key; the first occurrence wins."""
+    ids: set[str] = set()
     by_key: dict[str, JobPosting] = {}
-    for posting in reversed(list(by_id.values())):
-        by_key.setdefault(match_key(posting.title, posting.company), posting)
+    for posting in postings:
+        if posting.external_id not in ids:
+            ids.add(posting.external_id)
+            by_key.setdefault(match_key(posting.title, posting.company), posting)
     return list(by_key.values())
 
 

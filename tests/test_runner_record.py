@@ -147,3 +147,11 @@ def test_a_kept_job_is_not_new_again_after_its_listing_is_deleted(session_factor
         s.commit()
         delete_listing(s, a)
         assert record_results(s, r2, b, [p("1")], NOW + timedelta(days=1)) == ListingResult(found=1, new=0)
+
+
+def test_first_of_repeated_postings_wins(session_factory):
+    a = add_listing(session_factory, "A")
+    r = add_run(session_factory, NOW)
+    with session_factory() as s:
+        record_results(s, r, a, [p("1", title="PHP Dev"), p("2", title="PHP Dev"), p("1", title="PHP Dev")], NOW)
+        assert s.exec(select(Job)).one().external_id == "1"
