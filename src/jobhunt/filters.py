@@ -10,6 +10,7 @@ from sqlmodel import Session, select
 
 from jobhunt.eligibility import VERDICT_LABELS, VERDICTS
 from jobhunt.language import language_name
+from jobhunt.signals import LIKELY_GHOST
 from jobhunt.models import Job, Listing, Match, Run, RunListing
 from jobhunt.timeutil import local_day_bounds_utc
 from jobhunt.workplace import WORKPLACES
@@ -41,6 +42,7 @@ class JobFilters:
     listing_id: int | None = None
     workplace: tuple[str, ...] = ()
     eligibility: tuple[str, ...] = ()  # none = everything except jobs hidden by default
+    ghost: str = ""  # "hide" leaves out likely ghost jobs
     language: str = ""  # "", "en", "non-en" or an ISO 639-1 code
     seniority: str = ""
     employment_type: str = ""
@@ -62,6 +64,7 @@ class JobFilters:
             listing_id=int(listing) if listing.isdecimal() else None,
             workplace=tuple(dict.fromkeys(v for v in params.getlist("workplace") if v in WORKPLACE_FILTERS)),
             eligibility=tuple(dict.fromkeys(v for v in params.getlist("eligibility") if v in VERDICTS)),
+            ghost="hide" if get("ghost") == "hide" else "",
             language=get("language"), seniority=get("seniority"), employment_type=get("employment_type"),
             company=get("company"),
             found_within=get("found_within") if get("found_within") in WITHIN else "",
@@ -87,6 +90,8 @@ class JobFilters:
                  for w in self.workplace]
         chips += [(VERDICT_LABELS[v], self.query(eligibility=tuple(x for x in self.eligibility if x != v)))
                   for v in self.eligibility]
+        if self.ghost:
+            chips.append(("Hiding likely ghost jobs", self.query(ghost="")))
         if self.language:
             label = {"en": "English", "non-en": "Not English"}.get(self.language) or language_name(self.language)
             chips.append((label, self.query(language="")))
@@ -121,6 +126,8 @@ def apply_filters(stmt, f: JobFilters, now: datetime, *, include_tab: bool = Tru
         stmt = stmt.where(EFFECTIVE_ELIGIBILITY.in_(f.eligibility))
     else:
         stmt = stmt.where(not_(HIDDEN_BY_DEFAULT))
+    if f.ghost == "hide":
+        stmt = stmt.where(or_(Job.ghost_risk.is_(None), Job.ghost_risk < LIKELY_GHOST))
     if f.language == "non-en":
         stmt = stmt.where(Job.language.is_not(None), Job.language != "en")
     elif f.language:

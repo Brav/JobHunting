@@ -4,13 +4,16 @@ Every place that changes a job's texts (search results, download, translation), 
 by older rules, and saving the settings call this module, so each check runs at the same moments.
 """
 
+import json
 from dataclasses import dataclass, field
+from datetime import date
 
 from sqlmodel import Session, or_, select
 
-from jobhunt import eligibility
-from jobhunt.models import Job
+from jobhunt import eligibility, signals
+from jobhunt.models import Job, Sighting
 from jobhunt.preferences import Preferences, load_preferences
+from jobhunt.timeutil import utcnow
 
 
 @dataclass
@@ -20,6 +23,7 @@ class CheckContext:
     prefs: Preferences
     blocked: set[str] = field(default_factory=set)
     rules: list = field(default_factory=list)
+    today: date = field(default_factory=lambda: utcnow().date())
 
 
 def load_context(session: Session) -> CheckContext:
@@ -29,6 +33,10 @@ def load_context(session: Session) -> CheckContext:
 def refresh(session: Session, job: Job, ctx: CheckContext) -> None:
     """Decide everything about the job again from its current texts; the user's own choices are left alone."""
     eligibility.refresh(session, job, ctx.profile)
+    sightings = list(session.exec(select(Sighting).where(Sighting.job_id == job.id)).all()) if job.id else []
+    job.reposts = signals.reposts(sightings)
+    score, reasons = signals.ghost(job, sightings, ctx.today)
+    job.ghost_risk, job.ghost_reasons = score, json.dumps(reasons, ensure_ascii=False)
 
 
 def refresh_job(session_factory, job_id: int) -> None:

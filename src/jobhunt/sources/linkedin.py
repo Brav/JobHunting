@@ -1,11 +1,12 @@
 """LinkedIn job search (through JobSpy) and job descriptions. The only module that imports jobspy or pandas."""
 
+import html
 import logging
 import re
 from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import pandas as pd
 import requests
@@ -141,4 +142,21 @@ def fetch_job_page(external_id: str, get: Callable[..., Any] | None = None) -> J
         label, value = item.find("h3"), item.find("span")
         if label and value:
             details.append((label.get_text(strip=True), value.get_text(strip=True)))
-    return JobPage(description=description, details=details)
+    applicants = soup.select_one(".num-applicants__caption")
+    salary = soup.select_one(".compensation__salary")
+    closed = soup.select_one("figure.closed-job") is not None or "No longer accepting applications" in response.text
+    return JobPage(description=description, details=details,
+                   applicants_text=" ".join(applicants.get_text().split()) if applicants else None,
+                   closed=closed, apply_url=_apply_url(soup),
+                   salary_text=" ".join(salary.get_text().split()) if salary else None)
+
+
+def _apply_url(soup) -> str | None:
+    """The employer's application page: LinkedIn hides it in a comment, wrapped in its own redirect."""
+    code = soup.select_one("code#applyUrl")
+    found = re.search(r'"(https?://[^"]+)"', str(code)) if code else None
+    if not found:
+        return None
+    url = html.unescape(found.group(1))
+    inner = parse_qs(urlparse(url).query).get("url")
+    return inner[0] if inner else url

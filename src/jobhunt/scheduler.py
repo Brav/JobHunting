@@ -12,7 +12,9 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import func
 from sqlmodel import Session, or_, select
 
+from jobhunt import checks
 from jobhunt.backup import backup_now
+from jobhunt.signals import check_closed
 from jobhunt.config import Settings
 from jobhunt.enrich import BLOCK_BACKOFF, ENRICH_EVERY_MINUTES, EnrichResult, enrich_pending, first_of_next_month
 from jobhunt.models import Run
@@ -152,6 +154,22 @@ class RunCoordinator:
         except Exception:
             logger.exception("nightly backup failed")
 
+    def nightly_recheck(self) -> None:
+        """Ages change daily (ghost risk counts days open): decide every job again."""
+        try:
+            with self.session_factory() as s:
+                logger.info("re-checked %d jobs", checks.refresh_all(s))
+        except Exception:
+            logger.exception("nightly re-check failed")
+
+    def closed_check(self) -> None:
+        try:
+            closed = check_closed(self.session_factory, self.fetch_page, utcnow(), sleep=self.sleep,
+                                  blocked=self.linkedin_blocked, note_blocked=self.note_blocked)
+            logger.info("%d saved or applied jobs no longer accept applications", closed)
+        except Exception:
+            logger.exception("closed check failed")
+
     def start(self) -> None:
         s = self.settings
         hours = run_hours(s.run_at, s.run_every_hours)
@@ -163,6 +181,11 @@ class RunCoordinator:
                                 id="catch_up_check", coalesce=True)
         self._scheduler.add_job(self.nightly_backup, CronTrigger(hour=3, minute=30, timezone=s.tz), id="backup",
                                 coalesce=True, misfire_grace_time=6 * 3600)
+        self._scheduler.add_job(self.nightly_recheck, CronTrigger(hour=4, minute=0, timezone=s.tz), id="recheck",
+                                coalesce=True, misfire_grace_time=6 * 3600)
+        if self.fetch_page is not None:
+            self._scheduler.add_job(self.closed_check, CronTrigger(hour=5, minute=0, timezone=s.tz), id="closed",
+                                    coalesce=True, misfire_grace_time=6 * 3600)
         if self.fetch_page is not None:
             self._scheduler.add_job(self.enrich_if_idle, "interval", minutes=ENRICH_EVERY_MINUTES, id="enrich",
                                     coalesce=True, max_instances=1, next_run_time=datetime.now(s.tz))

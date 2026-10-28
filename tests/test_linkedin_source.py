@@ -158,3 +158,20 @@ def test_server_and_network_errors_are_temporary():
 def test_postings_carry_is_remote():
     rows = [{**GOOD, "id": f"li-{n}", "is_remote": value} for n, value in ((1, True), (2, False), (3, float("nan")))]
     assert [p.is_remote for p in postings_from_frame(frame(*rows))] == [True, False, None]
+
+
+SIGNALS_HTML = ('<html><body><figure class="closed-job"><figcaption>No longer accepting applications</figcaption></figure>'
+                '<figcaption class="num-applicants__caption"> Over 200 applicants </figcaption>'
+                '<div class="salary compensation__salary"> €50,000.00/yr - €60,000.00/yr </div>'
+                '<code id="applyUrl" style="display: none"><!--"https://www.linkedin.com/jobs/view/externalApply/123?url='
+                'https%3A%2F%2Fjobs%2Eacme%2Ecom%2Fapply%2F42&urlHash=x"--></code>'
+                '<div class="show-more-less-html__markup"><p>Build PHP APIs.</p></div></body></html>')
+
+
+def test_fetch_job_page_reads_signals():
+    result = fetch_job_page("123", get=lambda url, **kw: page(text=SIGNALS_HTML))
+    assert result.applicants_text == "Over 200 applicants" and result.closed
+    assert result.apply_url == "https://jobs.acme.com/apply/42"
+    assert result.salary_text == "€50,000.00/yr - €60,000.00/yr"
+    plain = fetch_job_page("123", get=lambda url, **kw: page())
+    assert (plain.applicants_text, plain.closed, plain.apply_url, plain.salary_text) == (None, False, None, None)

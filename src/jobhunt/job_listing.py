@@ -8,6 +8,7 @@ from sqlalchemy import update
 
 from jobhunt.language import detect_language
 from jobhunt.checks import refresh_job
+from jobhunt.signals import applicant_count
 from jobhunt.workplace import details_value, workplace_from
 from jobhunt.models import Job
 from jobhunt.sources.base import JobPage, SourceBlocked, SourceError, SourceUnavailable
@@ -42,7 +43,9 @@ def download_listing(session_factory, job_id: int, fetch_page: Callable[[str], J
             description_fetched_at=now, language=detect_language(page.description), description_error=None,
             seniority=details_value(page.details, "Seniority level"),
             employment_type=details_value(page.details, "Employment type"),
-            workplace=workplace_from(title, location, details_values, page.description) or workplace)
+            workplace=workplace_from(title, location, details_values, page.description) or workplace,
+            applicants_text=page.applicants_text, applicants=applicant_count(page.applicants_text),
+            closed_at=now if page.closed else None, apply_url=page.apply_url, salary_source_text=page.salary_text)
     refresh_job(session_factory, job_id)
 
 

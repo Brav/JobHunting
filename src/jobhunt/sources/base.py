@@ -21,6 +21,10 @@ class JobPage:
     """A job's own page: the description (Markdown) and LinkedIn's details box as (label, value) pairs."""
     description: str
     details: list[tuple[str, str]]
+    applicants_text: str | None = None  # "Over 200 applicants"
+    closed: bool = False  # "No longer accepting applications"
+    apply_url: str | None = None  # the employer's own application page, when LinkedIn links to it
+    salary_text: str | None = None  # LinkedIn's salary box
 
 
 class SourceError(Exception):

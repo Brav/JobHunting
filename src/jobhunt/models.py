@@ -58,6 +58,15 @@ class Job(SQLModel, table=True):
     eligibility_reasons: str | None = None
     eligibility_override: str | None = None
     eligibility_rules: int | None = None
+    # jobhunt.signals: what LinkedIn's page says about the posting, and how often it has come back
+    applicants: int | None = None
+    applicants_text: str | None = None
+    closed_at: NaiveDatetime | None = None  # LinkedIn says it no longer accepts applications
+    apply_url: str | None = None  # the employer's own application page
+    salary_source_text: str | None = None  # LinkedIn's salary box, as shown
+    reposts: int | None = None
+    ghost_risk: int | None = Field(default=None, index=True)  # 0–3; 2+ = likely ghost
+    ghost_reasons: str | None = None  # JSON list of short reasons
 
 
 class Run(SQLModel, table=True):
@@ -112,3 +121,15 @@ class Setting(SQLModel, table=True):
     key: str = Field(primary_key=True)
     value: str
     updated_at: NaiveDatetime = Field(default_factory=utcnow)
+
+
+class Sighting(SQLModel, table=True):
+    """A job seen in a run's results: when, under which LinkedIn id, and the posting date shown then."""
+
+    __tablename__ = "sightings"
+
+    id: int | None = Field(default=None, primary_key=True)
+    job_id: int = Field(foreign_key="jobs.id", index=True, ondelete="CASCADE")  # history goes with its job
+    seen_at: NaiveDatetime
+    external_id: str
+    posted_at: date | None = None

@@ -265,3 +265,5 @@ caption { text-align: left; font-weight: 600; font-size: var(--t2); padding: 0 0
 .standalone-pane { padding: var(--s2) 0 var(--s5); }
 @media (max-width: 900px) { .listings-layout { grid-template-columns: 1fr; } .listings-table { overflow-x: auto; } }
 .actions-row { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; margin: var(--s3) 0; }
+.item-age .reposts { color: var(--warning); font-variant-numeric: tabular-nums; }
+.pane-signals { margin: 0 0 var(--s2); }

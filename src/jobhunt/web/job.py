@@ -11,6 +11,7 @@ from sqlmodel import select
 from jobhunt.actions import mark_seen
 from jobhunt.applications import next_stage, steps_for
 from jobhunt.eligibility import effective
+from jobhunt.signals import LIKELY_GHOST
 from jobhunt.job_listing import download_listing, translate_description, translate_title
 from jobhunt.models import Job, Listing, Match
 from jobhunt.sources.base import SourceBlocked, SourceError
@@ -65,9 +66,19 @@ def prepare_job(request: Request, job_id: int, error: str = "", fetch: bool = Tr
     return {"job": job, "details": json.loads(job.details) if job.details else [], "download_error": download_error,
             "translation_error": (reason or job.translation_error) if untranslated else None,
             "found_by": found_by, "standalone": False, "steps": steps, "stage_default": next_stage(job.stage),
-            "step_error": "", "eligibility": {
+            "step_error": "", "signals": _signals(job), "eligibility": {
                 "verdict": effective(job), "override": job.eligibility_override,
                 "reasons": json.loads(job.eligibility_reasons) if job.eligibility_reasons else []}}
+
+
+def _signals(job: Job) -> dict:
+    """Freshness and ghost signals for the pane."""
+    days = (utcnow().date() - job.first_seen_at.date()).days if job.first_seen_at else 0
+    line = [f"first seen {days} days ago" if days > 1 else None,
+            f"reposted {job.reposts}×" if job.reposts else None, job.applicants_text]
+    reasons = json.loads(job.ghost_reasons) if job.ghost_reasons else []
+    return {"line": " · ".join(x for x in line if x), "ghost": (job.ghost_risk or 0) >= LIKELY_GHOST,
+            "reasons": reasons, "closed_at": job.closed_at}
 
 
 def pane_response(request: Request, job_id: int, *, step_error: str = "", status_code: int = 200):

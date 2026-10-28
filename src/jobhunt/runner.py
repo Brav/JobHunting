@@ -14,6 +14,7 @@ from sqlmodel import Session, select
 
 from jobhunt.dedup import is_matchable, match_key
 from jobhunt import checks
+from jobhunt.signals import record_sighting
 from jobhunt.workplace import details_text, workplace_from
 from jobhunt.models import Job, Listing, Match, Run, RunListing
 from jobhunt.sources.base import JobPosting, JobSource, SourceError
@@ -102,13 +103,13 @@ def record_results(session: Session, run_id: int, listing_id: int,
                       workplace=workplace_from(posting.title, posting.location, is_remote=posting.is_remote))
         # New means first found now; a job kept after its listing was deleted has lost its matches but isn't new.
         is_new = job.id is None
-        if job.id not in matched:
-            checks.refresh(session, job, ctx)  # its title, location or texts may have changed
         session.add(job)
         session.flush()
         if job.id in matched:
             continue  # two postings resolved to the same job
         matched.add(job.id)
+        record_sighting(session, job, posting.external_id, posting.posted_at, now)
+        checks.refresh(session, job, ctx)  # its title, location or texts may have changed
         session.add(Match(run_id=run_id, listing_id=listing_id, job_id=job.id, is_new=is_new))
         new += is_new
     result = ListingResult(found=len(matched), new=new)

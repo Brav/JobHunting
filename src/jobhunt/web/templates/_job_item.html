@@ -9,5 +9,5 @@
     {% set job_tags = job | tags %}
     {% if job_tags %}<span class="item-tags">{% for label, kind in job_tags %}<span class="tag {{ kind }}">{{ label }}</span>{% endfor %}</span>{% endif %}
   </span>
-  <span class="item-age" title="{{ job_age[1] }}">{{ job_age[0] }}</span>
+  <span class="item-age" title="{{ job_age[1] }}">{{ job_age[0] }}{% if job.reposts %} <span class="reposts" title="Reposted {{ job.reposts }}×">↻{{ job.reposts }}</span>{% endif %}</span>
 </li>
