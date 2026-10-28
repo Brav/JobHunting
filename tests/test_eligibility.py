@@ -48,6 +48,22 @@ CORPUS = [  # real sentences from the live jobs, then look-alikes
     (dict(location="Spain", description="Remote. We hire in Poland, Serbia and Romania."), "eligible", "Open to Serbia"),
     (dict(location="Germany", description="Must be a German citizen."), "not_eligible", "Requires German citizenship"),
     (dict(location="Netherlands", description="Security clearance required."), "not_eligible", "Requires security clearance"),
+    # found in the accuracy pass on the live jobs
+    (dict(location="Vilnius, Vilniaus, Lithuania", workplace=None,
+          description="Workation: work from anywhere in the EU for up to 30 days per year"), "check", "Workplace unknown"),
+    (dict(location="Berlin, Germany", workplace="hybrid", description="Work from anywhere in the world for 30 days per year"),
+     "relocate", "Hybrid in Germany"),
+    (dict(location="UK", description="🌍 **Work from anywhere** - Enjoy the freedom of remote work within the country of employment"),
+     "not_eligible", "Job in the UK — no work rights there"),
+    (dict(location="Italy", description="Work from anywhere."), "check", "Remote in Italy — policy not stated"),
+    (dict(location="Thessaloniki, Central Macedonia, Greece", workplace="hybrid",
+          description="EU timezone, and the right to work in the EU"), "relocate", "Hybrid in Greece"),
+    (dict(location="Warsaw, Mazowieckie, Poland", workplace="hybrid",
+          description="We welcome applications from candidates based in Spain or Poland."), "relocate", "Must be based in Poland"),
+    (dict(location="Spain", description="Knowledge of French is required for positions permanently located in Quebec, "
+                                        "so incumbents can communicate with their colleagues. French-language training "
+                                        "is offered to all incumbents who do not have a good knowledge of French."),
+     "check", "Remote in Spain — policy not stated"),
     # look-alikes that must not trigger anything beyond the location
     (dict(location="Spain", description="Experience in a B2B SaaS company"), "check", "Remote in Spain — policy not stated"),
     (dict(location="France", description="**Timezone:** France (CET)"), "check", "Remote in France — policy not stated"),

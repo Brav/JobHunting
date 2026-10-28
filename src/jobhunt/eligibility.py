@@ -19,7 +19,7 @@ from jobhunt.places import REGIONS, place_name, place_of, places_in
 VERDICTS = ("eligible", "relocate", "check", "not_eligible")
 VERDICT_LABELS = {"eligible": "Eligible", "relocate": "Relocate", "check": "Check", "not_eligible": "Not eligible"}
 VERDICT_SYMBOLS = {"eligible": "✓", "relocate": "↗", "check": "?", "not_eligible": "✕"}
-RULES_VERSION = 1  # bump when the rules change: every job is checked again on the next start
+RULES_VERSION = 3  # bump when the rules change: every job is checked again on the next start
 
 
 @dataclass(frozen=True)
@@ -74,13 +74,18 @@ CITIZENSHIP = [re.compile(p) for p in (
     r"\b(?P<nat>[A-Z][A-Za-z]+)\s+citizenship\s+(?:is\s+)?(?:required|mandatory)",
 )]
 CLEARANCE = [re.compile(r"\bsecurity\s+clearance\b", re.IGNORECASE), re.compile(r"\b(?:SC|DV|NV1|NV2)[- ](?:clearance|cleared)\b")]
-# "work from almost anywhere in the world", "remote worldwide", "fully distributed"
+# "work from almost anywhere in the world", "remote worldwide", "fully distributed" — a bare "work from anywhere"
+# names no scope and is usually a perk, so it doesn't count
 WORLDWIDE = [re.compile(p, re.IGNORECASE) for p in (
-    r"\b(?:work\s+from\s+anywhere|anywhere\s+in\s+the\s+world|from\s+any\s+country|fully\s+distributed|"
-    r"location[- ]independent)\b",
-    r"\b(?:remote|work|working|hire|hiring|candidates?|applicants?|position|role)\b[^.\n]{0,30}\b(?:worldwide|world-wide|"
-    r"globally)\b",
+    r"\b(?:anywhere\s+in\s+the\s+world|from\s+any\s+country|fully\s+distributed|location[- ]independent)\b",
+    r"\b(?:remote|hire|hiring|candidates?|applicants?|position|role)\b[^.\n]{0,30}\b(?:worldwide|world-wide|globally)\b",
 )]
+# A sentence about time-limited remote work is a perk, not where you may live: "work from anywhere for 30 days per year"
+PERK = re.compile(r"\b(?:workation|\d+\s+(?:days?|weeks?)\s+(?:per|a|each|every)\s+year|up\s+to\s+\d+\s+(?:days?|weeks?)|"
+                  r"(?:days?|weeks?)\s+(?:per|a)\s+year)\b", re.IGNORECASE)
+# "remote work within the country of employment" takes back a "work from anywhere" in the same sentence
+COUNTRY_OF_EMPLOYMENT = re.compile(r"\b(?:within|in)\s+(?:the|your)\s+country\s+of\s+(?:employment|residence)\b|"
+                                   r"\bwithin\s+your\s+country\b", re.IGNORECASE)
 # "European time zones", "EU timezone", "CET ± 2", "within 3 hours of CET", "overlap … (CET, UTC+1"
 TZ_WINDOW = [re.compile(p, re.IGNORECASE) for p in (
     r"\b(?:European|EU|CET|CEST|EET|Central European)\s+time\s?zones?\b",
@@ -150,6 +155,12 @@ NICE_TO_HAVE = re.compile(r"\b(?:plus|nice[- ]to[- ]have|advantage\w*|bonus|pref
                           r"von\s+Vorteil|wünschenswert|un\s+plus|apprécié\w*|valorable|se\s+valorará|deseable|"
                           r"preferibile|gradit\w|pluspunt|mile\s+widzian\w|atut\w*)\b", re.IGNORECASE)
 
+# A requirement that applies only elsewhere: "French is required for positions located in Quebec".
+CONDITIONAL = re.compile(r"\b(?:for\s+(?:positions|roles|candidates)\s+(?:\w+\s+){0,2}(?:located|based)\s+in|"
+                         r"if\s+(?:you\s+are\s+)?(?:based|located)\s+in|"
+                         r"(?:do\s+not|don't|doesn't|does\s+not)\s+(?:yet\s+)?(?:have|speak)|"  # "who do not have a good knowledge of"
+                         r"training\s+(?:is\s+)?(?:offered|provided|available))\b", re.IGNORECASE)
+
 _STANDING_ORDER = {"open": 0, "relocate": 1, "rights": 2, "closed": 3}
 
 
@@ -169,7 +180,9 @@ def _quote(text: str, start: int, end: int) -> str:
 
 
 def _sentence_is_a_wish(text: str, start: int, end: int) -> bool:
-    return bool(NICE_TO_HAVE.search(_quote(text, start, end)))
+    """A wish ("German is a plus") or a condition that applies elsewhere ("… for positions located in Quebec")."""
+    sentence = _quote(text, start, end)
+    return bool(NICE_TO_HAVE.search(sentence) or CONDITIONAL.search(sentence))
 
 
 def _countries(place: str) -> frozenset[str]:
@@ -188,8 +201,13 @@ def standing(place: str, profile: Profile) -> str:
     return "closed"
 
 
-def _best(places: list[str], profile: Profile) -> tuple[str, str]:
-    return min(((standing(p, profile), p) for p in places), key=lambda sp: _STANDING_ORDER[sp[0]])
+def _best(places: list[str], profile: Profile, prefer: str | None = None) -> tuple[str, str]:
+    """The place best for the user; among equals, the job's own country ("based in Spain or Poland" in Warsaw)."""
+    return min(((standing(p, profile), p) for p in places), key=lambda sp: (_STANDING_ORDER[sp[0]], sp[1] != prefer))
+
+
+def _is_perk(text: str, start: int, end: int) -> bool:
+    return bool(PERK.search(_quote(text, start, end)))
 
 
 def _home_offset(profile: Profile) -> float:
@@ -204,13 +222,13 @@ def _tz_window_fits(text: str, profile: Profile) -> tuple[int, int] | None:
     offset = _home_offset(profile)
     for m in TZ_RANGE.finditer(text):
         lo, hi = (int(g.replace("−", "-").replace(" ", "")) for g in m.groups())
-        if min(lo, hi) <= offset <= max(lo, hi):
+        if min(lo, hi) <= offset <= max(lo, hi) and not _is_perk(text, *m.span()):
             return m.span()
     if 0 <= offset <= 3:  # named European windows (CET, "European time zones") fit Europe's own time zones
         for pattern in TZ_WINDOW:
-            m = pattern.search(text)
-            if m:
-                return m.span()
+            for m in pattern.finditer(text):
+                if not _is_perk(text, *m.span()):
+                    return m.span()
     return None
 
 
@@ -248,12 +266,13 @@ def assess(job, profile: Profile) -> Assessment:
     for code, quote in _language_requirements(english, original):
         if code not in profile.languages:
             blockers.append(_reason("blocker", f"Requires {language_name(code)}", quote))
+    location = place_of(job.location)
     for pattern in RESIDENCE:
         for m in pattern.finditer(english):
             places = places_in(m.group("place"))
-            if not places:
+            if not places or _is_perk(english, *m.span()):
                 continue
-            state, place = _best(places, profile)
+            state, place = _best(places, profile, prefer=location)
             quote = _quote(english, *m.span())
             if state == "open":
                 anywhere = "anywhere" in m.groupdict() and m.group("anywhere")
@@ -284,9 +303,13 @@ def assess(job, profile: Profile) -> Assessment:
                                         _quote(english, *m.span())))
     if m := _first_match(CLEARANCE, english):
         blockers.append(_reason("blocker", "Requires security clearance", _quote(english, *m.span())))
-    if m := _first_match(WORLDWIDE, english):
-        opens.append(_reason("open", "Open worldwide", _quote(english, *m.span())))
-    if span := _tz_window_fits(english, profile):
+    for m in (m for pattern in WORLDWIDE for m in pattern.finditer(english)):
+        quote = _quote(english, *m.span())
+        if not PERK.search(quote) and not COUNTRY_OF_EMPLOYMENT.search(quote):
+            opens.append(_reason("open", "Open worldwide", quote))
+            break
+    # A time-zone window says where you may work from, not that a job you must commute to is remote.
+    if job.workplace not in ("hybrid", "on-site") and (span := _tz_window_fits(english, profile)):
         opens.append(_reason("open", "European time-zone window", _quote(english, *span)))
     if m := _first_match(US_HOURS, english):
         downgrades.append(_reason("note", "Works US hours", _quote(english, *m.span())))
@@ -299,7 +322,6 @@ def assess(job, profile: Profile) -> Assessment:
         name = language_name(job.language)
         downgrades.append(_reason("note", f"Listing is in {name} — {name} may be required", job.title or ""))
 
-    location = place_of(job.location)
     where = job.location or ""
     if location in ("EUROPE", "EMEA") and job.workplace == "remote":
         opens.append(_reason("open", f"Remote in {place_name(location)}", where))
