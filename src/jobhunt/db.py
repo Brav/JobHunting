@@ -5,7 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Engine, event, update
+from sqlalchemy import Engine, event, inspect, update
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from jobhunt.applications import backfill_applied_steps
@@ -49,6 +49,7 @@ def _add_missing_columns(engine: Engine) -> None:
 
 def init_db(engine: Engine, tz: ZoneInfo = ZoneInfo("UTC")) -> None:
     """Create tables and mark runs left 'running' by a crash or restart as interrupted."""
+    steps_are_new = not inspect(engine).has_table("application_steps")
     SQLModel.metadata.create_all(engine)
     _add_missing_columns(engine)
     with engine.begin() as conn:
@@ -72,8 +73,9 @@ def init_db(engine: Engine, tz: ZoneInfo = ZoneInfo("UTC")) -> None:
             job.workplace = workplace_from(job.title, job.location, details_text(job.details), job.description)
             session.add(job)
         session.commit()
-    with Session(engine) as session:
-        backfill_applied_steps(session, tz)
+    if steps_are_new:  # once, when upgrading: later, an applied job without steps is the user's choice
+        with Session(engine) as session:
+            backfill_applied_steps(session, tz)
     with Session(engine) as session:
         session.exec(
             update(Run)

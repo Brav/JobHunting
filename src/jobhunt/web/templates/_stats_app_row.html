@@ -10,12 +10,16 @@
   <td class="num">{{ row.app.latest_on.isoformat() if row.app.latest_on else "—" }}</td>
   <td class="num">{% if row.waiting is none %}—{% elif row.stale %}<span class="stale">{{ icon("triangle-alert") }} no change for {{ row.waiting }} days</span>
     {%- elif row.waiting == 0 %}today{% elif row.waiting == 1 %}1 day{% else %}{{ row.waiting }} days{% endif %}</td>
-  <td><select name="stage" aria-label="Move {{ job.title_en or job.title }} to a stage" hx-post="/jobs/{{ job.id }}/steps"
-              hx-trigger="change" hx-vals='{"view": "stats-row", "on_date": "{{ today.isoformat() }}"}'
-              hx-target="closest tr" hx-swap="outerHTML">
-      <option value="" selected>Move to…</option>
-      {% for s in stages %}<option value="{{ s }}">{{ stage_labels[s] }}</option>{% endfor %}
-    </select></td>
+  <td>{# A button, not on-change: arrow keys on a closed select change it at once in some browsers. The ids let htmx
+         put focus back after the row is replaced. #}
+    <form class="move-form" hx-post="/jobs/{{ job.id }}/steps" hx-target="closest tr" hx-swap="outerHTML">
+      <input type="hidden" name="view" value="stats-row"><input type="hidden" name="on_date" value="{{ today.isoformat() }}">
+      <select id="move-{{ job.id }}" name="stage" required aria-label="Move {{ job.title_en or job.title }} to a stage">
+        <option value="" selected>Move to…</option>
+        {% for s in stages %}<option value="{{ s }}">{{ stage_labels[s] }}</option>{% endfor %}
+      </select>
+      <button id="move-button-{{ job.id }}" class="btn small" type="submit">Move</button>
+    </form></td>
 </tr>
 {% else %}
 <tr id="app-row-{{ job_id }}"><td colspan="7" class="error" role="alert">{{ step_error }}</td></tr>

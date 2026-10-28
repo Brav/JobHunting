@@ -67,3 +67,15 @@ def test_stage_select_adds_a_step_and_returns_the_row(app_factory):
         assert '<span class="tag stage-offer">Offer</span>' in r.text
         r = c.post(f"/jobs/{other}/steps", data={"stage": "offer", "on_date": today(app).isoformat(), "view": "stats-row"})
         assert r.status_code == 422 and "Mark the job Applied first" in r.text and f'id="app-row-{other}"' in r.text
+
+
+def test_move_needs_a_button_press(app_factory):
+    app = app_factory()
+    with TestClient(app) as c:
+        j, _ = seeded(app)
+        c.post(f"/jobs/{j}/status", data={"status": "applied"})
+        row = c.get("/stats").text.split(f'id="app-row-{j}"')[1].split("</tr>")[0]
+        assert 'hx-trigger="change"' not in row  # arrow keys on a closed select fire change in Chrome
+        assert f'<form class="move-form" hx-post="/jobs/{j}/steps"' in row
+        assert f'<select id="move-{j}" name="stage" required' in row
+        assert ">Move</button>" in row

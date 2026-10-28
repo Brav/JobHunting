@@ -140,6 +140,8 @@ def test_backfill_gives_applied_jobs_an_applied_step(tmp_path):
     with sf() as s:  # marked Applied before steps existed
         s.exec(update(Job).where(Job.id == j).values(status="applied", status_changed_at=datetime(2026, 10, 27, 23, 30)))
         s.commit()
+    with engine.begin() as conn:  # a database from before this version
+        conn.exec_driver_sql("DROP TABLE application_steps")
     init_db(engine, TZ)
     init_db(engine, TZ)
     assert stages(sf, j) == [("applied", TODAY)]
@@ -155,3 +157,24 @@ def test_delete_listing_keeps_jobs_with_history(session_factory):
         set_job_status(s, j, "new", NOW, TZ)
         delete_listing(s, s.exec(select(Listing.id)).one())
         assert s.get(Job, j) is not None
+
+
+def test_leaving_applied_later_keeps_the_applied_date(session_factory):
+    (j,) = make_jobs(session_factory, "1")
+    apply(session_factory, j, now=datetime(2026, 10, 1, 9, 0))
+    with session_factory() as s:
+        set_job_status(s, j, "hidden", NOW, TZ)  # X pressed by mistake weeks later
+    apply(session_factory, j)  # ...and undone
+    assert stages(session_factory, j) == [("applied", date(2026, 10, 1))]
+
+
+def test_backfill_runs_once(tmp_path):
+    engine = make_engine(tmp_path / "c.db")
+    init_db(engine, TZ)
+    sf = make_session_factory(engine)
+    (j,) = make_jobs(sf, "1")
+    apply(sf, j)
+    with sf() as s:
+        delete_step(s, j, steps_for(s, j)[0].id)  # the user removed it
+    init_db(engine, TZ)  # next start
+    assert stages(sf, j) == []

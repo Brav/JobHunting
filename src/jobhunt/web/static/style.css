@@ -205,6 +205,7 @@ dl.shortcuts dd { margin: 0; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 caption { text-align: left; font-weight: 600; font-size: var(--t2); padding: 0 0 var(--s1); }
 .apps-table select { font-size: var(--t1); padding: 4px 6px; }
+.move-form { display: flex; gap: var(--s1); align-items: center; }
 .row-error { display: block; font-size: var(--t1); }
 .stale { color: var(--fg); display: inline-flex; gap: 4px; align-items: center; }
 .stale .icon { color: var(--danger); }

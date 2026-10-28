@@ -1,7 +1,7 @@
 """Application stages: dated steps after a job is marked Applied, and the job's current stage."""
 
 from collections.abc import Iterable
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlmodel import Session, select
@@ -20,6 +20,7 @@ STAGE_LABELS = {"applied": "Applied", "hr_interview": "HR interview", "technical
                 "withdrawn": "Withdrawn", "no_response": "No response"}
 STALE_DAYS = 14
 NOTE_MAX = 500
+UNDO_WINDOW = timedelta(minutes=10)  # an automatic Applied step this new is removed when the job leaves Applied
 
 
 class StepError(ValueError):
@@ -104,8 +105,10 @@ def on_status_change(session: Session, job: Job, previous: str, today: date, now
         session.add(ApplicationStep(job_id=job.id, stage="applied", on_date=today, created_at=now))
         session.flush()
     elif previous == "applied" and job.status != "applied":
-        # A lone automatic Applied step means nothing happened yet: an Apply + Undo leaves no trace.
-        if len(steps) == 1 and steps[0].stage == "applied" and not steps[0].note:
+        # A lone Applied step added moments ago was a slip: an Apply + Undo leaves no trace. An older one is a
+        # real application date and stays, so leaving Applied by mistake and undoing it later loses nothing.
+        if (len(steps) == 1 and steps[0].stage == "applied" and not steps[0].note
+                and now - steps[0].created_at <= UNDO_WINDOW):
             session.delete(steps[0])
             session.flush()
     refresh_stage(session, job)
