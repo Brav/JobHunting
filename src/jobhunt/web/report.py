@@ -14,7 +14,7 @@ from jobhunt.models import Job, Listing
 from jobhunt.reports import report_dates
 from jobhunt.timeutil import utcnow
 from jobhunt.web.common import STATUS_LABELS, is_htmx, render, session
-from jobhunt.web.job import prepare_job
+from jobhunt.web.job import pane_response, prepare_job
 
 router = APIRouter()
 
@@ -87,9 +87,7 @@ def change_status(request: Request, job_id: int, status: str = Form("")):
             job = set_job_status(s, job_id, status, utcnow(), request.app.state.settings.tz)
         except ValueError:
             raise HTTPException(status_code=400, detail="Unknown status")
-    standalone = request.headers.get("HX-Current-URL", "").rstrip("/").endswith(f"/jobs/{job_id}")
-    pane = {**prepare_job(request, job_id, fetch=False), "standalone": standalone}
-    response = render(request, "_status_response.html", pane=pane, job=job, oob=True)
+    response = pane_response(request, job_id)
     response.headers["HX-Trigger-After-Settle"] = json.dumps({"jobStatusChanged": {
         "jobId": job.id, "status": job.status, "previous": previous, "label": STATUS_LABELS[job.status]}})
     return response

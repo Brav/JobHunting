@@ -15,7 +15,7 @@ from jobhunt.scheduler import RunCoordinator
 from jobhunt.job_listing import clear_service_translation_errors
 from jobhunt.sources.base import JobPage, JobSource
 from jobhunt.translate import DeepLTranslator, NoTranslator, Translator
-from jobhunt.web import cv, focus, job, listings, report, tracker
+from jobhunt.web import applications, cv, focus, job, listings, report, tracker
 from jobhunt.web.common import render
 
 
@@ -57,6 +57,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     app.include_router(cv.router)
     app.include_router(job.router)
     app.include_router(focus.router)
+    app.include_router(applications.router)
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
     @app.post("/runs", response_class=HTMLResponse)

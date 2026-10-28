@@ -1,0 +1,30 @@
+{% from "_macros.html" import icon %}
+{# Needs: pane (job, steps, stage_default, step_error), today #}
+{% set job = pane.job %}
+<section id="application-{{ job.id }}" class="application" aria-labelledby="application-title-{{ job.id }}">
+  <h2 id="application-title-{{ job.id }}" class="application-title">Application
+    {% if job.stage %}<span class="tag {{ job.stage | stage_kind }}">{{ stage_labels[job.stage] }}</span>{% endif %}</h2>
+  <form class="step-form" hx-post="/jobs/{{ job.id }}/steps" hx-target="#job-pane" hx-swap="innerHTML">
+    <select name="stage" aria-label="Stage">
+      {% for s in stages %}<option value="{{ s }}"{% if s == pane.stage_default %} selected{% endif %}>{{ stage_labels[s] }}</option>{% endfor %}
+    </select>
+    <input type="date" name="on_date" value="{{ today.isoformat() }}" max="{{ today.isoformat() }}" required aria-label="Date">
+    <input type="text" name="note" maxlength="500" placeholder="Note (optional)" aria-label="Note">
+    <button class="btn small" type="submit">Add step</button>
+    {% if pane.step_error %}<p class="error" role="alert">{{ pane.step_error }}</p>{% endif %}
+  </form>
+  {% if pane.steps %}
+  <ol class="timeline">
+    {% for step in pane.steps %}
+    <li id="step-{{ step.id }}">
+      <span class="step-date">{{ step.on_date.isoformat() }}</span>
+      <span class="step-main"><strong>{{ stage_labels[step.stage] }}</strong>
+        {%- if step.note %}<span class="step-note">{{ step.note }}</span>{% endif %}</span>
+      <button class="btn ghost small" type="button" hx-post="/jobs/{{ job.id }}/steps/{{ step.id }}/delete"
+              hx-target="#job-pane" hx-swap="innerHTML"
+              aria-label="Delete step {{ stage_labels[step.stage] }} {{ step.on_date.isoformat() }}">{{ icon("x") }}</button>
+    </li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+</section>

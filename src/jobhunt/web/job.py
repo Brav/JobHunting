@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import select
 
 from jobhunt.actions import mark_seen
+from jobhunt.applications import next_stage, steps_for
 from jobhunt.job_listing import download_listing, translate_description, translate_title
 from jobhunt.models import Job, Listing, Match
 from jobhunt.sources.base import SourceBlocked, SourceError
@@ -59,9 +60,18 @@ def prepare_job(request: Request, job_id: int, error: str = "", fetch: bool = Tr
     with session(request) as s:
         found_by = list(s.exec(select(Listing.name).join(Match, Match.listing_id == Listing.id)
                                .where(Match.job_id == job_id).distinct().order_by(Listing.name)).all())
+        steps = steps_for(s, job_id) if job.status == "applied" else []
     return {"job": job, "details": json.loads(job.details) if job.details else [], "download_error": download_error,
             "translation_error": (reason or job.translation_error) if untranslated else None,
-            "found_by": found_by, "standalone": False}
+            "found_by": found_by, "standalone": False, "steps": steps, "stage_default": next_stage(job.stage),
+            "step_error": ""}
+
+
+def pane_response(request: Request, job_id: int, *, step_error: str = "", status_code: int = 200):
+    """The job's detail pane after a change, with its list row updated out of band."""
+    standalone = request.headers.get("HX-Current-URL", "").rstrip("/").endswith(f"/jobs/{job_id}")
+    pane = {**prepare_job(request, job_id, fetch=False), "standalone": standalone, "step_error": step_error}
+    return render(request, "_status_response.html", status_code=status_code, pane=pane, job=pane["job"], oob=True)
 
 
 @router.get("/jobs/{job_id}", response_class=HTMLResponse)

@@ -33,7 +33,7 @@ document.addEventListener("alpine:init", () => {
       if (selected) { this.selectedId = selected.dataset.jobId; selected.scrollIntoView({ block: "nearest" }); }
       // A pane that arrives after the selection moved on belongs to another job: don't show it.
       document.body.addEventListener("htmx:beforeSwap", (e) => {
-        const match = (e.detail.requestConfig?.path || "").match(/^\/jobs\/(\d+)\/pane/);
+        const match = (e.detail.requestConfig?.path || "").match(/^\/jobs\/(\d+)\/(pane|steps)/);
         if (match && e.detail.target?.id === "job-pane" && match[1] !== this.selectedId) e.detail.shouldSwap = false;
       });
       document.body.addEventListener("htmx:afterSwap", (e) => {

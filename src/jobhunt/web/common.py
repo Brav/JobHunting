@@ -10,6 +10,7 @@ from markdown_it import MarkdownIt
 from markupsafe import Markup
 from sqlmodel import Session
 
+from jobhunt.applications import STAGE_LABELS, STAGES, stage_kind
 from jobhunt.language import language_name
 from jobhunt.reports import run_summary
 from jobhunt.timeutil import local_date, to_local, utcnow
@@ -61,7 +62,9 @@ def job_tags(job) -> list[tuple[str, str]]:
         tags.append((WORKPLACE_LABELS[job.workplace], ""))
     if job.language and job.language != "en":
         tags.append((language_name(job.language), "lang"))
-    if job.status != "new":
+    if job.status == "applied" and job.stage:
+        tags.append((STAGE_LABELS[job.stage], stage_kind(job.stage)))
+    elif job.status != "new":
         tags.append((STATUS_LABELS[job.status], f"status-{job.status}"))
     elif job.seniority:
         tags.append((job.seniority, ""))
@@ -80,8 +83,9 @@ def job_age(job, now: datetime, tz: ZoneInfo) -> tuple[str, str]:
     return short, f"Found {local_dt(job.first_seen_at, tz)}"
 
 
-templates.env.filters.update(tags=job_tags)
-templates.env.globals.update(status_labels=STATUS_LABELS, workplace_labels=WORKPLACE_LABELS)
+templates.env.filters.update(tags=job_tags, stage_kind=stage_kind)
+templates.env.globals.update(status_labels=STATUS_LABELS, workplace_labels=WORKPLACE_LABELS, stages=STAGES,
+                             stage_labels=STAGE_LABELS)
 
 
 def is_htmx(request: Request) -> bool:

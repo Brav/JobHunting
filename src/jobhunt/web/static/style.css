@@ -56,6 +56,9 @@ kbd { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 0 5px;
 .tag.status-interested { background: var(--success-tint); color: var(--success); }
 .tag.status-applied { background: var(--violet-tint); color: var(--violet); }
 .tag.status-hidden { background: var(--danger-tint); color: var(--danger); }
+.tag.stage-open { background: var(--violet-tint); color: var(--violet); }
+.tag.stage-offer { background: var(--success-tint); color: var(--success); }
+.tag.stage-closed { background: var(--surface-2); color: var(--muted); }
 .lang { font-size: 11.5px; padding: 0 7px; border-radius: 999px; background: var(--accent-tint); color: var(--accent); }
 .chips { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
 .chip { display: inline-flex; align-items: center; gap: 4px; font-size: var(--t2); padding: 3px 10px; border-radius: 999px;
@@ -106,6 +109,17 @@ label { display: grid; gap: 4px; font-size: var(--t2); color: var(--muted); }
 .pane-title { margin-top: 0; display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
 .pane-meta { color: var(--muted); font-size: var(--t2); margin: 0 0 var(--s3); }
 .pane-actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s3) 0; }
+/* Application block: add dated stage steps, newest first */
+.application { border-top: 1px solid var(--line); margin: var(--s4) 0; padding-top: var(--s3); }
+.application-title { font-size: var(--t4); margin: 0 0 var(--s2); display: flex; gap: var(--s2); align-items: center; }
+.step-form { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+.step-form input[type="text"] { flex: 1 1 180px; min-width: 0; }
+.step-form .error { flex-basis: 100%; margin: 0; }
+.timeline { list-style: none; margin: var(--s3) 0 0; padding: 0; }
+.timeline li { display: grid; grid-template-columns: 6.5em minmax(0, 1fr) auto; gap: var(--s2); align-items: baseline;
+               padding: var(--s1) 0; border-bottom: 1px solid var(--line); }
+.step-date { color: var(--muted); font-size: var(--t2); font-variant-numeric: tabular-nums; }
+.step-note { display: block; color: var(--muted); font-size: var(--t2); overflow-wrap: anywhere; }
 .back-to-list { display: none; margin-bottom: var(--s2); }
 dl.details { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s5); margin: var(--s3) 0; }
 dl.details dt { font-size: var(--t1); color: var(--muted); }

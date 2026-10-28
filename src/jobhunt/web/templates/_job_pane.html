@@ -24,6 +24,8 @@
     <a class="btn" data-action="cv" href="/jobs/{{ job.id }}/cv-prompt" target="_blank" rel="noopener">{{ icon("file-text") }} CV prompt {{ key("C") }}</a>
     <a class="btn" data-action="linkedin" href="{{ job.url }}" target="_blank" rel="noopener">{{ icon("external-link") }} LinkedIn {{ key("O") }}</a>
   </div>
+  {% if job.status == "applied" %}{% include "_application.html" %}
+  {% elif pane.step_error %}<p class="notice error-notice" role="alert">{{ pane.step_error }}</p>{% endif %}
   {% endif %}
   {% if pane.download_error %}
   <div class="notice error-notice">
