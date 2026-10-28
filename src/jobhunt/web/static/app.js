@@ -31,7 +31,7 @@ document.addEventListener("alpine:init", () => {
       const selected = this.list().querySelector('.job-item[aria-selected="true"]');
       if (selected) { this.selectedId = selected.dataset.jobId; selected.scrollIntoView({ block: "nearest" }); }
     },
-    list() { return this.$el.querySelector("#job-list"); },
+    list() { return this.$root.querySelector("#job-list"); },
     rows() { return [...this.list().querySelectorAll(".job-item:not(.is-removed)")]; },
     row(id) { return document.getElementById(`job-item-${id}`); },
 
@@ -48,7 +48,7 @@ document.addEventListener("alpine:init", () => {
       const url = new URL(location.href);
       url.searchParams.set("job", row.dataset.jobId);
       history.replaceState(null, "", url);
-      this.$el.classList.add("has-selection");
+      this.$root.classList.add("has-selection");
     },
     move(step) {
       const rows = this.rows();
@@ -57,7 +57,7 @@ document.addEventListener("alpine:init", () => {
       this.select(rows[i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + step))]);
     },
     onClick(e) { const row = e.target.closest(".job-item"); if (row) this.select(row); },
-    closePane() { this.$el.classList.remove("has-selection"); },
+    closePane() { this.$root.classList.remove("has-selection"); },
     act(name) { const el = document.querySelector(`#job-pane [data-action="${name}"]`); if (el) el.click(); },
 
     // Sent by the server (HX-Trigger-After-Settle) after a status change from the pane.
@@ -97,7 +97,7 @@ document.addEventListener("alpine:init", () => {
       else if (key === "k" || key === "ArrowUp") this.move(-1);
       else if (actions[key]) this.act(actions[key]);
       else if (key === "u") this.undo();
-      else if (key === "f" && this.$el.dataset.focusUrl) location.href = this.$el.dataset.focusUrl;
+      else if (key === "f" && this.$root.dataset.focusUrl) location.href = this.$root.dataset.focusUrl;
       else if (key === "/" && document.getElementById("search")) document.getElementById("search").focus();
       else return;
       e.preventDefault();
@@ -110,7 +110,7 @@ document.addEventListener("alpine:init", () => {
       if (isTyping(e) || hasModifier(e) || Alpine.store("help").open) return;
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
       const forms = { x: "hide", s: "save", a: "applied", l: "later" };
-      if (forms[key]) this.$el.querySelector(`form[data-focus-action="${forms[key]}"]`)?.requestSubmit();
+      if (forms[key]) this.$root.querySelector(`form[data-focus-action="${forms[key]}"]`)?.requestSubmit();
       else if (key === "c" || key === "o") document.querySelector(`[data-action="${key === "c" ? "cv" : "linkedin"}"]`)?.click();
       else if (key === "Escape") document.getElementById("focus-back")?.click();
       else return;

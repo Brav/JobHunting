@@ -1,6 +1,7 @@
 {% from "_macros.html" import icon %}
 {# Needs: filters, options, filter_action, filter_hidden [(name, value)], show_listing, show_sort, listings #}
-<form class="filter-bar" method="get" action="{{ filter_action }}" x-data @change="$el.requestSubmit()">
+<form class="filter-bar" method="get" action="{{ filter_action }}" x-data @change="$el.requestSubmit()"
+      @submit="$el.querySelectorAll('input, select').forEach((e) => { if (e.name && (e.value === '' || e.value === e.dataset.default)) e.disabled = true })">
   {% for name, value in filter_hidden %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
   <label class="search">{{ icon("search") }}<input id="search" type="search" name="q" value="{{ filters.q }}" placeholder="Title or company" aria-label="Search title or company"></label>
   {% if show_listing %}
@@ -40,7 +41,7 @@
   </select>
   {% endfor %}
   {% if show_sort %}
-  <select name="sort" aria-label="Sort">
+  <select name="sort" aria-label="Sort" data-default="found">
     {% for value, text in [("found", "Newest found"), ("posted", "Newest posted"), ("company", "Company A–Z")] %}
     <option value="{{ value }}"{% if filters.sort == value %} selected{% endif %}>{{ text }}</option>
     {% endfor %}
