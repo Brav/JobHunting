@@ -51,3 +51,10 @@ def test_job_status(app_factory):
         assert "Django Dev" not in c.get("/report/2026-10-28").text
         assert c.post(f"/jobs/{jid}/status", data={"status": "bogus"}).status_code == 400
         assert c.post("/jobs/9999/status", data={"status": "applied"}).status_code == 404
+
+
+def test_report_jump_without_a_date_goes_home(app_factory):
+    with TestClient(app_factory()) as c:
+        for day in ("", "not-a-date"):
+            r = c.get("/report", params={"day": day}, follow_redirects=False)
+            assert (r.status_code, r.headers["location"]) == (303, "/")

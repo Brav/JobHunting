@@ -36,8 +36,13 @@ def latest_report(request: Request):
 
 
 @router.get("/report")
-def jump_to_report(day: date | None = None):
-    return RedirectResponse(f"/report/{day.isoformat()}" if day else "/", status_code=303)
+def jump_to_report(day: str = ""):
+    # The date picker sends day="" when cleared, so it is parsed here rather than typed as a date.
+    try:
+        target = f"/report/{date.fromisoformat(day).isoformat()}"
+    except ValueError:
+        target = "/"
+    return RedirectResponse(target, status_code=303)
 
 
 @router.get("/report/{day}", response_class=HTMLResponse)
