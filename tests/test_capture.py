@@ -91,3 +91,17 @@ def test_greenhouse_pages_are_read_from_its_api():
         ("Backend Engineer", "GitLab", "Remote, EMEA", "2026-07-22")
     assert job["remote"] and "Build **Rails** services." in job["description"]
     assert job["url"] == "https://job-boards.greenhouse.io/gitlab/jobs/8638232002?gh_src=abc"
+
+
+def test_a_captured_job_without_text_is_not_looked_up_on_linkedin(app_factory):
+    calls = []
+    app = app_factory(fetch_page=lambda external_id: calls.append(external_id))
+    with TestClient(app) as c:
+        token = c.get("/capture").text and app.state.form_token
+        r = c.post("/capture/save", data={"token": token, "title": "Dev", "company": "Example",
+                                          "url": "https://example.com/job/1"}, follow_redirects=False)
+        job_url = r.headers["location"]
+        assert "No description saved" in c.get(job_url).text
+        c.get(f"{job_url}/cv-prompt")
+        c.post(f"{job_url}/description")
+    assert calls == []

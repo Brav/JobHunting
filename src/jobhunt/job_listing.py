@@ -22,11 +22,16 @@ def _update(session_factory, job_id: int, *conditions, **values) -> None:
         s.commit()
 
 
+def on_linkedin(job: Job) -> bool:
+    return (job.source or "linkedin") == "linkedin"
+
+
 def download_listing(session_factory, job_id: int, fetch_page: Callable[[str], JobPage], now: datetime) -> None:
-    """Download and store the job's page. Raises SourceError; stores the reason only if it's about this job."""
+    """Download and store the job's page. Raises SourceError; stores the reason only if it's about this job.
+    Only LinkedIn jobs are downloaded: the other sources bring their text with them, or the user pasted it."""
     with session_factory() as s:
         job = s.get(Job, job_id)
-        if job is None:
+        if job is None or not on_linkedin(job):
             return
         external_id, title, location, workplace = job.external_id, job.title, job.location, job.workplace
     same_posting = Job.external_id == external_id

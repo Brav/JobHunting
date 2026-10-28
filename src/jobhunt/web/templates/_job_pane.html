@@ -78,6 +78,9 @@
   </dl>
   {% endif %}
   {% if pane.translation_error %}<p class="notice">{{ pane.translation_error }}</p>{% endif %}
+  {% if not job.description and job.source and job.source != "linkedin" and not pane.download_error %}
+  <p class="muted">No description saved for this job — <a href="{{ job.url }}" target="_blank" rel="noopener">the original page</a> has it.</p>
+  {% endif %}
   {% if job.description %}
   <div class="listing">
     {% if job.description_en %}

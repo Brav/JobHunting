@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from sqlalchemy import update
-from sqlmodel import select
+from sqlmodel import or_, select
 
 from jobhunt.job_listing import download_listing, translate_title
 from jobhunt.models import Job
@@ -45,7 +45,8 @@ def enrich_pending(session_factory, fetch_page: Callable[[str], JobPage], transl
     result = EnrichResult()
     with session_factory() as s:
         pending = s.exec(select(Job.id)
-                         .where(Job.description.is_(None), Job.description_error.is_(None))
+                         .where(Job.description.is_(None), Job.description_error.is_(None),
+                                or_(Job.source == "linkedin", Job.source.is_(None)))  # others bring their text
                          .order_by(Job.first_seen_at.desc(), Job.id.desc())
                          .limit(batch)).all()
     for i, job_id in enumerate(pending):

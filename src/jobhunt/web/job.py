@@ -16,7 +16,7 @@ from jobhunt.followups import follow_up_due
 from jobhunt.preferences import load_preferences
 from jobhunt.stats import load_application
 from jobhunt.signals import LIKELY_GHOST
-from jobhunt.job_listing import download_listing, translate_description, translate_title
+from jobhunt.job_listing import download_listing, on_linkedin, translate_description, translate_title
 from jobhunt.models import Contact, ContactJob, Job, Listing, Match
 from jobhunt.sources.base import SourceBlocked, SourceError
 from jobhunt.timeutil import local_date, utcnow
@@ -41,7 +41,7 @@ def prepare_job(request: Request, job_id: int, error: str = "", fetch: bool = Tr
     sf, state = request.app.state.session_factory, request.app.state
     job = _job(request, job_id)
     download_error = None
-    if fetch and not job.description:
+    if fetch and not job.description and on_linkedin(job):
         if error:
             download_error = error  # Try again just failed; don't send a second request
         elif state.coordinator.linkedin_blocked():

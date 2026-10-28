@@ -128,3 +128,16 @@ def test_an_unexpected_error_is_stored_and_the_pass_goes_on(session_factory):
     with session_factory() as s:
         errors = {j.external_id: j.description_error for j in s.exec(select(Job))}
     assert errors == {"1": None, "2": "ValueError: unexpected markup"}
+
+
+def test_only_linkedin_jobs_are_downloaded(session_factory):
+    seed(session_factory, 1)
+    with session_factory() as s:
+        s.add(Job(external_id="capture:https://example.com/job/1", source="capture", title="Dev", company="Example",
+                  location="", url="https://example.com/job/1", first_seen_at=NOW))
+        s.add(Job(external_id="remoteok:7", source="remoteok", title="Dev", company="Other", location="",
+                  url="https://remoteok.com/7", first_seen_at=NOW))
+        s.commit()
+    pages = Pages()
+    run(session_factory, pages)
+    assert pages.calls == ["1"]  # never linkedin.com/jobs/view/capture:https://…
