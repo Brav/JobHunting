@@ -70,7 +70,8 @@ def check_closed(session_factory, fetch_page: Callable[[str], JobPage], now: dat
     """Look again at saved and applied jobs on LinkedIn; mark those no longer accepting applications."""
     with session_factory() as s:
         jobs = [(j.id, j.external_id) for j in s.exec(select(Job).where(
-            Job.status.in_(("interested", "applied")), Job.closed_at.is_(None))).all()]
+            Job.status.in_(("interested", "applied")), Job.closed_at.is_(None),
+            (Job.source == "linkedin") | Job.source.is_(None))).all()]
     closed = 0
     for i, (job_id, external_id) in enumerate(jobs):
         if blocked():

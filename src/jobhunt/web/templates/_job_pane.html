@@ -6,7 +6,7 @@
     {% if job.language and job.language != "en" %}<span class="tag lang">{{ job.language | language_name }}</span>{% endif %}</h1>
   {% if job.title_en and job.title_en != job.title %}<p class="muted small">Original title: {{ job.title }}</p>{% endif %}
   <p class="pane-meta"><a href="/companies/{{ company_key(job.company) | urlencode }}">{{ job.company }}</a>{% if job.location %} · {{ job.location }}{% endif %}
-    · {{ age(job)[1] | lower }}{% if pane.found_by %} · found by {{ pane.found_by | join(", ") }}{% endif %}</p>
+    · {{ age(job)[1] | lower }}{% if pane.found_by %} · found by {{ pane.found_by | join(", ") }}{% endif %}{% if job.source and job.source != "linkedin" %} · via {{ source_labels.get(job.source, job.source) }}{% endif %}</p>
   {% if pane.signals.line %}<p class="pane-signals muted small">{{ pane.signals.line[:1] | upper }}{{ pane.signals.line[1:] }}</p>{% endif %}
   {% if pane.signals.closed_at %}<p class="notice error-notice">No longer accepting applications (seen {{ pane.signals.closed_at | local_dt(tz) }})</p>{% endif %}
   {% if pane.scam %}<div class="notice error-notice" role="alert"><strong>Scam warning signs</strong>
@@ -36,7 +36,7 @@
             hx-post="/jobs/{{ job.id }}/status" hx-vals='{"status": "new", "view": "pane"}' hx-target="#job-pane" hx-swap="innerHTML">{{ icon("undo-2") }} Reset</button>
     {% endif %}
     <a class="btn" data-action="cv" href="/jobs/{{ job.id }}/cv-prompt" target="_blank" rel="noopener">{{ icon("file-text") }} CV prompt {{ key("C") }}</a>
-    <a class="btn" data-action="linkedin" href="{{ job.url }}" target="_blank" rel="noopener">{{ icon("external-link") }} LinkedIn {{ key("O") }}</a>
+    <a class="btn" data-action="linkedin" href="{{ job.url }}" target="_blank" rel="noopener">{{ icon("external-link") }} {{ source_labels.get(job.source or "linkedin", "Original") if (job.source or "linkedin") == "linkedin" else "Open on " ~ source_labels.get(job.source, "the original site") }} {{ key("O") }}</a>
     {% if job.apply_url %}<a class="btn" href="{{ job.apply_url }}" target="_blank" rel="noopener noreferrer">{{ icon("external-link") }} Apply on company site</a>{% endif %}
     <button class="btn ghost" type="button" hx-post="/jobs/{{ job.id }}/{{ 'unblock' if pane.company_blocked else 'block' }}-company"
             hx-target="#job-pane" hx-swap="innerHTML">{{ "Unblock company" if pane.company_blocked else "Block company" }}</button>

@@ -14,6 +14,10 @@ class JobPosting:
     url: str
     posted_at: date | None
     is_remote: bool | None = None  # JobSpy's own remote guess from title and location
+    description: str | None = None  # feeds carry the text; LinkedIn's is downloaded later
+    source: str = "linkedin"
+    salary_text: str | None = None
+    apply_url: str | None = None
 
 
 @dataclass(frozen=True)

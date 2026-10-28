@@ -57,7 +57,7 @@ def init_db(engine: Engine, tz: ZoneInfo = ZoneInfo("UTC")) -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_jobs_match_key ON jobs (match_key)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_matches_job_id ON matches (job_id)")
         for column in ("workplace", "language", "seniority", "employment_type", "company", "first_seen_at", "stage",
-                       "eligibility"):
+                       "eligibility", "source"):
             conn.exec_driver_sql(f"CREATE INDEX IF NOT EXISTS ix_jobs_{column} ON jobs ({column})")
     with Session(engine) as session:
         for job in session.exec(select(Job).where(Job.match_key.is_(None))):

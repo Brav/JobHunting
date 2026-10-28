@@ -58,8 +58,15 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     session_factory = make_session_factory(engine)
     _default_skills_from_cv(session_factory, settings)
     if source is None:
+        import requests
+        from jobhunt.preferences import load_preferences
+        from jobhunt.sources.feeds import CombinedSource
         from jobhunt.sources.linkedin import LinkedInSource
-        source = LinkedInSource()
+
+        def enabled_feeds() -> tuple[str, ...]:
+            with session_factory() as s:
+                return load_preferences(s).sources
+        source = CombinedSource(LinkedInSource(), get=requests.get, enabled=enabled_feeds)
     if fetch_page is None:
         from jobhunt.sources.linkedin import fetch_job_page as fetch_page
     if translator is None:
@@ -81,6 +88,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     app.state.settings = settings
     app.state.session_factory = session_factory
     app.state.coordinator = coordinator
+    app.state.source = source
     app.state.fetch_page = fetch_page
     app.state.translator = translator
     app.include_router(report.router)

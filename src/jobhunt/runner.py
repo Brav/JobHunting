@@ -14,6 +14,7 @@ from sqlmodel import Session, select
 
 from jobhunt.dedup import is_matchable, match_key
 from jobhunt import checks
+from jobhunt.language import detect_language
 from jobhunt.signals import record_sighting
 from jobhunt.workplace import details_text, workplace_from
 from jobhunt.models import Job, Listing, Match, Run, RunListing
@@ -91,7 +92,8 @@ def record_results(session: Session, run_id: int, listing_id: int,
                                            is_remote=posting.is_remote) or job.workplace
         elif job is None and is_matchable(key):
             job = session.exec(select(Job).where(Job.match_key == key).order_by(Job.id)).first()
-            if job is not None and _is_newer(posting, job):
+            # The same job on another source is the same job: only a newer posting on the same source replaces it.
+            if job is not None and posting.source == (job.source or "linkedin") and _is_newer(posting, job):
                 # A newer repost of the same job: follow it, so the link and description stay live.
                 job.external_id, job.url, job.posted_at = posting.external_id, posting.url, posting.posted_at
                 job.description = job.description_fetched_at = job.details = job.description_error = None
@@ -99,8 +101,13 @@ def record_results(session: Session, run_id: int, listing_id: int,
         if job is None:
             job = Job(external_id=posting.external_id, match_key=key, first_seen_at=now,
                       title=posting.title, company=posting.company, location=posting.location,
-                      url=posting.url, posted_at=posting.posted_at,
-                      workplace=workplace_from(posting.title, posting.location, is_remote=posting.is_remote))
+                      url=posting.url, posted_at=posting.posted_at, source=posting.source,
+                      workplace=workplace_from(posting.title, posting.location, posting.description,
+                                               is_remote=posting.is_remote),
+                      salary_source_text=posting.salary_text, apply_url=posting.apply_url)
+            if posting.description:  # feeds bring the text: no download, and the language is known now
+                job.description, job.description_fetched_at = posting.description, now
+                job.language = detect_language(posting.description)
         # New means first found now; a job kept after its listing was deleted has lost its matches but isn't new.
         is_new = job.id is None
         session.add(job)

@@ -29,7 +29,8 @@ class Job(SQLModel, table=True):
     __tablename__ = "jobs"
 
     id: int | None = Field(default=None, primary_key=True)
-    external_id: str = Field(unique=True, index=True)
+    external_id: str = Field(unique=True, index=True)  # LinkedIn's id; other sources are prefixed ("remoteok:…")
+    source: str | None = Field(default="linkedin", index=True)  # None (older rows) = linkedin
     # Normalised title + company (jobhunt.dedup.match_key); reposts and other listings' finds map to this job.
     match_key: str | None = Field(default=None, index=True)
     title: str
