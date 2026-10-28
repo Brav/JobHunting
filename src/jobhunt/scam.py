@@ -12,12 +12,17 @@ RULES = [
         r"\bstarter\s+kit\b",
         r"\bpay\s+(?:a\s+fee\s+)?for\s+(?:your\s+)?(?:own\s+)?(?:training|equipment|registration|onboarding)\b",
     )]),
+    # You being paid in it — not a payments product that handles it ("payment gateway for Bitcoin merchants").
     ("Pays in crypto or gift cards", [re.compile(p, _I) for p in (
-        r"\b(?:paid|payment|salary|wages?|pay)\b[^.\n]{0,40}\b(?:crypto(?:currency)?|bitcoin|USDT|gift\s*cards?)\b",
-        r"\b(?:crypto(?:currency)?|bitcoin|USDT|gift\s*cards?)\b[^.\n]{0,20}\b(?:payment|salary|wages)\b",
+        r"\b(?:paid|payments?|salary|wages?|pay|compensation)\s+(?:is\s+|will\s+be\s+)?(?:\w+\s+){0,2}?"
+        r"(?:in|via|with|through|using)\s+(?:crypto(?:currency)?|bitcoin|USDT|gift\s*cards?)\b",
+        r"\b(?:crypto(?:currency)?|bitcoin|USDT|gift\s*cards?)\s+(?:as\s+)?(?:salary|wages|compensation)\b",
     )]),
+    # Being told to get in touch there — not a product built on it ("integrations with the WhatsApp Business API").
     ("Contact on WhatsApp, Telegram or Signal", [re.compile(p, _I) for p in (
-        r"\b(?:contact|message|text|reach|write|apply|send|chat)\b[^.\n]{0,40}\b(?:WhatsApp|Telegram|Signal)\b",
+        r"\b(?:(?:contact|message|text|reach(?:\s+out\s+to)?|write\s+to)\s+(?:us|me|our\s+[\w-]+|the\s+(?:recruiter|team|hr)|hr)|"
+        r"apply|send\s+(?:us\s+)?(?:your\s+)?(?:cv|resume|application|portfolio|details))\b(?:\s+[\w-]+){0,3}?"
+        r"\s+(?:on|via|through|over|using|at)\s+(?:WhatsApp|Telegram|Signal)\b(?!-)",
         r"\b(?:WhatsApp|Telegram)\b\s*(?::|at|on)?\s*\+?\d[\d\s-]{6,}",
     )]),
     ("Personal email address to apply", [re.compile(
@@ -27,13 +32,17 @@ RULES = [
         r"\b(?:paid|pay|earn)\s+per\s+task\b", r"\brate\s+(?:the\s+)?apps\b",
         r"\b(?:task|order)[- ]based\s+(?:pay|commission|earnings)\b", r"\bcomplete\s+tasks\s+(?:to|and)\s+earn\b",
     )]),
-    ("Work from your phone", [re.compile(r"\bwork\s+(?:from|on)\s+your\s+(?:phone|smartphone|mobile)\b", _I)]),
+    ("Work from your phone", [re.compile(r"\bwork\s+(?:from|on)\s+your\s+(?:phone|smartphone|mobile)\b"
+                                         r"(?!\s*(?:app|application|banking|game))", _I)]),
 ]
 NO_EXPERIENCE = re.compile(r"\bno\s+experience\s+(?:needed|required|necessary)\s*[!.]", _I)
 HIGH_PAY = re.compile(r"\bearn\s+up\s+to\b|[$€£]\s?\d{3,}\s*(?:per|/|a)\s*(?:day|week)\b", _I)
 NEGATION = re.compile(r"\b(?:no|not|never|without|free\s+of)\b", _I)
-# A perk, not a demand: "Registration Fees Paid", "we cover your training fees", "fees are reimbursed".
-PAID_FOR_YOU = re.compile(r"\s*(?:(?:are|is|will\s+be|get)\s+)?(?:paid|covered|reimbursed|funded|included)\b", _I)
+# Not asked of you: a perk ("Registration Fees Paid", "fees are reimbursed", "fee waived") or a thing being built
+# ("the application processing fee calculator").
+PAID_FOR_YOU = re.compile(r"\s*(?:(?:are|is|will\s+be|get)\s+)?(?:paid|covered|reimbursed|funded|included|waived|refunded)\b|"
+                          r"\s+(?:calculator|calculation|engine|logic|module|service|system|api|model|structure|"
+                          r"management|tracking)s?\b", _I)
 PAYS_FOR_YOU = re.compile(r"\b(?:we|company|employer)\s+(?:will\s+)?(?:pay|pays|cover|covers|reimburse|reimburses|fund|funds)"
                           r"\s+(?:for\s+)?(?:your|all|any)?\s*$", _I)
 

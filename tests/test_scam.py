@@ -20,6 +20,8 @@ def flags(description, title="Developer"):
     ("You will need to pay for your training materials up front.", "Asks you to pay a fee"),
     ("Salary is paid weekly in USDT.", "Pays in crypto or gift cards"),
     ("To apply, message our recruiter on WhatsApp.", "Contact on WhatsApp, Telegram or Signal"),
+    ("Apply via Telegram and send your CV on WhatsApp.", "Contact on WhatsApp, Telegram or Signal"),
+    ("Contact us on WhatsApp for an interview.", "Contact on WhatsApp, Telegram or Signal"),
     ("Telegram: +44 7700 900123", "Contact on WhatsApp, Telegram or Signal"),
     ("Send your CV to hiring.team.jobs@gmail.com", "Personal email address to apply"),
     ("No experience needed! Earn up to $500 per day.", "No experience needed, high pay"),
@@ -40,6 +42,16 @@ def test_rules(text, flag):
     "* Paid CPD Days\n* Professional Registration Fees Paid\n* RAVE Awards",  # a benefit, from a real job
     "We cover your training fees and certification costs.",
     "Registration fees are reimbursed in full.",
+    # Ordinary tech jobs (from the final review).
+    "Build payment infrastructure for crypto exchanges.",
+    "You will own the payment gateway for Bitcoin and USDT merchants.",
+    "Write integrations with the WhatsApp Business API.",
+    "Our product connects chat platforms such as WhatsApp or Telegram.",
+    "Application fee waived for all candidates.",
+    "Maintain the application processing fee calculator.",
+    "You will send notifications through WhatsApp and Telegram bots.",
+    "Our mobile app lets users message each other on Signal-like encrypted chat.",
+    "Work on your phone app: we build mobile banking.",
 ])
 def test_look_alikes(text):
     assert flags(text) == []
