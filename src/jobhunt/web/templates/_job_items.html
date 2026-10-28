@@ -1,0 +1,2 @@
+{% for job in jobs %}{% with is_last=loop.last %}{% include "_job_item.html" %}{% endwith %}{% endfor %}
+{% if not jobs and not offset %}<li class="list-empty" role="presentation">{{ empty_message or "No jobs here" }}</li>{% endif %}

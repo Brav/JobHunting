@@ -1,0 +1,9 @@
+{% macro icon(name, label=None) -%}
+<svg class="icon"{% if label %} role="img" aria-label="{{ label }}"{% else %} aria-hidden="true"{% endif %}><use href="/static/icons.svg#i-{{ name }}"></use></svg>
+{%- endmacro %}
+
+{% macro tag(text, kind="") -%}
+<span class="tag{% if kind %} {{ kind }}{% endif %}">{{ text }}</span>
+{%- endmacro %}
+
+{% macro key(k) -%}<kbd>{{ k }}</kbd>{%- endmacro %}

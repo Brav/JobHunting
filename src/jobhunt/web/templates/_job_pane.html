@@ -1,0 +1,52 @@
+{% from "_macros.html" import icon, key %}
+{% set job = pane.job %}
+<article class="pane-body" aria-labelledby="pane-title-{{ job.id }}">
+  {% if not pane.standalone %}<button class="btn ghost small back-to-list" type="button" @click="$dispatch('back-to-list')">{{ icon("chevron-left") }} Back to list</button>{% endif %}
+  <h1 id="pane-title-{{ job.id }}" class="pane-title">{{ job.title_en or job.title }}
+    {% if job.language and job.language != "en" %}<span class="tag lang">{{ job.language | language_name }}</span>{% endif %}</h1>
+  {% if job.title_en and job.title_en != job.title %}<p class="muted small">Original title: {{ job.title }}</p>{% endif %}
+  <p class="pane-meta">{{ job.company }}{% if job.location %} · {{ job.location }}{% endif %}
+    · {{ age(job)[1] | lower }}{% if pane.found_by %} · found by {{ pane.found_by | join(", ") }}{% endif %}</p>
+  <div class="pane-actions" role="group" aria-label="Decide on this job">
+    {% for status, action, label, done, icon_name, k in [
+         ("interested", "save", "Save", "Saved", "bookmark", "S"),
+         ("applied", "applied", "Applied", "Applied", "send", "A"),
+         ("hidden", "hide", "Hide", "Hidden", "eye-off", "X")] %}
+    <button class="btn{% if action == 'save' %} primary{% endif %}{% if job.status == status %} current{% endif %}" type="button" data-action="{{ action }}"
+            hx-post="/jobs/{{ job.id }}/status" hx-vals='{"status": "{{ status }}", "view": "pane"}' hx-target="#job-pane" hx-swap="innerHTML">
+      {{ icon(icon_name) }} {{ done if job.status == status else label }} {{ key(k) }}</button>
+    {% endfor %}
+    {% if job.status != "new" %}
+    <button class="btn ghost" type="button" data-action="reset"
+            hx-post="/jobs/{{ job.id }}/status" hx-vals='{"status": "new", "view": "pane"}' hx-target="#job-pane" hx-swap="innerHTML">{{ icon("undo-2") }} Reset</button>
+    {% endif %}
+    <a class="btn" data-action="cv" href="/jobs/{{ job.id }}/cv-prompt" target="_blank" rel="noopener">{{ icon("file-text") }} CV prompt {{ key("C") }}</a>
+    <a class="btn" data-action="linkedin" href="{{ job.url }}" target="_blank" rel="noopener">{{ icon("external-link") }} LinkedIn {{ key("O") }}</a>
+  </div>
+  {% if pane.download_error %}
+  <div class="notice error-notice">
+    <p>Couldn't load the job listing: {{ pane.download_error }}</p>
+    <form method="post" action="/jobs/{{ job.id }}/description">
+      <input type="hidden" name="next" value="/jobs/{{ job.id }}"><button class="btn small" type="submit">Try again</button>
+    </form>
+  </div>
+  {% endif %}
+  {% if pane.details or job.workplace %}
+  <dl class="details">
+    {% if job.workplace %}<div><dt>Workplace</dt><dd>{{ workplace_labels[job.workplace] }}</dd></div>{% endif %}
+    {% for label, value in pane.details %}<div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>{% endfor %}
+  </dl>
+  {% endif %}
+  {% if pane.translation_error %}<p class="notice">{{ pane.translation_error }}</p>{% endif %}
+  {% if job.description %}
+  <div class="listing">
+    {% if job.description_en %}
+    <p class="muted small">Translated from {{ job.language | language_name }}</p>
+    {{ job.description_en | markdown }}
+    <details><summary>Show original ({{ job.language | language_name }})</summary>{{ job.description | markdown }}</details>
+    {% else %}
+    {{ job.description | markdown }}
+    {% endif %}
+  </div>
+  {% endif %}
+</article>

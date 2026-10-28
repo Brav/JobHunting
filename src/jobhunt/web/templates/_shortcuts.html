@@ -1,0 +1,20 @@
+<div class="overlay" x-data x-cloak x-show="$store.help.open" @click.self="$store.help.open = false" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
+  <div class="overlay-card">
+    <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+    <dl class="shortcuts">
+      <dt><kbd>J</kbd> <kbd>↓</kbd></dt><dd>Next job</dd>
+      <dt><kbd>K</kbd> <kbd>↑</kbd></dt><dd>Previous job</dd>
+      <dt><kbd>S</kbd></dt><dd>Save</dd>
+      <dt><kbd>A</kbd></dt><dd>Applied</dd>
+      <dt><kbd>X</kbd></dt><dd>Hide</dd>
+      <dt><kbd>U</kbd></dt><dd>Undo last change</dd>
+      <dt><kbd>L</kbd></dt><dd>Later (focus mode)</dd>
+      <dt><kbd>C</kbd></dt><dd>CV prompt</dd>
+      <dt><kbd>O</kbd></dt><dd>Open on LinkedIn</dd>
+      <dt><kbd>F</kbd></dt><dd>Focus mode</dd>
+      <dt><kbd>/</kbd></dt><dd>Search</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Close / leave focus mode</dd>
+    </dl>
+    <button class="btn" type="button" @click="$store.help.open = false">Close</button>
+  </div>
+</div>

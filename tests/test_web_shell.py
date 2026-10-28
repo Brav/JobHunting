@@ -19,7 +19,7 @@ def test_run_now(app_factory):
     with TestClient(app) as client:
         assert client.post("/runs").status_code == 200
         wait_until(lambda: not app.state.coordinator.is_running)
-        assert "1 of 1 listings OK" in client.get("/runs/status").text
+        assert "1 of 1 OK" in client.get("/runs/status").text
 
 
 def test_status_bar_shows_failure(app_factory):
@@ -28,7 +28,7 @@ def test_status_bar_shows_failure(app_factory):
     with TestClient(app) as client:
         app.state.coordinator.run_blocking("manual")
         text = client.get("/runs/status").text
-    assert "0 of 1 listings OK" in text and "'Data Eng Berlin' failed: rate limited by LinkedIn" in text
+    assert "0 of 1 OK" in text and "'Data Eng Berlin' failed" in text and "rate limited by LinkedIn" in text
 
 
 def test_static_htmx(app_factory):
@@ -68,4 +68,23 @@ def test_status_bar_shows_when_a_run_crashed(app_factory):
     add_run(app.state.session_factory, datetime(2026, 10, 27, 9, 0), status="failed", error="OperationalError: disk full")
     with TestClient(app) as client:
         text = client.get("/runs/status").text
-    assert "2026-10-27 10:00 (manual)" in text and "Run failed: OperationalError: disk full" in text
+    assert "2026-10-27 10:00" in text and "Run failed: OperationalError: disk full" in text
+
+
+def test_top_bar_and_assets(app_factory):
+    with TestClient(app_factory()) as c:
+        page = c.get("/listings").text
+        assert 'href="/jobs">All jobs</a>' in page and 'aria-current="page"' in page
+        assert "/static/alpine.min.js" in page and "/static/app.js" in page
+        for asset in ("/static/alpine.min.js", "/static/app.js", "/static/icons.svg"):
+            assert c.get(asset).status_code == 200
+
+
+def test_compact_status_bar(app_factory):
+    app = app_factory(FakeSource({"data": [SourceBlocked("rate limited by LinkedIn")]}))
+    add_listing(app.state.session_factory, "Data Eng Berlin", keywords="data")
+    with TestClient(app) as c:
+        app.state.coordinator.run_blocking("manual")
+        bar = c.get("/runs/status").text
+    assert "0 of 1 OK" in bar and "'Data Eng Berlin' failed" in bar and "Run now" in bar
+    assert "listings OK" not in bar

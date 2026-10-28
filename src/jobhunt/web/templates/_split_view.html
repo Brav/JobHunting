@@ -1,0 +1,18 @@
+{% from "_macros.html" import icon, key %}
+<div class="split{% if pane %} has-selection{% endif %}" x-data="jobList" data-focus-url="{{ focus_url or '' }}"
+     @keydown.window="onKey($event)" @back-to-list.window="closePane()" @job-status-changed.camel.window="onStatus($event.detail)">
+  <div class="split-list">
+    <ul id="job-list" role="listbox" aria-label="Jobs" data-hide-hidden="{{ 'true' if hide_hidden else 'false' }}"
+        @click="onClick($event)">
+      {% include "_job_items.html" %}
+    </ul>
+  </div>
+  <section id="job-pane" class="split-pane" aria-live="polite">
+    {% if pane %}{% include "_job_pane.html" %}{% else %}
+    <div class="pane-empty">
+      <p>Select a job to read it here.</p>
+      <p class="muted small">{{ key("J") }} {{ key("K") }} move · {{ key("S") }} save · {{ key("X") }} hide · {{ key("?") }} all shortcuts</p>
+    </div>
+    {% endif %}
+  </section>
+</div>

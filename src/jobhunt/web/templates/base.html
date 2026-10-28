@@ -6,19 +6,26 @@
   <title>{% block title %}{% endblock %} · Job tracker</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+  <script src="/static/alpine.min.js" defer></script>
 </head>
-<body>
-  <header>
-    <nav>
-      <span class="brand">Job tracker</span>
-      <a href="/">Report</a>
-      <a href="/jobs">Tracker</a>
-      <a href="/listings">Listings</a>
+<body x-data @keydown.window="$store.help.handleKey($event)">
+  <header class="topbar">
+    <a class="brand" href="/">Job tracker</a>
+    <nav class="mainnav" aria-label="Sections">
+      <a href="/"{% if active == "report" %} aria-current="page"{% endif %}>Report</a>
+      <a href="/jobs"{% if active == "jobs" %} aria-current="page"{% endif %}>All jobs</a>
+      <a href="/listings"{% if active == "listings" %} aria-current="page"{% endif %}>Listings</a>
     </nav>
     {% include "_status_bar.html" %}
   </header>
-  <main>
+  <main class="{% block main_class %}page{% endblock %}">
     {% block content %}{% endblock %}
   </main>
+  <div class="toast" x-data x-cloak x-show="$store.toast.open" x-transition.opacity role="status">
+    <span x-text="$store.toast.message"></span>
+    <button class="btn small" type="button" x-show="$store.toast.undo" @click="$store.toast.runUndo()">Undo</button>
+  </div>
+  {% include "_shortcuts.html" %}
 </body>
 </html>

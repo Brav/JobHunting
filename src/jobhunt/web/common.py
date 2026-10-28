@@ -50,6 +50,44 @@ templates.env.filters.update(local_dt=local_dt, when=when, days_ago=days_ago, ma
                              language_name=language_name)
 
 
+STATUS_LABELS = {"new": "New", "interested": "Saved", "applied": "Applied", "hidden": "Hidden"}
+WORKPLACE_LABELS = {"remote": "Remote", "hybrid": "Hybrid", "on-site": "On-site"}
+
+
+def job_tags(job) -> list[tuple[str, str]]:
+    """Up to three (label, kind) tags for a job row: workplace, language, then seniority or the status."""
+    tags = []
+    if job.workplace in WORKPLACE_LABELS:
+        tags.append((WORKPLACE_LABELS[job.workplace], ""))
+    if job.language and job.language != "en":
+        tags.append((language_name(job.language), "lang"))
+    if job.status != "new":
+        tags.append((STATUS_LABELS[job.status], f"status-{job.status}"))
+    elif job.seniority:
+        tags.append((job.seniority, ""))
+    return tags[:3]
+
+
+def job_age(job, now: datetime, tz: ZoneInfo) -> tuple[str, str]:
+    """Short age of the posting ("today", "3d", "2w") or, without a posting date, of when it was found ("5h")."""
+    today = local_date(now, tz)
+    if job.posted_at:
+        days = (today - job.posted_at).days
+        short = "today" if days <= 0 else f"{days}d" if days < 14 else f"{days // 7}w"
+        return short, f"Posted {job.posted_at.isoformat()}"
+    minutes = int((now - job.first_seen_at).total_seconds() // 60)
+    short = f"{max(minutes, 1)}m" if minutes < 60 else f"{minutes // 60}h" if minutes < 1440 else f"{minutes // 1440}d"
+    return short, f"Found {local_dt(job.first_seen_at, tz)}"
+
+
+templates.env.filters.update(tags=job_tags)
+templates.env.globals.update(status_labels=STATUS_LABELS, workplace_labels=WORKPLACE_LABELS)
+
+
+def is_htmx(request: Request) -> bool:
+    return request.headers.get("HX-Request") == "true"
+
+
 def session(request: Request) -> Session:
     return request.app.state.session_factory()
 
@@ -59,7 +97,9 @@ def render(request: Request, name: str, status_code: int = 200, **ctx):
     coordinator = request.app.state.coordinator
     with session(request) as s:
         summary = run_summary(s)
-    base = {"tz": tz, "today": local_date(utcnow(), tz), "summary": summary,
+    now = utcnow()
+    base = {"tz": tz, "now": now, "today": local_date(now, tz), "summary": summary,
+            "age": lambda job: job_age(job, now, tz),
             "running": coordinator.is_running, "next_run": coordinator.next_run_at(),
             "results_cap": request.app.state.settings.results_per_listing}
     return templates.TemplateResponse(request, name, {**base, **ctx}, status_code=status_code)

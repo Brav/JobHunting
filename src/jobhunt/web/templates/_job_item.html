@@ -1,0 +1,14 @@
+{% set job_age = age(job) %}
+<li id="job-item-{{ job.id }}" class="job-item{% if not job.seen_at %} unseen{% endif %}" role="option"
+    aria-selected="{{ 'true' if selected_id == job.id else 'false' }}" data-job-id="{{ job.id }}"
+    data-pane-url="/jobs/{{ job.id }}/pane" tabindex="-1"{% if oob %} hx-swap-oob="outerHTML"{% endif %}
+    {%- if is_last and next_url %} hx-get="{{ next_url }}" hx-trigger="revealed" hx-swap="afterend"{% endif %}>
+  <span class="initial" aria-hidden="true">{{ (job.company or "?")[:1] | upper }}</span>
+  <span class="item-main">
+    <span class="item-title"{% if job.title_en and job.title_en != job.title %} title="{{ job.title }}"{% endif %}>{{ job.title_en or job.title }}</span>
+    <span class="item-meta">{{ job.company }}{% if job.location %} · {{ job.location }}{% endif %}</span>
+    {% set job_tags = job | tags %}
+    {% if job_tags %}<span class="item-tags">{% for label, kind in job_tags %}<span class="tag {{ kind }}">{{ label }}</span>{% endfor %}</span>{% endif %}
+  </span>
+  <span class="item-age" title="{{ job_age[1] }}">{{ job_age[0] }}</span>
+</li>
