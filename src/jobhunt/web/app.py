@@ -8,9 +8,10 @@ from datetime import datetime
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from jobhunt.backup import ensure_recent_backup, hold_app_lock
@@ -100,6 +101,21 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
                 _app.state.app_lock.close()
 
     app = FastAPI(title="Job tracker", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    allowed_hosts = {"localhost", "127.0.0.1", "::1", "testserver", urlsplit(settings.public_url).hostname or ""}
+
+    @app.middleware("http")
+    async def same_site_only(request: Request, call_next):
+        """Only this machine's own addresses (no DNS rebinding), and no writes posted from another site — except the
+        bookmarklet's job page into the capture form, which only shows it for the user to check."""
+        host = request.headers.get("host", "")
+        if urlsplit(f"//{host}").hostname not in allowed_hosts:
+            return PlainTextResponse("Unknown host", status_code=400)
+        origin = request.headers.get("origin")
+        if (request.method not in ("GET", "HEAD", "OPTIONS") and origin is not None
+                and urlsplit(origin).netloc != host and request.url.path != "/capture"):
+            return PlainTextResponse("Requests from other sites are refused", status_code=403)
+        return await call_next(request)
+
     app.state.settings = settings
     app.state.app_lock = hold_app_lock(settings.db_path)  # a restore refuses while this is held
     app.state.session_factory = session_factory
