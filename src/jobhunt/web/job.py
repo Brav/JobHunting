@@ -12,11 +12,14 @@ from jobhunt.actions import mark_seen
 from jobhunt.applications import next_stage, steps_for
 from jobhunt.blocks import blocked_keys, company_key
 from jobhunt.eligibility import effective
+from jobhunt.followups import follow_up_due
+from jobhunt.preferences import load_preferences
+from jobhunt.stats import load_application
 from jobhunt.signals import LIKELY_GHOST
 from jobhunt.job_listing import download_listing, translate_description, translate_title
 from jobhunt.models import Job, Listing, Match
 from jobhunt.sources.base import SourceBlocked, SourceError
-from jobhunt.timeutil import utcnow
+from jobhunt.timeutil import local_date, utcnow
 from jobhunt.translate import TranslationUnavailable
 from jobhunt.web.common import render, session
 
@@ -64,11 +67,13 @@ def prepare_job(request: Request, job_id: int, error: str = "", fetch: bool = Tr
         found_by = list(s.exec(select(Listing.name).join(Match, Match.listing_id == Listing.id)
                                .where(Match.job_id == job_id).distinct().order_by(Listing.name)).all())
         steps = steps_for(s, job_id) if job.status == "applied" else []
+        due = job.status == "applied" and follow_up_due(job, load_application(s, job_id), load_preferences(s),
+                                                        local_date(utcnow(), request.app.state.settings.tz))
         company_blocked = company_key(job.company) in blocked_keys(s)
     return {"job": job, "details": json.loads(job.details) if job.details else [], "download_error": download_error,
             "translation_error": (reason or job.translation_error) if untranslated else None,
             "found_by": found_by, "standalone": False, "steps": steps, "stage_default": next_stage(job.stage),
-            "step_error": "", "signals": _signals(job), "company_blocked": company_blocked,
+            "step_error": "", "follow_up_due": due, "signals": _signals(job), "company_blocked": company_blocked,
             "scam": json.loads(job.scam_flags) if job.scam_flags else [], "eligibility": {
                 "verdict": effective(job), "override": job.eligibility_override,
                 "reasons": json.loads(job.eligibility_reasons) if job.eligibility_reasons else []}}

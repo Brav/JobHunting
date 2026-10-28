@@ -278,3 +278,5 @@ form.inline { display: inline; }
 .salary-from { width: 9.5em; }
 .sent-form { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; margin-top: var(--s2); }
 .sent-form input[type="text"] { flex: 1 1 160px; min-width: 0; }
+.tag.follow-up { background: var(--warning-tint); color: var(--warning); }
+.follow-up-notice { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }

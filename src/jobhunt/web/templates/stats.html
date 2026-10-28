@@ -12,6 +12,7 @@
 
 <section class="stats-section" aria-labelledby="h-applications">
   <h2 id="h-applications">Applications</h2>
+  {% if due_n %}<p class="notice">{{ due_n }} follow-up{{ "s" if due_n != 1 }} due — applications at Applied with no reply for a while</p>{% endif %}
   {% if counts.all == 0 %}<p class="empty">{{ no_apps }}</p>
   {% else %}
   <nav class="chips" aria-label="Which applications">

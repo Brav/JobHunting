@@ -4,6 +4,8 @@
 <section id="application-{{ job.id }}" class="application" aria-labelledby="application-title-{{ job.id }}">
   <h2 id="application-title-{{ job.id }}" class="application-title">Application
     {% if job.stage %}<span class="tag {{ job.stage | stage_kind }}">{{ stage_labels[job.stage] }}</span>{% endif %}</h2>
+  {% if pane.follow_up_due %}<p class="notice follow-up-notice">No reply yet — time to follow up.
+    <button class="btn small" type="button" hx-post="/jobs/{{ job.id }}/followed-up" hx-target="#job-pane" hx-swap="innerHTML">Followed up</button></p>{% endif %}
   <form class="step-form" hx-post="/jobs/{{ job.id }}/steps" hx-target="#job-pane" hx-swap="innerHTML">
     <select name="stage" aria-label="Stage">
       {% for s in stages %}<option value="{{ s }}"{% if s == pane.stage_default %} selected{% endif %}>{{ stage_labels[s] }}</option>{% endfor %}

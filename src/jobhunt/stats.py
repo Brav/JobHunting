@@ -11,6 +11,8 @@ from zoneinfo import ZoneInfo
 
 from sqlmodel import Session, select
 
+from jobhunt.followups import follow_up_due
+from jobhunt.preferences import Preferences
 from jobhunt.applications import CHANNELS, END_STAGES, INTERVIEW_STAGES, PIPELINE, REPLY_STAGES, STALE_DAYS
 from jobhunt.language import language_name
 from jobhunt.models import ApplicationStep, Job, Listing, Match
@@ -98,16 +100,19 @@ class AppRow:
     waiting: int | None  # days since the latest step
     stale: bool
     open: bool
+    follow_up: bool = False  # jobhunt.followups.follow_up_due
 
 
-def application_row(app: Application, today: date) -> AppRow:
+def application_row(app: Application, today: date, prefs: Preferences | None = None) -> AppRow:
     is_open = app.job.stage is None or app.job.stage in PIPELINE
     waiting = (today - app.latest_on).days if app.latest_on else None
-    return AppRow(app, waiting, is_open and waiting is not None and waiting >= STALE_DAYS, is_open)
+    return AppRow(app, waiting, is_open and waiting is not None and waiting >= STALE_DAYS, is_open,
+                  follow_up_due(app.job, app, prefs or Preferences(), today))
 
 
-def application_rows(apps: list[Application], today: date, which: str) -> tuple[list[AppRow], dict[str, int]]:
-    rows = [application_row(app, today) for app in apps]
+def application_rows(apps: list[Application], today: date, which: str,
+                     prefs: Preferences | None = None) -> tuple[list[AppRow], dict[str, int]]:
+    rows = [application_row(app, today, prefs) for app in apps]
     counts = {"open": sum(r.open for r in rows), "closed": sum(not r.open for r in rows), "all": len(rows)}
     shown = [r for r in rows if which == "all" or r.open == (which == "open")]
     shown.sort(key=lambda r: (r.waiting is None, -(r.waiting or 0), r.app.job.company.casefold()))

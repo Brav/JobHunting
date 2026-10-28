@@ -9,6 +9,8 @@ from jobhunt.applications import StepError, add_step, delete_step
 from jobhunt.stats import application_row, load_application
 from jobhunt.timeutil import local_date, utcnow
 from jobhunt.web.common import render, session
+from jobhunt.models import Job
+from jobhunt.preferences import load_preferences
 from jobhunt.web.job import pane_response
 
 router = APIRouter()
@@ -18,9 +20,23 @@ def _row_response(request: Request, job_id: int, step_error: str = "", status_co
     """The job's row on the Stats page's applications table."""
     with session(request) as s:
         app = load_application(s, job_id)
+        prefs = load_preferences(s)
     today = local_date(utcnow(), request.app.state.settings.tz)
     return render(request, "_stats_app_row.html", status_code=status_code, job_id=job_id, step_error=step_error,
-                  row=application_row(app, today) if app else None)
+                  row=application_row(app, today, prefs) if app else None)
+
+
+@router.post("/jobs/{job_id}/followed-up", response_class=HTMLResponse)
+def followed_up(request: Request, job_id: int, view: str = Form("pane")):
+    """The user followed up today: the reminder (and the auto-close count) start again from now."""
+    with session(request) as s:
+        job = s.get(Job, job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        job.followed_up_on = local_date(utcnow(), request.app.state.settings.tz)
+        s.add(job)
+        s.commit()
+    return _row_response(request, job_id) if view == "stats-row" else pane_response(request, job_id)
 
 
 @router.post("/jobs/{job_id}/steps", response_class=HTMLResponse)

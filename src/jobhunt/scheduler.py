@@ -170,6 +170,16 @@ class RunCoordinator:
         except Exception:
             logger.exception("closed check failed")
 
+    def daily_auto_close(self) -> None:
+        from jobhunt.followups import auto_close
+        from jobhunt.preferences import load_preferences
+        try:
+            with self.session_factory() as s:
+                closed = auto_close(s, load_preferences(s), local_date(utcnow(), self.settings.tz), utcnow())
+            logger.info("closed %d applications without a reply", closed)
+        except Exception:
+            logger.exception("auto-close failed")
+
     def start(self) -> None:
         s = self.settings
         hours = run_hours(s.run_at, s.run_every_hours)
@@ -182,6 +192,8 @@ class RunCoordinator:
         self._scheduler.add_job(self.nightly_backup, CronTrigger(hour=3, minute=30, timezone=s.tz), id="backup",
                                 coalesce=True, misfire_grace_time=6 * 3600)
         self._scheduler.add_job(self.nightly_recheck, CronTrigger(hour=4, minute=0, timezone=s.tz), id="recheck",
+                                coalesce=True, misfire_grace_time=6 * 3600)
+        self._scheduler.add_job(self.daily_auto_close, CronTrigger(hour=5, minute=15, timezone=s.tz), id="auto_close",
                                 coalesce=True, misfire_grace_time=6 * 3600)
         if self.fetch_page is not None:
             self._scheduler.add_job(self.closed_check, CronTrigger(hour=5, minute=0, timezone=s.tz), id="closed",

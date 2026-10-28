@@ -79,6 +79,8 @@ class Job(SQLModel, table=True):
     sent_tailored: bool | None = None
     sent_cover_letter: bool | None = None
     sent_file: str | None = None  # relative to the data directory
+    followed_up_on: date | None = None  # jobhunt.followups
+    auto_closed_on: date | None = None
 
 
 class Run(SQLModel, table=True):

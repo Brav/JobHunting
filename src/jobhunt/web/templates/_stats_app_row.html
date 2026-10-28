@@ -12,6 +12,9 @@
     {%- elif row.waiting == 0 %}today{% elif row.waiting == 1 %}1 day{% else %}{{ row.waiting }} days{% endif %}</td>
   <td>{# A button, not on-change: arrow keys on a closed select change it at once in some browsers. The ids let htmx
          put focus back after the row is replaced. #}
+    {% if row.follow_up %}<form class="move-form" hx-post="/jobs/{{ job.id }}/followed-up" hx-target="closest tr" hx-swap="outerHTML">
+      <input type="hidden" name="view" value="stats-row"><span class="tag follow-up">Follow up</span>
+      <button id="followed-{{ job.id }}" class="btn small" type="submit">Followed up</button></form>{% endif %}
     <form class="move-form" hx-post="/jobs/{{ job.id }}/steps" hx-target="closest tr" hx-swap="outerHTML">
       <input type="hidden" name="view" value="stats-row"><input type="hidden" name="on_date" value="{{ today.isoformat() }}">
       <select id="move-{{ job.id }}" name="stage" required aria-label="Move {{ job.title_en or job.title }} to a stage">
