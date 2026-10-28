@@ -274,3 +274,5 @@ caption { text-align: left; font-weight: 600; font-size: var(--t2); padding: 0 0
 .inline-form { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; margin: var(--s2) 0; }
 form.inline { display: inline; }
 .scam-mark { color: var(--danger); }
+.item-pay { color: var(--success); }
+.salary-from { width: 9.5em; }

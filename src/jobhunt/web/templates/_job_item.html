@@ -5,7 +5,7 @@
   <span class="initial" aria-hidden="true">{{ (job.company or "?")[:1] | upper }}</span>
   <span class="item-main">
     <span class="item-title"{% if job.scam_flags %} data-scam="true"{% endif %}{% if job.title_en and job.title_en != job.title %} title="{{ job.title }}"{% endif %}>{% if job.scam_flags %}<span class="scam-mark" title="Scam warning signs">⚠ </span>{% endif %}{{ job.title_en or job.title }}</span>
-    <span class="item-meta">{{ job.company }}{% if job.location %} · {{ job.location }}{% endif %}</span>
+    <span class="item-meta">{{ job.company }}{% if job.location %} · {{ job.location }}{% endif %}{% if job.salary_max_eur %} · <span class="item-pay">{{ job | salary_short }}</span>{% endif %}</span>
     {% set job_tags = job | tags %}
     {% if job_tags %}<span class="item-tags">{% for label, kind in job_tags %}<span class="tag {{ kind }}">{{ label }}</span>{% endfor %}</span>{% endif %}
   </span>

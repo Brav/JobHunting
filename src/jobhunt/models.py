@@ -70,6 +70,9 @@ class Job(SQLModel, table=True):
     blocked_by: str | None = None  # jobhunt.blocks: why the user's rules hide it ("Company blocked")
     hide_reason: str | None = None  # why the user hid it (jobhunt.blocks.HIDE_REASONS)
     scam_flags: str | None = None  # jobhunt.scam: JSON list of warning signs, None when there are none
+    salary_min_eur: int | None = None  # jobhunt.salary: yearly, in euros
+    salary_max_eur: int | None = Field(default=None, index=True)
+    salary_text: str | None = None  # as written in the job
 
 
 class Run(SQLModel, table=True):

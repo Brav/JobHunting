@@ -52,6 +52,8 @@ class JobFilters:
     eligibility: tuple[str, ...] = ()  # none = everything except jobs hidden by default
     ghost: str = ""  # "hide" leaves out likely ghost jobs
     blocked: str = ""  # "show" includes jobs the user's block rules hide
+    has_salary: str = ""  # "yes": only jobs that state pay
+    salary_from: str = ""  # thousands of euros a year; compared with the top of the range
     language: str = ""  # "", "en", "non-en" or an ISO 639-1 code
     seniority: str = ""
     employment_type: str = ""
@@ -75,6 +77,8 @@ class JobFilters:
             eligibility=tuple(dict.fromkeys(v for v in params.getlist("eligibility") if v in VERDICTS)),
             ghost="hide" if get("ghost") == "hide" else "",
             blocked="show" if get("blocked") == "show" else "",
+            has_salary="yes" if get("has_salary") == "yes" else "",
+            salary_from=get("salary_from") if get("salary_from").isdecimal() and len(get("salary_from")) <= 4 else "",
             language=get("language"), seniority=get("seniority"), employment_type=get("employment_type"),
             company=get("company"),
             found_within=get("found_within") if get("found_within") in WITHIN else "",
@@ -104,6 +108,10 @@ class JobFilters:
             chips.append(("Hiding likely ghost jobs", self.query(ghost="")))
         if self.blocked:
             chips.append(("Showing blocked jobs", self.query(blocked="")))
+        if self.has_salary:
+            chips.append(("Has salary", self.query(has_salary="")))
+        if self.salary_from:
+            chips.append((f"Salary from €{self.salary_from}k", self.query(salary_from="")))
         if self.language:
             label = {"en": "English", "non-en": "Not English"}.get(self.language) or language_name(self.language)
             chips.append((label, self.query(language="")))
@@ -138,6 +146,10 @@ def apply_filters(stmt, f: JobFilters, now: datetime, *, include_tab: bool = Tru
         stmt = stmt.where(EFFECTIVE_ELIGIBILITY.in_(f.eligibility))
     if (hidden := _hidden(f)) is not None:
         stmt = stmt.where(not_(hidden))
+    if f.has_salary:
+        stmt = stmt.where(Job.salary_max_eur.is_not(None))
+    if f.salary_from:
+        stmt = stmt.where(Job.salary_max_eur >= int(f.salary_from) * 1000)
     if f.ghost == "hide":
         stmt = stmt.where(or_(Job.ghost_risk.is_(None), Job.ghost_risk < LIKELY_GHOST))
     if f.language == "non-en":

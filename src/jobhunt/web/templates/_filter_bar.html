@@ -16,6 +16,9 @@
     {% endfor %}
   </fieldset>
   <label class="check"><input type="checkbox" name="ghost" value="hide"{% if filters.ghost %} checked{% endif %}> Hide likely ghost jobs</label>
+  <label class="check"><input type="checkbox" name="has_salary" value="yes"{% if filters.has_salary %} checked{% endif %}> Has salary</label>
+  <input class="salary-from" type="number" name="salary_from" min="0" max="9999" step="5" value="{{ filters.salary_from }}"
+         placeholder="Salary from (k€)" aria-label="Salary from, thousands of euros a year">
   <fieldset class="check-group"><legend class="sr-only">Eligibility</legend>
     {% for value in verdicts %}
     <label class="check"><input type="checkbox" name="eligibility" value="{{ value }}"{% if value in filters.eligibility %} checked{% endif %}> {{ verdict_labels[value] }}</label>

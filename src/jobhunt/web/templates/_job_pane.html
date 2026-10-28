@@ -44,9 +44,10 @@
     </form>
   </div>
   {% endif %}
-  {% if pane.details or job.workplace %}
+  {% if pane.details or job.workplace or job.salary_max_eur %}
   <dl class="details">
     {% if job.workplace %}<div><dt>Workplace</dt><dd>{{ workplace_labels[job.workplace] }}</dd></div>{% endif %}
+    {% if job.salary_max_eur %}<div><dt>Salary</dt><dd>{{ job | salary_short }} a year <span class="muted small">({{ job.salary_text }})</span></dd></div>{% endif %}
     {% for label, value in pane.details %}<div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>{% endfor %}
   </dl>
   {% endif %}
