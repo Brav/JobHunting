@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Update from an email{% endblock %}
+{% block content %}
+<p><a href="/stats">‹ Stats</a></p>
+<h1>Update an application from an email</h1>
+<p class="muted">Paste an email from an employer. The app suggests the step it means; nothing changes until you confirm. The text isn't kept.</p>
+<form class="stack" method="post" action="/email">
+  <label>Email<textarea name="text" rows="10" required placeholder="From:, Subject: and the message">{{ text }}</textarea></label>
+  <button class="btn small" type="submit">Read the email</button>
+</form>
+{% if read %}
+<section aria-labelledby="h-proposal">
+  <h2 id="h-proposal">{{ kind_label or "Not sure what this email says" }}</h2>
+  {% if phrase %}<p class="muted">Because it says “{{ phrase }}”.</p>
+  {% else %}<p class="muted">Pick the step yourself.</p>{% endif %}
+  {% if rows %}
+  <ul class="plain-list">{% for job, stage in rows %}
+    <li>
+      <a href="/jobs/{{ job.id }}">{{ job.title }}</a> · {{ job.company }}
+      <span class="muted small">{{ stage_labels[job.stage] if job.stage else "Saved" }}</span>
+      {% if stage %}
+      <form class="inline-form" method="post" action="/email/confirm">
+        <input type="hidden" name="token" value="{{ token }}">
+        <input type="hidden" name="job_id" value="{{ job.id }}">
+        <select name="stage" aria-label="Step to add">{% for s in stages %}
+          <option value="{{ s }}"{% if s == stage %} selected{% endif %}>{{ stage_labels[s] }}</option>{% endfor %}
+        </select>
+        <input name="note" value="{{ note }}" aria-label="Note" size="40">
+        <button class="btn small" type="submit">Confirm</button>
+      </form>
+      {% else %}<span class="muted small">— already marked Applied, nothing to add</span>{% endif %}
+    </li>{% endfor %}
+  </ul>
+  {% else %}<p class="empty">No saved or applied job matches this email. Its company may be written differently — find the job and add the step there.</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

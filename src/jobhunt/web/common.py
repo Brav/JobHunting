@@ -1,10 +1,11 @@
 """Shared web helpers: templates, Jinja filters, and the context every page needs."""
 
+import secrets
 from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from markdown_it import MarkdownIt
 from markupsafe import Markup
@@ -122,3 +123,9 @@ def render(request: Request, name: str, status_code: int = 200, **ctx):
             "running": coordinator.is_running, "next_run": coordinator.next_run_at(),
             "results_cap": request.app.state.settings.results_per_listing, "paused_until": paused}
     return templates.TemplateResponse(request, name, {**base, **ctx}, status_code=status_code)
+
+
+def check_token(request: Request, token: str) -> None:
+    """Forms that store what another site sent need the token from this app's own page, so no other site can post."""
+    if not secrets.compare_digest(token, request.app.state.form_token):
+        raise HTTPException(status_code=403, detail="This form has expired — open it again")

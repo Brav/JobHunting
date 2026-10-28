@@ -1,6 +1,5 @@
 """Add a job from any site: a bookmarklet posts the page here, the user checks the fields, then saves."""
 
-import secrets
 from datetime import date
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -14,7 +13,7 @@ from jobhunt.dedup import is_matchable, match_key
 from jobhunt.language import detect_language
 from jobhunt.models import Job
 from jobhunt.timeutil import utcnow
-from jobhunt.web.common import render, session
+from jobhunt.web.common import check_token, render, session
 from jobhunt.workplace import workplace_from
 
 router = APIRouter()
@@ -24,12 +23,6 @@ BOOKMARKLET = ("javascript:(()=>{const f=document.createElement('form');f.method
                "i.name=n;i.value=v;f.appendChild(i)};add('url',location.href);add('title',document.title);"
                "document.querySelectorAll('script[type=\"application/ld+json\"]').forEach(s=>add('ld',s.textContent));"
                "document.body.appendChild(f);f.submit();f.remove()})()")
-
-
-def check_token(request: Request, token: str) -> None:
-    """Saving needs the token from this app's own confirm page, so another site can't post jobs in."""
-    if not secrets.compare_digest(token, request.app.state.form_token):
-        raise HTTPException(status_code=403, detail="This form has expired — open it again")
 
 
 @router.get("/capture", response_class=HTMLResponse)

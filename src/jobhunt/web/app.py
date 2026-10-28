@@ -20,7 +20,7 @@ from jobhunt.scheduler import RunCoordinator
 from jobhunt.job_listing import clear_service_translation_errors
 from jobhunt.sources.base import JobPage, JobSource
 from jobhunt.translate import DeepLTranslator, NoTranslator, Translator
-from jobhunt.web import applications, blocks, capture, companies, contacts, cv, data, digest, eligibility, sent, focus, job, listings, report, stats, tracker
+from jobhunt.web import applications, blocks, capture, companies, contacts, cv, data, digest, eligibility, email_update, sent, focus, job, listings, report, stats, tracker
 from jobhunt.web import settings as settings_page  # `settings` is create_app's Settings
 from jobhunt.web.common import render
 
@@ -116,6 +116,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     app.include_router(contacts.router)
     app.include_router(digest.router)
     app.include_router(capture.router)
+    app.include_router(email_update.router)
     app.include_router(settings_page.router)
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
