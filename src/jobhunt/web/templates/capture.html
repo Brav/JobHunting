@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Add a job{% endblock %}
+{% block content %}
+<h1>Add a job from any site</h1>
+<section>
+  <h2>Bookmarklet</h2>
+  <p>Drag this to your bookmarks bar: <a class="btn small" href="{{ bookmarklet }}">+ Job tracker</a></p>
+  <p class="muted">On a job's page, click it: a new tab opens here with the job's details filled in for you to check and save. It sends the page's address and its job details to this app only.</p>
+</section>
+<section>
+  <h2>Add by address</h2>
+  <form class="inline-form" method="post" action="/capture">
+    <input name="url" type="url" placeholder="https://…" aria-label="Job page address" required size="50">
+    <button class="btn small" type="submit">Read the page</button>
+  </form>
+  <p class="muted">Fetches the page and reads its job details. Some sites block this; the bookmarklet works on those.</p>
+</section>
+{% endblock %}

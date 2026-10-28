@@ -42,7 +42,7 @@ def _markdown(text: str | None) -> str:
     return re.sub(r"\n{3,}", "\n\n", markdownify(text or "")).strip()
 
 
-def _pay(low, high, currency: str, period: str = "a year") -> str | None:
+def pay_text(low, high, currency: str, period: str = "a year") -> str | None:
     low, high = int(low or 0), int(high or 0)
     if not high and not low:
         return None
@@ -63,7 +63,7 @@ def remoteok(get) -> list[FeedPosting]:
             location=(item.get("location") or "").strip() or "Remote", url=item.get("url") or "",
             posted_at=date.fromisoformat(posted) if posted else None, is_remote=True,
             description=_markdown(item.get("description")), source="remoteok",
-            salary_text=_pay(item.get("salary_min"), item.get("salary_max"), "USD"),
+            salary_text=pay_text(item.get("salary_min"), item.get("salary_max"), "USD"),
             apply_url=item.get("apply_url")), tags))
     return found
 
@@ -91,7 +91,7 @@ def himalayas(keywords: str, get) -> list[FeedPosting]:
             company=(item.get("companyName") or "").strip(), location=location,
             url=item.get("applicationLink") or item.get("guid") or "", posted_at=posted, is_remote=True,
             description=f"{where}\n\n{_markdown(item.get('description'))}", source="himalayas",
-            salary_text=_pay(item.get("minSalary"), item.get("maxSalary"), item.get("currency") or "USD", period),
+            salary_text=pay_text(item.get("minSalary"), item.get("maxSalary"), item.get("currency") or "USD", period),
             apply_url=item.get("applicationLink")), tuple(item.get("categories") or ())))
     return found
 

@@ -6,6 +6,7 @@
 {% block content %}
 <div class="toolbar">
   <h1>All jobs</h1>
+  <a class="btn ghost small" href="/capture">+ Add a job</a>
   <nav class="chips" aria-label="Status">
     {% for tab, label in tab_labels %}
     <a class="chip{% if filters.tab == tab %} on{% endif %}"{% if filters.tab == tab %} aria-current="true"{% endif %} href="{{ tab_url(tab) }}"><span>{{ label }}</span> <span class="count">{{ counts[tab] }}</span></a>

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Check the job{% endblock %}
+{% block content %}
+<p><a href="/capture">‹ Add a job</a></p>
+<h1>Check the job before saving</h1>
+{% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+<form class="stack settings-form" method="post" action="/capture/save">
+  <input type="hidden" name="token" value="{{ token }}">
+  <fieldset><legend>Job</legend>
+    <label>Title<input name="title" value="{{ job.title }}" required></label>
+    <label>Company<input name="company" value="{{ job.company }}" required></label>
+    <label>Location<input name="location" value="{{ job.location }}"></label>
+    <label class="check"><input type="checkbox" name="remote" value="1"{% if job.remote %} checked{% endif %}> Remote</label>
+    <label>Posted on<input name="posted_at" type="date" value="{{ job.posted_at }}"></label>
+    <label>Salary<input name="salary_text" value="{{ job.salary_text }}" placeholder="€50,000–€60,000 a year"></label>
+    <label>Job page<input name="url" type="url" value="{{ job.url }}" required></label>
+    <label>Apply on<input name="apply_url" type="url" value="{{ job.apply_url }}"></label>
+    <label>Description<textarea name="description" rows="12">{{ job.description }}</textarea></label>
+  </fieldset>
+  <button class="btn" type="submit">Save to Saved jobs</button>
+</form>
+{% endblock %}

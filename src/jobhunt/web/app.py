@@ -1,6 +1,7 @@
 """FastAPI application factory and the run-control routes."""
 
 import logging
+import secrets
 import time
 from dataclasses import replace
 from datetime import datetime
@@ -19,7 +20,7 @@ from jobhunt.scheduler import RunCoordinator
 from jobhunt.job_listing import clear_service_translation_errors
 from jobhunt.sources.base import JobPage, JobSource
 from jobhunt.translate import DeepLTranslator, NoTranslator, Translator
-from jobhunt.web import applications, blocks, companies, contacts, cv, data, digest, eligibility, sent, focus, job, listings, report, stats, tracker
+from jobhunt.web import applications, blocks, capture, companies, contacts, cv, data, digest, eligibility, sent, focus, job, listings, report, stats, tracker
 from jobhunt.web import settings as settings_page  # `settings` is create_app's Settings
 from jobhunt.web.common import render
 
@@ -97,6 +98,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     import requests as _requests
     app.state.http_get = _requests.get  # board detection; tests swap in a fake
     app.state.fetch_page = fetch_page
+    app.state.form_token = secrets.token_urlsafe(24)  # forms that write what another site sent (capture, email)
     app.state.translator = translator
     app.include_router(report.router)
     app.include_router(listings.router)
@@ -113,6 +115,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     app.include_router(companies.router)
     app.include_router(contacts.router)
     app.include_router(digest.router)
+    app.include_router(capture.router)
     app.include_router(settings_page.router)
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
