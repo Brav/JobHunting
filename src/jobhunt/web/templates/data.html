@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Backups and export{% endblock %}
+{% block content %}
+<p><a href="/settings">‹ Settings</a></p>
+<h1>Backups and export</h1>
+<p class="muted">A backup is made every night at 03:30 and when the app starts after a day without one; the newest 14 are kept in <code>data/backups</code>.
+To restore one, stop the app and run <code>python -m jobhunt.backup restore data/backups/&lt;file&gt;</code>.</p>
+{% if made %}<p class="notice" role="status">Backed up to {{ made }}</p>{% endif %}
+<div class="actions-row">
+  <form method="post" action="/data/backup"><button class="btn primary" type="submit">Back up now</button></form>
+  <a class="btn" href="/data/export.zip">Export everything (zip)</a>
+  <a class="btn" href="/data/jobs.csv">Jobs (CSV)</a>
+  <a class="btn" href="/data/applications.csv">Applications (CSV)</a>
+</div>
+<h2>Backups</h2>
+{% if files %}
+<div class="table-scroll"><table>
+  <thead><tr><th>File</th><th class="num">Size</th><th></th></tr></thead>
+  <tbody>{% for name, size in files %}<tr><td>{{ name }}</td><td class="num">{{ (size / 1024) | round | int }} KB</td>
+    <td><a href="/data/backups/{{ name }}">Download</a></td></tr>{% endfor %}</tbody>
+</table></div>
+{% else %}<p class="empty">No backups yet.</p>{% endif %}
+{% endblock %}

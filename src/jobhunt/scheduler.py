@@ -12,6 +12,7 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import func
 from sqlmodel import Session, or_, select
 
+from jobhunt.backup import backup_now
 from jobhunt.config import Settings
 from jobhunt.enrich import BLOCK_BACKOFF, ENRICH_EVERY_MINUTES, EnrichResult, enrich_pending, first_of_next_month
 from jobhunt.models import Run
@@ -143,6 +144,14 @@ class RunCoordinator:
         finally:
             self._enrich_lock.release()
 
+    def nightly_backup(self) -> None:
+        try:
+            path = backup_now(self.settings.db_path, self.settings.db_path.parent / "backups",
+                              datetime.now(self.settings.tz).replace(tzinfo=None))
+            logger.info("backed up to %s", path.name)
+        except Exception:
+            logger.exception("nightly backup failed")
+
     def start(self) -> None:
         s = self.settings
         hours = run_hours(s.run_at, s.run_every_hours)
@@ -152,6 +161,8 @@ class RunCoordinator:
                                 args=["scheduled"], id="scheduled", coalesce=True, misfire_grace_time=3600)
         self._scheduler.add_job(self.catch_up_if_needed, "interval", minutes=CATCH_UP_CHECK_MINUTES,
                                 id="catch_up_check", coalesce=True)
+        self._scheduler.add_job(self.nightly_backup, CronTrigger(hour=3, minute=30, timezone=s.tz), id="backup",
+                                coalesce=True, misfire_grace_time=6 * 3600)
         if self.fetch_page is not None:
             self._scheduler.add_job(self.enrich_if_idle, "interval", minutes=ENRICH_EVERY_MINUTES, id="enrich",
                                     coalesce=True, max_instances=1, next_run_time=datetime.now(s.tz))

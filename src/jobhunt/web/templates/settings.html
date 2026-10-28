@@ -2,6 +2,7 @@
 {% block title %}Settings{% endblock %}
 {% block content %}
 <h1>Settings</h1>
+<p><a href="/data">Backups and export</a></p>
 <p class="muted">Eligibility uses these to decide which jobs you can take. Saving checks every job again.</p>
 {% if saved %}<p class="notice" role="status">Saved · {{ saved }} jobs re-checked</p>{% endif %}
 {% if errors %}<ul class="field-error" role="alert">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}

@@ -1,6 +1,8 @@
 """FastAPI application factory and the run-control routes."""
 
+import logging
 import time
+from datetime import datetime
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -9,13 +11,14 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
+from jobhunt.backup import ensure_recent_backup
 from jobhunt.config import Settings
 from jobhunt.db import init_db, make_engine, make_session_factory
 from jobhunt.scheduler import RunCoordinator
 from jobhunt.job_listing import clear_service_translation_errors
 from jobhunt.sources.base import JobPage, JobSource
 from jobhunt.translate import DeepLTranslator, NoTranslator, Translator
-from jobhunt.web import applications, cv, eligibility, focus, job, listings, report, stats, tracker
+from jobhunt.web import applications, cv, data, eligibility, focus, job, listings, report, stats, tracker
 from jobhunt.web import settings as settings_page  # `settings` is create_app's Settings
 from jobhunt.web.common import render
 
@@ -23,6 +26,12 @@ from jobhunt.web.common import render
 def create_app(settings: Settings, *, source: JobSource | None = None,
                fetch_page: Callable[[str], JobPage] | None = None, translator: Translator | None = None,
                start_scheduler: bool = True, sleep: Callable[[float], None] = time.sleep) -> FastAPI:
+    if settings.db_path.exists():  # a copy before startup changes anything (new columns, re-checks)
+        try:
+            ensure_recent_backup(settings.db_path, settings.db_path.parent / "backups",
+                                 datetime.now(settings.tz).replace(tzinfo=None))
+        except Exception:
+            logging.getLogger(__name__).exception("startup backup failed")
     engine = make_engine(settings.db_path)
     init_db(engine, settings.tz)
     session_factory = make_session_factory(engine)
@@ -61,6 +70,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     app.include_router(applications.router)
     app.include_router(stats.router)
     app.include_router(eligibility.router)
+    app.include_router(data.router)
     app.include_router(settings_page.router)
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
