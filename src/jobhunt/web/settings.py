@@ -13,6 +13,8 @@ from jobhunt.eligibility import DEFAULT_PROFILE, Profile, load_profile, profile_
 from jobhunt.preferences import SOURCES, Preferences, load_preferences, save_preferences
 from jobhunt.models import BlockedCompany, NegativeRule
 from jobhunt.places import COUNTRIES
+from jobhunt.schedule import form_values, from_form, to_text
+from jobhunt.scheduler import default_schedule
 from jobhunt.setup import fill_skills_from_cv
 from jobhunt.timeutil import utcnow
 from jobhunt.web.common import apply_time_zone, render, session
@@ -39,14 +41,18 @@ def _form_languages(languages: tuple[str, ...]) -> list[str]:
 
 def _page(request: Request, profile: Profile, errors: list[str], saved: str = "", status_code: int = 200,
           prefs: Preferences | None = None, pref_errors: list[str] | None = None, cv_notice: str = "",
-          cv_error: str = "", translation_notice: str = "", translation_error: str = ""):
+          cv_error: str = "", translation_notice: str = "", translation_error: str = "",
+          sched: dict | None = None, sched_error: str = "", schedule_notice: str = ""):
     with session(request) as s:
         blocked = list(s.exec(select(BlockedCompany).order_by(BlockedCompany.name)).all())
         rules = list(s.exec(select(NegativeRule).order_by(NegativeRule.phrase)).all())
         prefs = prefs or load_preferences(s)
         cv = current_cv(s, request.app.state.settings)
+        default = default_schedule(load_preferences(s), request.app.state.settings)
     return render(request, "settings.html", status_code=status_code, active="settings", profile=profile,
                   cv=cv, cv_notice=cv_notice, cv_error=cv_error, translation=_translation(request),
+                  sched=sched or form_values(to_text(default)), sched_error=sched_error,
+                  schedule_notice=schedule_notice,
                   translation_notice=translation_notice, translation_error=translation_error,
                   blocked=blocked, rules=rules, prefs=prefs, pref_errors=pref_errors or [], sources=SOURCES,
                   languages=_form_languages(profile.languages), errors=errors, saved=saved,
@@ -75,9 +81,27 @@ TRANSLATION_NOTICES = {"saved": "Key saved · translation is on", "removed": "Ke
 
 
 @router.get("/settings", response_class=HTMLResponse)
-def settings_page(request: Request, saved: str = "", cv: str = "", translation: str = ""):
+def settings_page(request: Request, saved: str = "", cv: str = "", translation: str = "", schedule: str = ""):
     return _page(request, _shown_profile(request), [], saved if saved.isdecimal() else "",
-                 cv_notice="CV saved" if cv == "saved" else "", translation_notice=TRANSLATION_NOTICES.get(translation, ""))
+                 cv_notice="CV saved" if cv == "saved" else "", translation_notice=TRANSLATION_NOTICES.get(translation, ""),
+                 schedule_notice="Schedule saved" if schedule == "saved" else "")
+
+
+@router.post("/settings/schedule", response_class=HTMLResponse)
+def save_schedule(request: Request, schedule: str = Form("every"), times: list[str] = Form([]), start: str = Form(""),
+                  every: str = Form("")):
+    """The default search schedule: every listing without its own times follows it."""
+    choice = schedule if schedule in ("times", "every") else "every"
+    text, problems = from_form(choice, times, start, every)
+    if problems:
+        return _page(request, _shown_profile(request), [], status_code=422, sched_error=" ".join(problems),
+                     sched={"choice": choice, "times": times or [""], "start": start, "every": every})
+    now = utcnow()
+    with session(request) as s:
+        save_preferences(s, replace(load_preferences(s), schedule=text,
+                                    schedule_changed_at=now.isoformat(timespec="minutes")), now)
+    request.app.state.coordinator.schedule_changed()  # the phone push follows the new start
+    return RedirectResponse("/settings?schedule=saved", status_code=303)
 
 
 @router.post("/settings/translation", response_class=HTMLResponse)

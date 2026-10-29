@@ -11,6 +11,16 @@
   <div><button class="btn primary" type="submit">Save</button></div>
 </form>
 
+<section class="settings-section" id="schedule" aria-labelledby="h-schedule">
+  <h2 id="h-schedule">Search schedule</h2>
+  {% if schedule_notice %}<p class="notice" role="status">{{ schedule_notice }}</p>{% endif %}
+  <p class="muted">When listings without their own times search. A listing can have its own times on its form.</p>
+  <form class="stack settings-form" method="post" action="/settings/schedule">
+    {% with allow_default = false, legend = "Default schedule" %}{% include "_schedule_fields.html" %}{% endwith %}
+    <div><button class="btn primary" type="submit">Save</button></div>
+  </form>
+</section>
+
 <section class="settings-section" id="cv" aria-labelledby="h-cv">
   <h2 id="h-cv">Your CV</h2>
   {% if cv_notice %}<p class="notice" role="status">{{ cv_notice }}</p>{% endif %}

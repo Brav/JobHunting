@@ -154,3 +154,40 @@ def test_export_zip_never_holds_the_key(app_factory):
         data = c.get("/data/export.zip").content
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         assert z.namelist() and all(b"abc-secret-key" not in z.read(name) for name in z.namelist())
+
+
+# --- the default search schedule ---
+
+def test_settings_shows_the_current_default(app_factory):
+    with TestClient(app_factory()) as c:
+        html = c.get("/settings").text
+    assert "Search schedule" in html and "choice: 'every'" in html
+    assert 'name="start" value="10:00"' in html and '<option value="4" selected>' in html
+    assert 'name="schedule" value="default"' not in html.split('id="schedule"')[1].split("</section>")[0]
+
+
+def test_saving_the_default_schedule(app_factory):
+    from jobhunt.preferences import load_preferences
+    app = app_factory()
+    with TestClient(app) as c:
+        r = c.post("/settings/schedule", data={"schedule": "times", "times": ["07:00", "19:00"]}, follow_redirects=False)
+        assert (r.status_code, r.headers["location"]) == (303, "/settings?schedule=saved")
+        assert "Schedule saved" in c.get("/settings?schedule=saved").text
+    with app.state.session_factory() as s:
+        prefs = load_preferences(s)
+    assert prefs.schedule == "times:07:00,19:00" and prefs.schedule_changed_at
+
+
+def test_default_schedule_errors(app_factory):
+    with TestClient(app_factory()) as c:
+        r = c.post("/settings/schedule", data={"schedule": "every", "start": "06:00", "every": "5"})
+    assert r.status_code == 422 and "Choose how many hours" in r.text and 'name="start" value="06:00"' in r.text
+
+
+def test_saving_the_default_moves_the_push(app_factory):
+    app = app_factory()
+    calls = []
+    app.state.coordinator.schedule_changed = lambda: calls.append(1)
+    with TestClient(app) as c:
+        c.post("/settings/schedule", data={"schedule": "every", "start": "06:00", "every": "6"})
+    assert calls == [1]
