@@ -7,7 +7,7 @@ from sqlmodel import select, update
 import jobhunt.eligibility as eligibility
 from fakes import FakeClock, FakeSource, add_listing, job_id, make_posting as p
 from jobhunt.db import init_db
-from jobhunt.eligibility import DEFAULT_PROFILE, effective, load_profile, refresh_all, refresh_job, save_profile
+from jobhunt.eligibility import DEFAULT_PROFILE, LEGACY_PROFILE, effective, load_profile, refresh_all, refresh_job, save_profile
 from jobhunt.job_listing import download_listing, translate_description
 from jobhunt.models import Job
 from jobhunt.runner import run_daily
@@ -34,11 +34,11 @@ class ToPortugal:
         return "You must be based in Portugal."
 
 
-def test_profile_defaults_and_saves(session_factory):
-    with session_factory() as s:
+def test_profile_defaults_and_saves(fresh_session_factory):
+    with fresh_session_factory() as s:
         assert load_profile(s) == DEFAULT_PROFILE
         save_profile(s, replace(DEFAULT_PROFILE, languages=("en", "de")), NOW)
-    with session_factory() as s:
+    with fresh_session_factory() as s:
         assert load_profile(s).languages == ("en", "de")
 
 
@@ -81,7 +81,7 @@ def test_override_survives_refresh(session_factory):
         s.commit()
     refresh_job(session_factory, job_id(session_factory, "1"))
     with session_factory() as s:
-        refresh_all(s, DEFAULT_PROFILE)
+        refresh_all(s, LEGACY_PROFILE)
     job = get(session_factory, "1")
     assert (job.eligibility, job.eligibility_override, effective(job)) == ("not_eligible", "eligible", "eligible")
 
@@ -95,5 +95,5 @@ def test_startup_checks_stale_jobs(engine, session_factory, monkeypatch):
     assert get(session_factory, "1").eligibility == "not_eligible"
     monkeypatch.setattr(eligibility, "RULES_VERSION", eligibility.RULES_VERSION + 1)
     with session_factory() as s:
-        assert refresh_all(s, DEFAULT_PROFILE, stale_only=True) == 2
-        assert refresh_all(s, DEFAULT_PROFILE, stale_only=True) == 0
+        assert refresh_all(s, LEGACY_PROFILE, stale_only=True) == 2
+        assert refresh_all(s, LEGACY_PROFILE, stale_only=True) == 0

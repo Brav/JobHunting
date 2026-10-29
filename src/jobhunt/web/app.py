@@ -58,6 +58,10 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     engine = make_engine(settings.db_path)
     init_db(engine, settings.tz)
     session_factory = make_session_factory(engine)
+    with session_factory() as s:
+        from jobhunt.setup import adopt_legacy_profile
+        from jobhunt.timeutil import utcnow
+        adopt_legacy_profile(s, utcnow())
     _default_skills_from_cv(session_factory, settings)
     if source is None:
         import requests

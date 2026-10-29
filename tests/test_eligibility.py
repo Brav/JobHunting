@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from jobhunt.eligibility import DEFAULT_PROFILE, assess
+from jobhunt.eligibility import LEGACY_PROFILE, assess
 from jobhunt.models import Job
 
 
@@ -11,7 +11,7 @@ def job(location="Spain", description="", workplace="remote", language="en", des
                language=language, description=description, description_en=description_en)
 
 
-def decide(profile=DEFAULT_PROFILE, **kw):
+def decide(profile=LEGACY_PROFILE, **kw):
     a = assess(job(**kw), profile)
     return a.verdict, a.reasons[0]["text"], [r["text"] for r in a.reasons]
 
@@ -94,13 +94,13 @@ def test_downgrades_to_check():
 
 
 def test_profile_changes_the_verdict():
-    german = replace(DEFAULT_PROFILE, languages=DEFAULT_PROFILE.languages + ("de",))
+    german = replace(LEGACY_PROFILE, languages=LEGACY_PROFILE.languages + ("de",))
     assert decide(german, location="Germany", language="de", description="Sehr gute Deutschkenntnisse (C1)",
                   description_en="Very good German skills (C1)")[0] == "check"
-    serbian_only = replace(DEFAULT_PROFILE, work_rights=(), relocate_to=())
+    serbian_only = replace(LEGACY_PROFILE, work_rights=(), relocate_to=())
     assert decide(serbian_only, location="Portugal", description="Must be based in Portugal")[:2] == \
         ("not_eligible", "Must be based in Portugal")
-    uk = replace(DEFAULT_PROFILE, work_rights=("EU", "UK"))
+    uk = replace(LEGACY_PROFILE, work_rights=("EU", "UK"))
     assert decide(uk, location="UK", description="Remote role")[:2] == ("check", "Remote in the UK — policy not stated")
 
 

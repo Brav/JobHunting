@@ -19,7 +19,7 @@ from jobhunt.timeutil import utcnow
 @dataclass
 class CheckContext:
     """What the checks need besides the job, loaded once per batch."""
-    profile: eligibility.Profile
+    profile: eligibility.Profile | None  # None until the user saves one (setup): every job is Check
     prefs: Preferences
     blocked: set[str] = field(default_factory=set)
     rules: list = field(default_factory=list)
@@ -27,7 +27,8 @@ class CheckContext:
 
 
 def load_context(session: Session) -> CheckContext:
-    return CheckContext(eligibility.load_profile(session), load_preferences(session),
+    profile = eligibility.load_profile(session) if eligibility.profile_saved(session) else None
+    return CheckContext(profile, load_preferences(session),
                         blocked=blocks.blocked_keys(session), rules=blocks.active_rules(session))
 
 

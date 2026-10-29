@@ -24,15 +24,19 @@ RULES_VERSION = 11  # bump when the rules change: every job is checked again on 
 
 @dataclass(frozen=True)
 class Profile:
-    work_rights: tuple[str, ...] = ("EU",)  # keys of places.REGIONS
-    home_country: str = "RS"
-    time_zone: str = "Europe/Belgrade"
-    relocate_to: tuple[str, ...] = ("EU",)
-    languages: tuple[str, ...] = ("en", "sr", "hr", "bs", "me")
+    work_rights: tuple[str, ...] = ()  # keys of places.REGIONS
+    home_country: str = ""
+    time_zone: str = "UTC"
+    relocate_to: tuple[str, ...] = ()
+    languages: tuple[str, ...] = ("en",)
     contracts: tuple[str, ...] = ("employment", "b2b", "eor")
 
 
-DEFAULT_PROFILE = Profile()
+DEFAULT_PROFILE = Profile()  # a new install assumes nothing about the user
+# The built-in profile before setup existed: databases from then keep it as their saved profile (jobhunt.setup).
+LEGACY_PROFILE = Profile(work_rights=("EU",), home_country="RS", time_zone="Europe/Belgrade", relocate_to=("EU",),
+                         languages=("en", "sr", "hr", "bs", "me"))
+SETUP_REASON = {"kind": "check", "text": "Finish setup to check eligibility", "quote": ""}
 
 
 @dataclass(frozen=True)
@@ -445,6 +449,10 @@ def load_profile(session: Session) -> Profile:
         return DEFAULT_PROFILE
 
 
+def profile_saved(session: Session) -> bool:
+    return session.get(Setting, PROFILE_KEY) is not None
+
+
 def save_profile(session: Session, profile: Profile, now: datetime) -> None:
     row = session.get(Setting, PROFILE_KEY) or Setting(key=PROFILE_KEY, value="")
     row.value, row.updated_at = json.dumps(asdict(profile)), now
@@ -457,9 +465,9 @@ def effective(job) -> str:
     return job.eligibility_override or job.eligibility or "check"
 
 
-def refresh(session: Session, job: Job, profile: Profile) -> None:
-    """Decide the job again from its current texts; the user's override is left alone."""
-    result = assess(job, profile)
+def refresh(session: Session, job: Job, profile: Profile | None) -> None:
+    """Decide the job again from its current texts; the user's override is left alone. No profile yet: Check."""
+    result = assess(job, profile) if profile is not None else Assessment("check", [SETUP_REASON])
     job.eligibility, job.eligibility_reasons = result.verdict, json.dumps(result.reasons, ensure_ascii=False)
     job.eligibility_rules = RULES_VERSION
     session.add(job)
