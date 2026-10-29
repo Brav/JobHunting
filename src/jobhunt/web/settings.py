@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import select
 
 from jobhunt.cv import MAX_CV_BYTES, CVError, current_cv, store_upload
+from jobhunt.deepl_key import load_key, mask, remove_key, save_key
 from jobhunt.eligibility import DEFAULT_PROFILE, Profile, load_profile, profile_saved, refresh_all, save_profile
 from jobhunt.preferences import SOURCES, Preferences, load_preferences, save_preferences
 from jobhunt.models import BlockedCompany, NegativeRule
@@ -38,14 +39,15 @@ def _form_languages(languages: tuple[str, ...]) -> list[str]:
 
 def _page(request: Request, profile: Profile, errors: list[str], saved: str = "", status_code: int = 200,
           prefs: Preferences | None = None, pref_errors: list[str] | None = None, cv_notice: str = "",
-          cv_error: str = ""):
+          cv_error: str = "", translation_notice: str = "", translation_error: str = ""):
     with session(request) as s:
         blocked = list(s.exec(select(BlockedCompany).order_by(BlockedCompany.name)).all())
         rules = list(s.exec(select(NegativeRule).order_by(NegativeRule.phrase)).all())
         prefs = prefs or load_preferences(s)
         cv = current_cv(s, request.app.state.settings)
     return render(request, "settings.html", status_code=status_code, active="settings", profile=profile,
-                  cv=cv, cv_notice=cv_notice, cv_error=cv_error,
+                  cv=cv, cv_notice=cv_notice, cv_error=cv_error, translation=_translation(request),
+                  translation_notice=translation_notice, translation_error=translation_error,
                   blocked=blocked, rules=rules, prefs=prefs, pref_errors=pref_errors or [], sources=SOURCES,
                   languages=_form_languages(profile.languages), errors=errors, saved=saved,
                   regions=REGION_CHOICES, language_choices=LANGUAGE_CHOICES, contract_choices=CONTRACT_CHOICES,
@@ -60,10 +62,42 @@ def _shown_profile(request: Request) -> Profile:
     return replace(DEFAULT_PROFILE, time_zone=request.app.state.settings.tz.key)
 
 
+def _translation(request: Request) -> dict:
+    """Where the DeepL key comes from: "env" (.env wins), "saved" (Settings) or "" (none), and its masked form."""
+    settings = request.app.state.settings
+    if settings.deepl_auth_key:
+        return {"origin": "env", "masked": ""}
+    key = load_key(settings.db_path.parent)
+    return {"origin": "saved" if key else "", "masked": mask(key) if key else ""}
+
+
+TRANSLATION_NOTICES = {"saved": "Key saved · translation is on", "removed": "Key removed · translation is off"}
+
+
 @router.get("/settings", response_class=HTMLResponse)
-def settings_page(request: Request, saved: str = "", cv: str = ""):
+def settings_page(request: Request, saved: str = "", cv: str = "", translation: str = ""):
     return _page(request, _shown_profile(request), [], saved if saved.isdecimal() else "",
-                 cv_notice="CV saved" if cv == "saved" else "")
+                 cv_notice="CV saved" if cv == "saved" else "", translation_notice=TRANSLATION_NOTICES.get(translation, ""))
+
+
+@router.post("/settings/translation", response_class=HTMLResponse)
+def save_translation(request: Request, action: str = Form(""), key: str = Form("")):
+    settings = request.app.state.settings
+    if settings.deepl_auth_key:
+        raise HTTPException(status_code=409, detail="The DeepL key comes from .env")
+    data_dir = settings.db_path.parent
+    try:
+        if action == "remove":
+            remove_key(data_dir)
+        else:
+            save_key(data_dir, key)
+    except ValueError as e:
+        return _page(request, _shown_profile(request), [], status_code=422, translation_error=str(e))
+    except OSError as e:
+        return _page(request, _shown_profile(request), [], status_code=422,
+                     translation_error=f"Couldn't save the key: {e.strerror or e}")
+    request.app.state.translator.set(request.app.state.translator_factory(load_key(data_dir)))
+    return RedirectResponse(f"/settings?translation={'removed' if action == 'remove' else 'saved'}", status_code=303)
 
 
 @router.post("/settings/cv", response_class=HTMLResponse)

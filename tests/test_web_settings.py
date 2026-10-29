@@ -112,3 +112,45 @@ def test_upload_fills_empty_skills(app_factory):
                                              "application/octet-stream")})
     with app.state.session_factory() as s:
         assert "Python" in load_preferences(s).skills
+
+
+# --- the DeepL key ---
+
+def test_settings_saves_the_key_and_switches(app_factory):
+    app = app_factory()
+    made = []
+    app.state.translator_factory = lambda key: made.append(key) or f"translator for {key}"
+    with TestClient(app) as c:
+        r = c.post("/settings/translation", data={"action": "save", "key": " abc:fx \n"}, follow_redirects=False)
+        assert (r.status_code, r.headers["location"]) == (303, "/settings?translation=saved")
+        assert made == ["abc:fx"] and app.state.translator._inner == "translator for abc:fx"
+        html = c.get("/settings?translation=saved").text
+        assert "•••• c:fx" in html and "abc:fx" not in html
+        r = c.post("/settings/translation", data={"action": "remove"}, follow_redirects=False)
+        assert r.headers["location"] == "/settings?translation=removed"
+        assert made == ["abc:fx", ""]
+
+
+def test_empty_key_is_refused_on_the_page(app_factory):
+    with TestClient(app_factory()) as c:
+        r = c.post("/settings/translation", data={"action": "save", "key": "  "})
+        assert r.status_code == 422 and "Paste the key first" in r.text
+
+
+def test_environment_key_wins(app_factory):
+    with TestClient(app_factory(env={"DEEPL_AUTH_KEY": "from-env:fx"})) as c:
+        html = c.get("/settings").text
+        assert "Using the key from .env" in html and 'name="key"' not in html
+        assert c.post("/settings/translation", data={"action": "save", "key": "x"}).status_code == 409
+
+
+def test_export_zip_never_holds_the_key(app_factory):
+    import io
+    import zipfile
+    app = app_factory()
+    app.state.translator_factory = lambda key: None
+    with TestClient(app) as c:
+        c.post("/settings/translation", data={"action": "save", "key": "abc-secret-key:fx"})
+        data = c.get("/data/export.zip").content
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        assert z.namelist() and all(b"abc-secret-key" not in z.read(name) for name in z.namelist())

@@ -54,6 +54,25 @@
   {% endif %}
 </section>
 
+<section class="settings-section" id="translation" aria-labelledby="h-translation">
+  <h2 id="h-translation">Translation</h2>
+  {% if translation_notice %}<p class="notice" role="status">{{ translation_notice }}</p>{% endif %}
+  {% if translation_error %}<p class="field-error" role="alert">{{ translation_error }}</p>{% endif %}
+  {% if translation.origin == "env" %}
+  <p>Using the key from .env.</p>
+  {% else %}
+  <p class="muted">Non-English job titles and descriptions are translated with DeepL. A free key
+    (<a href="https://www.deepl.com/pro-api" target="_blank" rel="noopener">deepl.com/pro-api</a>) allows 500,000
+    characters a month. The key stays on this computer and isn't included in backups or the export.</p>
+  {% if translation.origin == "saved" %}<p>Saved key: <code>{{ translation.masked }}</code></p>{% endif %}
+  <form class="inline-form" method="post" action="/settings/translation">
+    <label>DeepL key <input type="password" name="key" autocomplete="off" spellcheck="false"></label>
+    <button class="btn" type="submit" name="action" value="save">Save key</button>
+    {% if translation.origin == "saved" %}<button class="btn ghost" type="submit" name="action" value="remove" formnovalidate>Remove key</button>{% endif %}
+  </form>
+  {% endif %}
+</section>
+
 <section class="settings-section" id="preferences" aria-labelledby="h-prefs">
   <h2 id="h-prefs">Preferences</h2>
   {% if pref_errors %}<ul class="field-error" role="alert">{% for e in pref_errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}

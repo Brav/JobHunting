@@ -64,3 +64,24 @@ def test_no_translator():
 def test_deepl_outage_fails_fast():
     # The job page waits for DeepL; the library's default 5 retries with back-off take about 30 s.
     assert deepl.http_client.max_network_retries <= 1
+
+
+def test_switchable_translator_swaps():
+    from jobhunt.translate import SwitchableTranslator
+
+    class Echo:
+        def __init__(self, tag):
+            self.tag = tag
+
+        def translate(self, text, language):
+            return f"{self.tag}:{text}"
+
+    t = SwitchableTranslator(Echo("a"))
+    assert t.translate("hi", "de") == "a:hi"
+    t.set(Echo("b"))
+    assert t.translate("hi", "de") == "b:hi"
+
+
+def test_key_messages_point_to_settings():
+    assert NO_KEY_MESSAGE == "Add a DeepL key in Settings → Translation to translate listings"
+    assert BAD_KEY_MESSAGE == "DeepL rejected the key — check it in Settings → Translation"

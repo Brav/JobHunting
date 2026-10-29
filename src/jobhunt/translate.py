@@ -9,9 +9,9 @@ from jobhunt.language import SERBIAN_CROATIAN, language_name
 # Job pages wait for DeepL: retry once, not 5 times with back-off (~30 s), when DeepL is down.
 deepl.http_client.max_network_retries = 1
 
-NO_KEY_MESSAGE = "Add a DeepL key (DEEPL_AUTH_KEY in .env) to translate listings"
+NO_KEY_MESSAGE = "Add a DeepL key in Settings → Translation to translate listings"
 QUOTA_MESSAGE = "DeepL's free monthly limit is used up — translations resume next month"
-BAD_KEY_MESSAGE = "DeepL rejected the key — check DEEPL_AUTH_KEY in .env"
+BAD_KEY_MESSAGE = "DeepL rejected the key — check it in Settings → Translation"
 
 
 class TranslationError(Exception):
@@ -28,6 +28,19 @@ class TranslationQuotaExceeded(TranslationUnavailable):
 
 class Translator(Protocol):
     def translate(self, text: str, language: str) -> str: ...
+
+
+class SwitchableTranslator:
+    """The translator the app hands out once; saving or removing a key in Settings swaps what it uses."""
+
+    def __init__(self, inner: Translator):
+        self._inner = inner
+
+    def set(self, inner: Translator) -> None:
+        self._inner = inner
+
+    def translate(self, text: str, language: str) -> str:
+        return self._inner.translate(text, language)
 
 
 class NoTranslator:

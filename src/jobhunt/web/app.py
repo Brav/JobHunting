@@ -20,10 +20,15 @@ from jobhunt.db import init_db, make_engine, make_session_factory
 from jobhunt.scheduler import RunCoordinator
 from jobhunt.job_listing import clear_service_translation_errors
 from jobhunt.sources.base import JobPage, JobSource
-from jobhunt.translate import DeepLTranslator, NoTranslator, Translator
+from jobhunt.deepl_key import load_key
+from jobhunt.translate import DeepLTranslator, NoTranslator, SwitchableTranslator, Translator
 from jobhunt.web import applications, blocks, capture, companies, contacts, cv, data, digest, eligibility, email_update, sent, focus, job, listings, report, stats, tracker
 from jobhunt.web import settings as settings_page  # `settings` is create_app's Settings
 from jobhunt.web.common import render
+
+
+def make_translator(key: str) -> Translator:
+    return DeepLTranslator(key) if key else NoTranslator()
 
 
 def _default_skills_from_cv(session_factory, settings: Settings) -> None:
@@ -76,8 +81,9 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
         source.on_errors = keep_feed_errors
     if fetch_page is None:
         from jobhunt.sources.linkedin import fetch_job_page as fetch_page
-    if translator is None:
-        translator = DeepLTranslator(settings.deepl_auth_key) if settings.deepl_auth_key else NoTranslator()
+    if translator is None:  # the .env key wins; else the one saved in Settings
+        translator = make_translator(settings.deepl_auth_key or load_key(settings.db_path.parent))
+    translator = SwitchableTranslator(translator)
     clear_service_translation_errors(session_factory)  # stored by older versions; retried from now on
     coordinator = RunCoordinator(session_factory, source, settings, sleep=sleep, fetch_page=fetch_page,
                                  translator=translator)
@@ -119,6 +125,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     app.state.fetch_page = fetch_page
     app.state.form_token = secrets.token_urlsafe(24)  # forms that write what another site sent (capture, email)
     app.state.translator = translator
+    app.state.translator_factory = make_translator  # Settings → Translation builds the new one; tests swap it
     app.include_router(report.router)
     app.include_router(listings.router)
     app.include_router(tracker.router)
