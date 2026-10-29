@@ -87,6 +87,7 @@ def test_second_trigger_refused_while_running(session_factory, settings):
 
 
 def test_start_catches_up_and_schedules(session_factory, settings):
+    add_listing(session_factory, "A", keywords="python")
     clock = FakeClock(datetime(2026, 10, 28, 9, 30))
     coord = RunCoordinator(session_factory, FakeSource({}), settings, clock=clock, sleep=clock.sleep)
     coord.start()
@@ -101,6 +102,7 @@ def test_start_catches_up_and_schedules(session_factory, settings):
 
 
 def test_catch_up_check_runs_only_after_a_missed_slot(session_factory, settings):
+    add_listing(session_factory, "A", keywords="python")
     clock = FakeClock(datetime(2026, 10, 28, 9, 30))
     coord = RunCoordinator(session_factory, FakeSource({}), settings, clock=clock, sleep=clock.sleep)
     assert coord.catch_up_if_needed() is True
@@ -192,3 +194,12 @@ def test_set_time_zone_without_a_running_scheduler(session_factory, settings):
     coord = RunCoordinator(session_factory, FakeSource({}), settings)
     coord.set_time_zone(ZoneInfo("Asia/Tokyo"))
     assert coord.settings.tz.key == "Asia/Tokyo"
+
+
+def test_no_automatic_run_without_listings(session_factory, settings):
+    """A new install has no searches yet: no empty "0 of 0" run, so the report keeps its "add a listing" hint."""
+    clock = FakeClock(datetime(2026, 10, 28, 9, 30))
+    coord = RunCoordinator(session_factory, FakeSource({}), settings, clock=clock, sleep=clock.sleep)
+    assert coord.trigger("scheduled") is False and coord.catch_up_if_needed() is False
+    with session_factory() as s:
+        assert s.exec(select(Run)).all() == []

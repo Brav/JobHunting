@@ -18,7 +18,7 @@ from jobhunt.backup import backup_now
 from jobhunt.signals import check_closed
 from jobhunt.config import Settings
 from jobhunt.enrich import BLOCK_BACKOFF, ENRICH_EVERY_MINUTES, EnrichResult, enrich_pending, first_of_next_month
-from jobhunt.models import Run
+from jobhunt.models import Listing, Run
 from jobhunt.runner import run_daily
 from jobhunt.sources.base import JobPage, JobSource
 from jobhunt.timeutil import local_date, local_to_utc, utcnow
@@ -96,6 +96,9 @@ class RunCoordinator:
         if trigger != "manual" and self._paused():
             logger.info("searches are paused; %s run skipped", trigger)
             return False
+        if trigger != "manual" and not self._has_listings():
+            logger.info("no active listings yet; %s run skipped", trigger)  # a new install: nothing to search
+            return False
         if not self._lock.acquire(blocking=False):
             logger.info("a run is already in progress; %s trigger ignored", trigger)
             return False
@@ -108,6 +111,10 @@ class RunCoordinator:
 
         threading.Thread(target=work, name=f"jobhunt-run-{trigger}", daemon=True).start()
         return True
+
+    def _has_listings(self) -> bool:
+        with self.session_factory() as s:
+            return s.exec(select(Listing.id).where(Listing.active == True).limit(1)).first() is not None  # noqa: E712
 
     def _paused(self) -> bool:
         from jobhunt.preferences import is_paused, load_preferences
