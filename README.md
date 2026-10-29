@@ -4,8 +4,6 @@ Searches LinkedIn every 4 hours for each of your saved searches ("listings") and
 dashboard at http://localhost:8765. Each job appears once; you can mark jobs Interested, Applied or Hidden, and get a
 ready-made prompt for tailoring your CV to any job in Claude.ai.
 
-Design: `docs/superpowers/specs/2026-10-28-linkedin-job-tracker-design.md`
-
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/): `curl -LsSf https://astral.sh/uv/install.sh | sh`
@@ -155,3 +153,12 @@ Environment variables (set them in `docker-compose.yml`, except `JOBHUNT_CV_DIR`
 | `JOBHUNT_CV_DIR` | — | Folder holding your CV on this computer (in `.env`; mounted read-only) |
 | `JOBHUNT_CV_NAME` | — | The CV's file name in that folder (in `.env`) |
 | `DEEPL_AUTH_KEY` | empty | DeepL API key (in `.env`); empty means no translation |
+
+## Licence and LinkedIn
+
+The code is under the MIT licence (`LICENSE`).
+
+Searches read LinkedIn's public job search through [python-jobspy](https://github.com/speedyapply/JobSpy).
+LinkedIn's terms don't allow automated access, so run it for yourself only, at your own risk, and keep the searches
+modest (the default is every 4 hours). The app runs on your computer and sends your data nowhere unless you set up
+translation (DeepL) or the phone push (ntfy).

@@ -3,6 +3,8 @@ name = "jobhunt"
 version = "0.1.0"
 description = "Daily LinkedIn job search with a local dashboard"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "Brav" }
 ]

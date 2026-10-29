@@ -3,3 +3,7 @@ __pycache__/
 data/
 .env
 .claude/
+reports/
+research_notes/
+# Design notes and plans stay on this computer: they hold personal details (the repository is public).
+docs/superpowers/
