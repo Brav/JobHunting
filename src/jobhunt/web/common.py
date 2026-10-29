@@ -1,7 +1,9 @@
 """Shared web helpers: templates, Jinja filters, and the context every page needs."""
 
+import hashlib
 import re
 import secrets
+from collections.abc import Iterable
 from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
@@ -30,6 +32,19 @@ from jobhunt.timeutil import local_date, to_local, utcnow
 from jobhunt.workplace import WORKPLACE_LABELS
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+
+
+def static_version(paths: Iterable[Path]) -> str:
+    """A short hash of the files' contents: links carry it (?v=…), so a new version means new URLs, never a stale
+    stylesheet or script from the browser's cache."""
+    digest = hashlib.sha256()
+    for path in paths:
+        digest.update(path.read_bytes())
+    return digest.hexdigest()[:10]
+
+
+STATIC_VERSION = static_version(Path(__file__).parent / "static" / name for name in ("style.css", "app.js"))
+templates.env.globals["static_version"] = STATIC_VERSION
 
 
 def local_dt(dt: datetime | None, tz: ZoneInfo) -> str:

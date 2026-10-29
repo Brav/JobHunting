@@ -9,9 +9,9 @@
   <title>{% block title %}{% endblock %} · Job tracker</title>
   {# Before the stylesheet, so the first paint already uses the chosen theme (see the theme switch). #}
   <script>try { const t = localStorage.getItem("theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}</script>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v={{ static_version }}">
   <script src="/static/htmx.min.js" defer></script>
-  <script src="/static/app.js" defer></script>
+  <script src="/static/app.js?v={{ static_version }}" defer></script>
   <script src="/static/alpine.min.js" defer></script>
 </head>
 <body x-data @keydown.window="$store.help.handleKey($event)">

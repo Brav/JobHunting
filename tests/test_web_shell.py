@@ -97,7 +97,7 @@ def test_compact_status_bar(app_factory):
 def test_theme_is_applied_before_the_stylesheet(app_factory):
     with TestClient(app_factory()) as c:
         html = c.get("/").text
-        assert html.index('localStorage.getItem("theme")') < html.index('href="/static/style.css"')
+        assert html.index('localStorage.getItem("theme")') < html.index('href="/static/style.css?v=')
         assert 'role="radiogroup" aria-label="Theme"' in html
         for value in ("system", "light", "dark"):
             assert f'name="theme" value="{value}"' in html
@@ -110,3 +110,21 @@ def test_forced_themes_have_tokens(app_factory):
         css = c.get("/static/style.css").text
         assert ':root[data-theme="dark"]' in css and ':root:not([data-theme="light"])' in css
         assert ':root[data-theme="light"] { color-scheme: light; }' in css
+
+
+def test_static_links_carry_the_version(app_factory):
+    from jobhunt.web.common import STATIC_VERSION
+    with TestClient(app_factory()) as c:
+        page = c.get("/").text
+    assert f"/static/style.css?v={STATIC_VERSION}" in page and f"/static/app.js?v={STATIC_VERSION}" in page
+
+
+def test_static_version_follows_content(tmp_path):
+    from jobhunt.web.common import static_version
+    a, b = tmp_path / "a.css", tmp_path / "b.js"
+    a.write_text("body {}")
+    b.write_text("let x = 1;")
+    before = static_version([a, b])
+    b.write_text("let x = 2;")
+    after = static_version([a, b])
+    assert before != after and len(after) == 10 and int(after, 16) >= 0
