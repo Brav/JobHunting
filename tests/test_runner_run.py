@@ -166,3 +166,15 @@ def test_matches_are_saved_only_with_the_listing_attempt(session_factory):
     run_id, _ = go(factory, FakeSource({"python": [[p("1")]]}))
     with session_factory() as s:
         assert (s.get(Run, run_id).status, s.exec(select(Match)).all(), s.exec(select(Job)).all()) == ("failed", [], [])
+
+
+
+def test_run_daily_only_the_given_listings(session_factory):
+    from jobhunt.models import RunListing
+    a = add_listing(session_factory, "A", keywords="python")
+    add_listing(session_factory, "B", keywords="go")
+    clock = FakeClock(NOW)
+    run_id = run_daily(session_factory, FakeSource({"python": [[]], "go": [[]]}), trigger="scheduled",
+                       clock=clock, sleep=clock.sleep, listing_ids=[a])
+    with session_factory() as s:
+        assert [r.listing_id for r in s.exec(select(RunListing).where(RunListing.run_id == run_id))] == [a]

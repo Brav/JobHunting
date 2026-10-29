@@ -1,4 +1,5 @@
 import threading
+from dataclasses import replace
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -7,11 +8,13 @@ from sqlmodel import select
 
 from fakes import FakeClock, FakeSource, FakeTranslator, add_listing, add_run, make_posting as p, wait_until
 from jobhunt.config import load_settings
-from jobhunt.models import Run
+from jobhunt.models import Listing, Run, RunListing
 from jobhunt.runner import record_results
 from jobhunt.sources.base import JobPage, SourceBlocked
 from jobhunt.translate import TranslationQuotaExceeded
-from jobhunt.scheduler import RunCoordinator, latest_run_started, latest_slot, run_hours, should_catch_up
+from jobhunt.preferences import Preferences, load_preferences, save_preferences
+from jobhunt.schedule import times_of_day
+from jobhunt.scheduler import RunCoordinator, default_schedule, due_listings
 
 TZ, TEN = ZoneInfo("Europe/Belgrade"), time(10, 0)
 
@@ -19,48 +22,6 @@ TZ, TEN = ZoneInfo("Europe/Belgrade"), time(10, 0)
 @pytest.fixture
 def settings(tmp_path):
     return load_settings({"JOBHUNT_DB_PATH": str(tmp_path / "unused.db")})
-
-
-def test_run_hours():
-    assert run_hours(time(10, 0), 4) == [2, 6, 10, 14, 18, 22]
-    assert run_hours(time(10, 0), 24) == [10]
-    assert run_hours(time(7, 30), 6) == [1, 7, 13, 19]
-
-
-def test_latest_slot():
-    assert latest_slot(datetime(2026, 10, 28, 9, 30), TZ, TEN, 4) == datetime(2026, 10, 28, 9, 0)    # 10:30 → 10:00
-    assert latest_slot(datetime(2026, 10, 28, 8, 59), TZ, TEN, 4) == datetime(2026, 10, 28, 5, 0)    # 09:59 → 06:00
-    assert latest_slot(datetime(2026, 10, 27, 23, 30), TZ, TEN, 4) == datetime(2026, 10, 27, 21, 0)  # 00:30 → 22:00 the day before
-    assert latest_slot(datetime(2026, 7, 1, 8, 30), TZ, TEN, 4) == datetime(2026, 7, 1, 8, 0)        # 10:30 CEST → 10:00 CEST
-
-
-def test_latest_slot_on_the_dst_fall_back_day():
-    # 2026-10-25: clocks go back from 03:00 CEST to 02:00 CET, so 02:00–03:00 local happens twice.
-    def slot(utc_hour, utc_minute=0, day=25):
-        return latest_slot(datetime(2026, 10, day, utc_hour, utc_minute), TZ, TEN, 4)
-
-    assert slot(23, 59, day=24) == datetime(2026, 10, 24, 20, 0)  # 01:59 CEST → 22:00 CEST the day before
-    assert slot(0, 30) == datetime(2026, 10, 25, 0, 0)  # 02:30 CEST → 02:00 CEST
-    assert slot(1, 30) == datetime(2026, 10, 25, 0, 0)  # 02:30 CET (the repeated hour) → still 02:00 CEST, not a new slot
-    assert slot(4, 59) == datetime(2026, 10, 25, 0, 0)  # 05:59 CET → 02:00 CEST
-    assert slot(5, 0) == datetime(2026, 10, 25, 5, 0)   # 06:00 CET
-    assert slot(9, 30) == datetime(2026, 10, 25, 9, 0)  # 10:30 CET → 10:00 CET
-
-
-def test_should_catch_up():
-    now = datetime(2026, 10, 28, 9, 30)  # 10:30 local; latest slot 10:00 local = 09:00 UTC
-    assert should_catch_up(now, TZ, TEN, 4, None)
-    assert should_catch_up(now, TZ, TEN, 4, datetime(2026, 10, 28, 8, 0))       # last run 09:00 local
-    assert not should_catch_up(now, TZ, TEN, 4, datetime(2026, 10, 28, 9, 0))
-    assert not should_catch_up(now, TZ, TEN, 4, datetime(2026, 10, 28, 9, 10))
-
-
-def test_latest_run_started_ignores_interrupted(session_factory):
-    now = datetime(2026, 10, 28, 9, 5)
-    add_run(session_factory, now - timedelta(days=1))
-    add_run(session_factory, now, status="failed", error="interrupted")
-    with session_factory() as s:
-        assert latest_run_started(s) == now - timedelta(days=1)
 
 
 def test_second_trigger_refused_while_running(session_factory, settings):
@@ -86,33 +47,52 @@ def test_second_trigger_refused_while_running(session_factory, settings):
     assert [(r.trigger, r.status) for r in runs] == [("manual", "ok")]
 
 
-def test_start_catches_up_and_schedules(session_factory, settings):
-    add_listing(session_factory, "A", keywords="python")
+def listing(sf, name, schedule=None, created=datetime(2026, 10, 27), active=True):
+    """A listing made before the test's clock (add_listing stamps the real time)."""
+    listing_id = add_listing(sf, name, keywords=name.lower(), active=active)
+    with sf() as s:
+        row = s.get(Listing, listing_id)
+        row.created_at, row.schedule = created, schedule
+        s.add(row)
+        s.commit()
+    return listing_id
+
+
+def attempt(sf, listing_id, started_at, error=None):
+    run_id = add_run(sf, started_at, status="failed" if error else "ok", error=error)
+    with sf() as s:
+        s.add(RunListing(run_id=run_id, listing_id=listing_id))
+        s.commit()
+
+
+def test_start_runs_what_is_due_and_says_when_next(session_factory, settings):
+    listing(session_factory, "A")
     clock = FakeClock(datetime(2026, 10, 28, 9, 30))
     coord = RunCoordinator(session_factory, FakeSource({}), settings, clock=clock, sleep=clock.sleep)
     coord.start()
     try:
         wait_until(lambda: not coord.is_running)
         with session_factory() as s:
-            assert [r.trigger for r in s.exec(select(Run)).all()] == ["catch_up"]
+            assert [r.trigger for r in s.exec(select(Run)).all()] == ["scheduled"]
+        assert coord._scheduler.get_job("due_check") is not None and coord._scheduler.get_job("scheduled") is None
         nxt = coord.next_run_at()
         assert nxt.hour in (2, 6, 10, 14, 18, 22) and nxt.minute == 0
     finally:
         coord.shutdown()
 
 
-def test_catch_up_check_runs_only_after_a_missed_slot(session_factory, settings):
-    add_listing(session_factory, "A", keywords="python")
+def test_check_due_after_a_missed_slot(session_factory, settings):
+    listing(session_factory, "A")
     clock = FakeClock(datetime(2026, 10, 28, 9, 30))
     coord = RunCoordinator(session_factory, FakeSource({}), settings, clock=clock, sleep=clock.sleep)
-    assert coord.catch_up_if_needed() is True
+    assert coord.check_due() is True
     wait_until(lambda: not coord.is_running)
-    assert coord.catch_up_if_needed() is False
-    clock.now = datetime(2026, 10, 28, 13, 5)  # 14:05 local: the 14:00 slot was missed
-    assert coord.catch_up_if_needed() is True
+    assert coord.check_due() is False
+    clock.now = datetime(2026, 10, 28, 13, 5)  # the 10:00 slot (UTC here) came and went
+    assert coord.check_due() is True
     wait_until(lambda: not coord.is_running)
     with session_factory() as s:
-        assert [r.trigger for r in s.exec(select(Run)).all()] == ["catch_up", "catch_up"]
+        assert [r.trigger for r in s.exec(select(Run)).all()] == ["scheduled", "scheduled"]
 
 
 def seed_jobs(sf, n):
@@ -172,7 +152,7 @@ def test_enrich_pauses_titles_after_quota(session_factory, settings):
     assert len(translator.calls) == 2
 
 
-CRON_JOBS = ("scheduled", "backup", "recheck", "digest_push", "auto_close", "closed")
+CRON_JOBS = ("backup", "recheck", "digest_push", "auto_close", "closed")
 
 
 def test_set_time_zone_moves_every_cron_job(session_factory, settings):
@@ -200,6 +180,134 @@ def test_no_automatic_run_without_listings(session_factory, settings):
     """A new install has no searches yet: no empty "0 of 0" run, so the report keeps its "add a listing" hint."""
     clock = FakeClock(datetime(2026, 10, 28, 9, 30))
     coord = RunCoordinator(session_factory, FakeSource({}), settings, clock=clock, sleep=clock.sleep)
-    assert coord.trigger("scheduled") is False and coord.catch_up_if_needed() is False
+    assert coord.trigger("scheduled") is False and coord.check_due() is False
     with session_factory() as s:
         assert s.exec(select(Run)).all() == []
+
+
+
+# --- the due rule (Europe/Belgrade, UTC+1 in late October; the default is every 4 h from 10:00) ---
+
+NOW = datetime(2026, 10, 28, 9, 30)  # 10:30 local: the latest slot is 10:00 local = 09:00 UTC
+
+
+def due(sf, settings, now=NOW, tz=TZ, prefs=None):
+    with sf() as s:
+        prefs = prefs or load_preferences(s)
+        changed = datetime.fromisoformat(prefs.schedule_changed_at) if prefs.schedule_changed_at else None
+        return due_listings(s, now, tz, default_schedule(prefs, settings), changed)
+
+
+def test_owner_default_keeps_the_six_times(settings):
+    assert times_of_day(default_schedule(Preferences(), settings)) == [time(h) for h in (2, 6, 10, 14, 18, 22)]
+
+
+def test_due_after_a_missed_slot_and_not_after_searching(session_factory, settings):
+    a = listing(session_factory, "A")
+    assert due(session_factory, settings) == [a]
+    attempt(session_factory, a, datetime(2026, 10, 28, 9, 1))
+    assert due(session_factory, settings) == []
+    attempt(session_factory, a, datetime(2026, 10, 28, 8, 0), error="rate limited")  # an older failure changes nothing
+    assert due(session_factory, settings) == []
+
+
+def test_new_listing_waits_for_its_next_time(session_factory, settings):
+    listing(session_factory, "A", created=datetime(2026, 10, 28, 9, 20))
+    assert due(session_factory, settings) == []
+    assert due(session_factory, settings, now=datetime(2026, 10, 28, 13, 0)) != []  # 14:00 local
+
+
+def test_edited_schedule_waits_for_its_next_time(session_factory, settings):
+    a = listing(session_factory, "A", schedule="times:09:00,10:00")
+    with session_factory() as s:
+        row = s.get(Listing, a)
+        row.schedule_changed_at = datetime(2026, 10, 28, 9, 10)
+        s.add(row)
+        s.commit()
+    assert due(session_factory, settings) == []
+
+
+def test_edited_default_waits_for_its_next_time(session_factory, settings):
+    on_default = listing(session_factory, "A")
+    own = listing(session_factory, "B", schedule="times:10:00")
+    prefs = replace(Preferences(), schedule_changed_at="2026-10-28T09:10")
+    assert due(session_factory, settings, prefs=prefs) == [own]
+    assert on_default in due(session_factory, settings, prefs=prefs, now=datetime(2026, 10, 28, 13, 0))  # 14:00
+
+
+def test_switched_off_listing_is_never_due(session_factory, settings):
+    listing(session_factory, "A", active=False)
+    assert due(session_factory, settings) == []
+
+
+def test_bad_stored_schedule_follows_the_default(session_factory, settings):
+    a = listing(session_factory, "A", schedule="garbage")
+    assert due(session_factory, settings) == [a]
+
+
+def test_interrupted_run_does_not_count(session_factory, settings):
+    a = listing(session_factory, "A")
+    attempt(session_factory, a, datetime(2026, 10, 28, 9, 1), error="interrupted")
+    assert due(session_factory, settings) == [a]
+
+
+def test_zone_change_gives_at_most_one_run(session_factory, settings):
+    a = listing(session_factory, "A")
+    attempt(session_factory, a, datetime(2026, 10, 28, 9, 1))  # searched at the 10:00 Belgrade slot
+    new_york = ZoneInfo("America/New_York")
+    later = datetime(2026, 10, 28, 14, 30)  # 10:30 in New York: its 10:00 slot is 14:00 UTC
+    assert due(session_factory, settings, now=later, tz=new_york) == [a]
+    attempt(session_factory, a, datetime(2026, 10, 28, 14, 31))
+    assert due(session_factory, settings, now=later, tz=new_york) == []
+
+
+def test_check_due_runs_only_due_listings_in_one_run(session_factory, settings):
+    a = listing(session_factory, "A")
+    b = listing(session_factory, "B", schedule="times:20:00")
+    attempt(session_factory, b, datetime(2026, 10, 27, 19, 30))  # B searched at its 20:00 slot yesterday
+    clock = FakeClock(NOW)
+    coord = RunCoordinator(session_factory, FakeSource({}), replace(settings, tz=TZ), clock=clock, sleep=clock.sleep)
+    assert coord.check_due() is True
+    wait_until(lambda: not coord.is_running)
+    with session_factory() as s:
+        run = s.exec(select(Run).where(Run.trigger == "scheduled")).one()
+        assert [r.listing_id for r in s.exec(select(RunListing).where(RunListing.run_id == run.id))] == [a]
+
+
+def test_check_due_skips_while_paused(session_factory, settings):
+    listing(session_factory, "A")
+    with session_factory() as s:
+        save_preferences(s, replace(load_preferences(s), paused_until="2099-01-01"), NOW)
+    clock = FakeClock(NOW)
+    coord = RunCoordinator(session_factory, FakeSource({}), replace(settings, tz=TZ), clock=clock, sleep=clock.sleep)
+    assert coord.check_due() is False
+
+
+def test_next_run_at_is_the_earliest_listing_time(session_factory, settings):
+    listing(session_factory, "A", schedule="times:12:30")
+    listing(session_factory, "B")  # default: next is 14:00 local
+    clock = FakeClock(NOW)
+    coord = RunCoordinator(session_factory, FakeSource({}), replace(settings, tz=TZ), clock=clock, sleep=clock.sleep)
+    nxt = coord.next_run_at()
+    assert (nxt.hour, nxt.minute, nxt.tzinfo) == (12, 30, TZ)
+
+
+def test_no_next_run_without_active_listings(session_factory, settings):
+    coord = RunCoordinator(session_factory, FakeSource({}), settings)
+    assert coord.next_run_at() is None
+
+
+def test_push_follows_the_default(session_factory, settings):
+    clock = FakeClock(NOW)
+    coord = RunCoordinator(session_factory, FakeSource({}), replace(settings, tz=TZ), clock=clock, sleep=clock.sleep)
+    coord.start()
+    try:
+        assert (coord._scheduler.get_job("digest_push").next_run_time.hour,
+                coord._scheduler.get_job("digest_push").next_run_time.minute) == (10, 30)
+        with session_factory() as s:
+            save_preferences(s, replace(load_preferences(s), schedule="times:07:00"), NOW)
+        coord.schedule_changed()
+        nxt = coord._scheduler.get_job("digest_push").next_run_time
+        assert (nxt.hour, nxt.minute) == (7, 30)
+    finally:
+        coord.shutdown()

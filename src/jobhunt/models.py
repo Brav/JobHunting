@@ -23,6 +23,8 @@ class Listing(SQLModel, table=True):
     created_at: NaiveDatetime = Field(default_factory=utcnow)
     # Set when keywords, location or radius change, so the next run searches the full 7 days again.
     search_changed_at: NaiveDatetime | None = None
+    schedule: str | None = None  # its own times (jobhunt.schedule text); None = the default from Settings
+    schedule_changed_at: NaiveDatetime | None = None  # its times changed or it was switched on: wait for the next one
 
 
 class Job(SQLModel, table=True):

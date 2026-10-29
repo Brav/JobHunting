@@ -1,4 +1,5 @@
-"""The user's working preferences (skills, follow-ups, goals, pause, sources, push), stored as JSON in settings."""
+"""The user's working preferences (skills, follow-ups, goals, pause, sources, push, default schedule), stored as JSON
+in settings."""
 
 import json
 from dataclasses import asdict, dataclass, fields
@@ -24,6 +25,8 @@ class Preferences:
     sources: tuple[str, ...] = tuple(SOURCES)
     ntfy_url: str = ""  # phone push for the daily digest; empty = nothing is sent
     last_digest_at: str = ""  # ISO datetime (naive UTC) the digest was last marked read
+    schedule: str = ""  # the default search schedule (jobhunt.schedule text); empty = JOBHUNT_RUN_AT every N hours
+    schedule_changed_at: str = ""  # ISO datetime (naive UTC) the default last changed
 
 
 def load_preferences(session: Session) -> Preferences:

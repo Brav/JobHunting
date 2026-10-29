@@ -166,8 +166,9 @@ def _attempt(session_factory, source: JobSource, run_id: int, listing: Listing,
 
 def run_daily(session_factory: Callable[[], Session], source: JobSource, *, trigger: str,
               results_per_listing: int = 100, clock: Callable[[], datetime] = utcnow,
-              sleep: Callable[[float], None] = time.sleep, rng: random.Random | None = None) -> int:
-    """Run every active listing, retrying failures; returns the run ID. Never raises."""
+              sleep: Callable[[float], None] = time.sleep, rng: random.Random | None = None,
+              listing_ids: list[int] | None = None) -> int:
+    """Run every active listing (or only these ones), retrying failures; returns the run ID. Never raises."""
     rng = rng or random.Random()
     with session_factory() as s:
         run = Run(trigger=trigger, started_at=clock())
@@ -179,7 +180,10 @@ def run_daily(session_factory: Callable[[], Session], source: JobSource, *, trig
     error = None
     try:
         with session_factory() as s:
-            listings = s.exec(select(Listing).where(Listing.active == True).order_by(Listing.id)).all()  # noqa: E712
+            query = select(Listing).where(Listing.active == True).order_by(Listing.id)  # noqa: E712
+            if listing_ids is not None:
+                query = query.where(Listing.id.in_(listing_ids))
+            listings = s.exec(query).all()
         windows: dict[int, int] = {}
         succeeded = 0
         pending = list(listings)
