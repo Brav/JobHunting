@@ -3,14 +3,16 @@
 from dataclasses import replace
 from zoneinfo import ZoneInfo, available_timezones
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import select
 
+from jobhunt.cv import MAX_CV_BYTES, CVError, current_cv, store_upload
 from jobhunt.eligibility import DEFAULT_PROFILE, Profile, load_profile, profile_saved, refresh_all, save_profile
 from jobhunt.preferences import SOURCES, Preferences, load_preferences, save_preferences
 from jobhunt.models import BlockedCompany, NegativeRule
 from jobhunt.places import COUNTRIES
+from jobhunt.setup import fill_skills_from_cv
 from jobhunt.timeutil import utcnow
 from jobhunt.web.common import apply_time_zone, render, session
 
@@ -35,25 +37,47 @@ def _form_languages(languages: tuple[str, ...]) -> list[str]:
 
 
 def _page(request: Request, profile: Profile, errors: list[str], saved: str = "", status_code: int = 200,
-          prefs: Preferences | None = None, pref_errors: list[str] | None = None):
+          prefs: Preferences | None = None, pref_errors: list[str] | None = None, cv_notice: str = "",
+          cv_error: str = ""):
     with session(request) as s:
         blocked = list(s.exec(select(BlockedCompany).order_by(BlockedCompany.name)).all())
         rules = list(s.exec(select(NegativeRule).order_by(NegativeRule.phrase)).all())
         prefs = prefs or load_preferences(s)
+        cv = current_cv(s, request.app.state.settings)
     return render(request, "settings.html", status_code=status_code, active="settings", profile=profile,
+                  cv=cv, cv_notice=cv_notice, cv_error=cv_error,
                   blocked=blocked, rules=rules, prefs=prefs, pref_errors=pref_errors or [], sources=SOURCES,
                   languages=_form_languages(profile.languages), errors=errors, saved=saved,
                   regions=REGION_CHOICES, language_choices=LANGUAGE_CHOICES, contract_choices=CONTRACT_CHOICES,
                   countries=COUNTRY_CHOICES, zones=ZONES)
 
 
-@router.get("/settings", response_class=HTMLResponse)
-def settings_page(request: Request, saved: str = ""):
+def _shown_profile(request: Request) -> Profile:
+    """The saved profile; nothing saved yet: the neutral one, in the zone the app runs in (TZ, else UTC)."""
     with session(request) as s:
-        # Nothing saved yet: the neutral profile, in the zone the app runs in (TZ, else UTC).
-        profile = load_profile(s) if profile_saved(s) else replace(DEFAULT_PROFILE,
-                                                                     time_zone=request.app.state.settings.tz.key)
-    return _page(request, profile, [], saved if saved.isdecimal() else "")
+        if profile_saved(s):
+            return load_profile(s)
+    return replace(DEFAULT_PROFILE, time_zone=request.app.state.settings.tz.key)
+
+
+@router.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request, saved: str = "", cv: str = ""):
+    return _page(request, _shown_profile(request), [], saved if saved.isdecimal() else "",
+                 cv_notice="CV saved" if cv == "saved" else "")
+
+
+@router.post("/settings/cv", response_class=HTMLResponse)
+def upload_cv(request: Request, cv: UploadFile = File(...)):
+    settings = request.app.state.settings
+    with session(request) as s:
+        if current_cv(s, settings).origin == "env":
+            raise HTTPException(status_code=409, detail="The CV comes from your CV folder (set in .env)")
+        try:
+            path = store_upload(s, settings.db_path.parent, cv.filename or "", cv.file.read(MAX_CV_BYTES + 1), utcnow())
+        except CVError as e:
+            return _page(request, _shown_profile(request), [], status_code=422, cv_error=str(e))
+        fill_skills_from_cv(s, path)
+    return RedirectResponse("/settings?cv=saved", status_code=303)
 
 
 @router.post("/settings", response_class=HTMLResponse)
@@ -101,7 +125,7 @@ def save_preferences_form(request: Request, skills: str = Form(""), follow_up_da
     errors: list[str] = []
     with session(request) as s:
         current = load_preferences(s)
-        profile = load_profile(s)
+    profile = _shown_profile(request)
     paused = paused_until.strip()
     try:
         if paused:

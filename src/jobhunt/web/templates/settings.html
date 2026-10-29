@@ -39,6 +39,21 @@
   <div><button class="btn primary" type="submit">Save</button></div>
 </form>
 
+<section class="settings-section" id="cv" aria-labelledby="h-cv">
+  <h2 id="h-cv">Your CV</h2>
+  {% if cv_notice %}<p class="notice" role="status">{{ cv_notice }}</p>{% endif %}
+  {% if cv_error %}<p class="field-error" role="alert">{{ cv_error }}</p>{% endif %}
+  {% if cv.origin == "env" %}
+  <p>Using the CV from your CV folder (set in .env): {{ cv.name }}</p>
+  {% else %}
+  <p>{% if cv.path %}Current CV: <strong>{{ cv.name }}</strong>{% else %}No CV yet. The prompts for Claude and the skills list read it.{% endif %}</p>
+  <form class="inline-form" method="post" action="/settings/cv" enctype="multipart/form-data">
+    <label>PDF or Word (.docx), up to 5 MB <input type="file" name="cv" accept=".pdf,.docx" required></label>
+    <button class="btn" type="submit">{% if cv.path %}Replace{% else %}Upload{% endif %}</button>
+  </form>
+  {% endif %}
+</section>
+
 <section class="settings-section" id="preferences" aria-labelledby="h-prefs">
   <h2 id="h-prefs">Preferences</h2>
   {% if pref_errors %}<ul class="field-error" role="alert">{% for e in pref_errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}

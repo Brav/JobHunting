@@ -72,3 +72,43 @@ def test_unsaved_profile_shows_the_server_zone(app_factory):
     with TestClient(app_factory(setup_done=False, env={"TZ": "America/Denver"})) as c:
         c.post("/setup/skip")
         assert 'name="time_zone" list="zones" value="America/Denver"' in c.get("/settings").text
+
+
+# --- the CV section ---
+
+PDF = b"%PDF-1.4\n% a tiny test file\n"
+
+
+def test_upload_a_cv_in_settings(app_factory):
+    app = app_factory()
+    with TestClient(app) as c:
+        r = c.post("/settings/cv", files={"cv": ("My CV.pdf", PDF, "application/pdf")}, follow_redirects=False)
+        assert (r.status_code, r.headers["location"]) == (303, "/settings?cv=saved")
+        html = c.get("/settings?cv=saved").text
+        assert "My CV.pdf" in html and 'name="cv"' in html
+    assert (app.state.settings.db_path.parent / "cv" / "cv.pdf").read_bytes() == PDF
+
+
+def test_cv_upload_errors_show_on_the_page(app_factory):
+    with TestClient(app_factory()) as c:
+        r = c.post("/settings/cv", files={"cv": ("notes.txt", b"hello", "text/plain")})
+        assert r.status_code == 422 and "Upload a PDF or Word (.docx) file" in r.text
+
+
+def test_environment_cv_hides_the_upload(tmp_path, app_factory):
+    env_cv = tmp_path / "Mine.pdf"
+    env_cv.write_bytes(PDF)
+    with TestClient(app_factory(cv_path=env_cv)) as c:
+        html = c.get("/settings").text
+        assert "Using the CV from your CV folder (set in .env)" in html and 'name="cv"' not in html
+
+
+def test_upload_fills_empty_skills(app_factory):
+    from test_cv import docx_bytes
+    from jobhunt.preferences import load_preferences
+    app = app_factory()
+    with TestClient(app) as c:
+        c.post("/settings/cv", files={"cv": ("cv.docx", docx_bytes("Backend developer", "Python, Django, PostgreSQL"),
+                                             "application/octet-stream")})
+    with app.state.session_factory() as s:
+        assert "Python" in load_preferences(s).skills
