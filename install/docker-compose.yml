@@ -1,0 +1,19 @@
+# Job tracker. Put this file in a folder of its own, open a terminal in that folder and run:
+#   docker compose up -d
+# then open http://localhost:8765 in your browser. The guide: https://github.com/Brav/JobHunting#readme
+services:
+  jobhunt:
+    image: ghcr.io/brav/jobhunting:latest
+    ports:
+      - "127.0.0.1:8765:8000"  # reachable from this computer only
+    volumes:
+      - jobhunt-data:/app/data  # your jobs, CV, settings and backups
+    restart: unless-stopped
+    # Optional, for advanced use: remove the # in front of these lines to change them.
+    # environment:
+    #   JOBHUNT_RUN_AT: "10:00"             # the time the searches are anchored to, in your time zone
+    #   JOBHUNT_RUN_EVERY_HOURS: "4"        # hours between searches; must divide 24
+    #   JOBHUNT_RESULTS_PER_LISTING: "100"  # at most this many jobs per search
+
+volumes:
+  jobhunt-data:

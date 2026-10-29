@@ -2,7 +2,7 @@ services:
   jobhunt:
     build: .
     container_name: jobhunt
-    user: "1000:1000"
+    user: "${JOBHUNT_UID:-1000}:${JOBHUNT_GID:-1000}"  # your user id on Linux (`id -u`), so ./data stays yours
     ports:
       - "127.0.0.1:8765:8000"
     restart: unless-stopped
