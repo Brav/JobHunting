@@ -164,6 +164,19 @@ def _attempt(session_factory, source: JobSource, run_id: int, listing: Listing,
     return "ok"
 
 
+def _note_crash(session_factory, run_id: int, listings: list[Listing], error: str) -> None:
+    """A crashed run still counts as an attempt for each of its listings: the schedule waits for their next time
+    instead of searching again a minute later (jobhunt.scheduler.due_listings)."""
+    try:
+        with session_factory() as s:
+            for listing in listings:
+                if s.get(RunListing, (run_id, listing.id)) is None:
+                    _add_attempt(s, run_id, listing.id, error=error)
+            s.commit()
+    except Exception:
+        logger.exception("run %d: couldn't record its crash per listing", run_id)
+
+
 def run_daily(session_factory: Callable[[], Session], source: JobSource, *, trigger: str,
               results_per_listing: int = 100, clock: Callable[[], datetime] = utcnow,
               sleep: Callable[[float], None] = time.sleep, rng: random.Random | None = None,
@@ -178,6 +191,7 @@ def run_daily(session_factory: Callable[[], Session], source: JobSource, *, trig
     logger.info("run %d started (%s)", run_id, trigger)
 
     error = None
+    listings: list[Listing] = []
     try:
         with session_factory() as s:
             query = select(Listing).where(Listing.active == True).order_by(Listing.id)  # noqa: E712
@@ -212,6 +226,7 @@ def run_daily(session_factory: Callable[[], Session], source: JobSource, *, trig
     except Exception as e:
         logger.exception("run %d crashed", run_id)
         status, error = "failed", f"{type(e).__name__}: {e}"
+        _note_crash(session_factory, run_id, listings, error)
 
     with session_factory() as s:
         run = s.get(Run, run_id)

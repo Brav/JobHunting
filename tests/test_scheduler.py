@@ -311,3 +311,37 @@ def test_push_follows_the_default(session_factory, settings):
         assert (nxt.hour, nxt.minute) == (7, 30)
     finally:
         coord.shutdown()
+
+
+# --- final review fixes ---
+
+def test_a_crashed_run_waits_for_the_next_time(session_factory, settings):
+    """A run that crashes mid-way still counts as an attempt: no new LinkedIn search every minute."""
+    a = listing(session_factory, "A")
+
+    class Broken:
+        def search(self, **kw):
+            raise KeyError("boom")
+
+    clock = FakeClock(NOW)
+    coord = RunCoordinator(session_factory, Broken(), replace(settings, tz=TZ), clock=clock, sleep=clock.sleep)
+    assert coord.check_due() is True
+    wait_until(lambda: not coord.is_running)
+    clock.now = NOW + timedelta(minutes=1)
+    assert coord.check_due() is False
+    with session_factory() as s:
+        rows = s.exec(select(RunListing)).all()
+    assert [r.listing_id for r in rows] == [a] and "KeyError" in rows[0].error
+
+
+def test_bad_default_change_time_is_ignored(session_factory, settings):
+    a = listing(session_factory, "A")
+    with session_factory() as s:
+        save_preferences(s, replace(load_preferences(s), schedule_changed_at="yesterday"), NOW)
+    clock = FakeClock(NOW)
+    coord = RunCoordinator(session_factory, FakeSource({}), replace(settings, tz=TZ), clock=clock, sleep=clock.sleep)
+    assert coord.next_run_at() is not None
+    with session_factory() as s:
+        assert due_listings(s, NOW, TZ, *coord._default(s)) == [a]
+        save_preferences(s, replace(load_preferences(s), schedule_changed_at="2026-10-28T11:10+02:00"), NOW)
+        assert coord._default(s)[1] == datetime(2026, 10, 28, 9, 10)  # with an offset: naive UTC

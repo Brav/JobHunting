@@ -31,3 +31,10 @@ def test_readme_explains_moving_to_another_computer():
     assert "docker compose cp jobhunt.db jobhunt:/app/data/import.db" in text
     assert "jobhunt.backup restore /app/data/import.db" in text
     assert "not in the zip" in text  # the CV and the DeepL key are added again
+
+
+def test_docs_describe_per_listing_schedules():
+    readme = (ROOT / "README.md").read_text()
+    dev = (ROOT / "docs" / "development.md").read_text()
+    assert "Search schedule" in readme and "every few hours" not in readme
+    assert "every minute" in dev and "within 15 minutes" not in dev

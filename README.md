@@ -108,7 +108,8 @@ at the top of each page links back to the setup page.
   removes it and asks why; Stats sums up the reasons.
 - **All jobs** has every job, with filters. Press **?** for keyboard shortcuts, or **Focus mode** to go through new
   jobs one at a time.
-- **Listings** are your searches. Add one per kind of job and place; each runs every few hours. LinkedIn understands
+- **Listings** are your searches. Add one per kind of job and place. Each runs on the default schedule (every 4 hours
+  at first; change it in Settings → Search schedule) or at its own times, set on its form. LinkedIn understands
   quotes and AND / OR / NOT, for example `"data engineer" NOT senior`.
 - **Applying:** press **Applied** on a job, then record each step as it happens. **Stats** lists your applications,
   how long each has waited, and when to follow up. Got an email from an employer? Paste it into **Stats → Update from

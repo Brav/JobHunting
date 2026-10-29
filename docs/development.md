@@ -41,8 +41,11 @@ test asks for a fresh install (`app_factory(setup_done=False)`, `fresh_session_f
 
 ## How searches run
 
-- Every 4 hours, at 02:00, 06:00, 10:00, 14:00, 18:00 and 22:00 in the user's time zone (the one in Settings), all
-  active listings run one after another. A missed run time (restart, sleep) is caught up within 15 minutes.
+- A check every minute searches the active listings whose time has come, together in one run. Each listing runs at
+  its own times (on its form) or on the default schedule (Settings → Search schedule; until one is saved,
+  `JOBHUNT_RUN_AT` every `JOBHUNT_RUN_EVERY_HOURS`: 02:00, 06:00, 10:00, 14:00, 18:00 and 22:00), in the user's time
+  zone. A missed time (restart, sleep) runs once at the next check; a new listing, or one whose times just changed,
+  waits for its next time. A crashed run counts as an attempt, so it isn't retried every minute.
 - A job is the same job when its title and company match, whatever listing or LinkedIn ID it came from.
 - Editing a listing's keywords, location or radius makes its next run look back 7 days again.
 - Job pages are downloaded in the background: every 5 minutes, up to 15 jobs, about 15 seconds apart, paused while a
@@ -121,8 +124,8 @@ and the phone push. These environment variables are for advanced use. Set them i
 | Variable | Default | Meaning |
 |---|---|---|
 | `TZ` | `UTC` | The time zone until the user saves one in setup or Settings; after that, Settings decides |
-| `JOBHUNT_RUN_AT` | `10:00` | Anchor time for the runs (HH:MM, in the user's time zone) |
-| `JOBHUNT_RUN_EVERY_HOURS` | `4` | Hours between runs; must divide 24 |
+| `JOBHUNT_RUN_AT` | `10:00` | Start of the default schedule (HH:MM, user's time zone) until one is saved in Settings |
+| `JOBHUNT_RUN_EVERY_HOURS` | `4` | Hours between the default schedule's runs (must divide 24), until Settings has one |
 | `JOBHUNT_DB_PATH` | `/app/data/jobhunt.db` | SQLite file; the uploaded CV, the DeepL key file and backups sit beside it |
 | `JOBHUNT_RESULTS_PER_LISTING` | `100` | Max jobs fetched per listing per run |
 | `JOBHUNT_PUBLIC_URL` | `http://127.0.0.1:8765` | Where links in the phone push point |

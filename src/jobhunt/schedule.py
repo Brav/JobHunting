@@ -98,7 +98,7 @@ def from_form(choice: str, times: list[str], start: str, every: str) -> tuple[st
         start_time = parse_time(start)
         if start_time is None:
             errors.append("Use times like 08:30")
-        if not every.strip().isdecimal() or int(every) not in EVERY_CHOICES:
+        if not every.strip().isdecimal() or int(every) not in EVERY_CHOICES + (24,):  # 24: once a day, from .env
             errors.append("Choose how many hours")
         if errors:
             return None, errors

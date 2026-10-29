@@ -184,3 +184,9 @@ def test_edit_page_shows_the_listings_times(app_factory):
         c.post(f"/listings/{lid}", data={**FORM, "schedule": "times", "times": ["07:00", "19:30"]})
         page = c.get(f"/listings/{lid}/edit").text
     assert "choice: 'times'" in page and "[&#34;07:00&#34;, &#34;19:30&#34;]" in page  # escaped inside x-data="…"
+
+
+def test_listings_page_says_where_times_are_set(app_factory):
+    with TestClient(app_factory()) as c:
+        page = c.get("/listings").text
+    assert "every few hours" not in page and "Settings → Search schedule" in page

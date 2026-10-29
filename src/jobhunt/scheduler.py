@@ -1,4 +1,5 @@
-"""When runs happen: every N hours from an anchor time, catch-up after missed slots, or on demand — one at a time."""
+"""When runs happen: a check every minute searches the listings whose time has come (each at its own times, or the
+default schedule's), missed times included; or on demand. One run at a time."""
 
 import logging
 import threading
@@ -35,6 +36,18 @@ DUE_CHECK_MINUTES = 1
 def default_schedule(prefs: Preferences, settings: Settings) -> Schedule:
     """The schedule of every listing without its own: Settings', else JOBHUNT_RUN_AT every JOBHUNT_RUN_EVERY_HOURS."""
     return parse(prefs.schedule) or from_env(settings.run_at, settings.run_every_hours)
+
+
+def changed_at(text: str) -> datetime | None:
+    """When the default schedule last changed (naive UTC); unreadable text counts as never, so searching goes on."""
+    if not text:
+        return None
+    try:
+        value = datetime.fromisoformat(text)
+    except ValueError:
+        logger.warning("unreadable default schedule change time %r; ignoring it", text)
+        return None
+    return value.astimezone(UTC).replace(tzinfo=None) if value.tzinfo else value
 
 
 def due_listings(session: Session, now: datetime, tz: ZoneInfo, default: Schedule,
@@ -122,8 +135,7 @@ class RunCoordinator:
 
     def _default(self, session: Session) -> tuple[Schedule, datetime | None]:
         prefs = load_preferences(session)
-        changed = datetime.fromisoformat(prefs.schedule_changed_at) if prefs.schedule_changed_at else None
-        return default_schedule(prefs, self.settings), changed
+        return default_schedule(prefs, self.settings), changed_at(prefs.schedule_changed_at)
 
     def check_due(self) -> bool:
         """Every minute: search the listings whose time has come (missed times included), together in one run."""
@@ -203,7 +215,7 @@ class RunCoordinator:
             logger.exception("auto-close failed")
 
     def push_digest(self) -> None:
-        """The morning push (after the run nearest 10:00), only to an ntfy address the user set."""
+        """The daily push (half an hour after the default schedule starts), only to an ntfy address the user set."""
         import requests
         from jobhunt.digest import build_digest, push_digest
         try:

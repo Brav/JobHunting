@@ -81,3 +81,8 @@ def test_push_time():
     assert push_time(OWNER) == time(10, 30)
     assert push_time(parse("times:23:45,08:00")) == time(8, 30)
     assert push_time(parse("times:23:45")) == time(0, 15)
+
+
+def test_once_a_day_from_the_environment_stays_valid():
+    assert from_form("every", [], "10:00", "24") == ("every:10:00/24", [])
+    assert from_form("every", [], "10:00", "5")[1] == ["Choose how many hours"]

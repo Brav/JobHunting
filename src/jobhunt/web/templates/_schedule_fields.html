@@ -23,6 +23,7 @@
     <label>Every
       <select name="every">
         {% for n in every_choices %}<option value="{{ n }}"{% if sched.every == n | string %} selected{% endif %}>{{ n }} h</option>{% endfor %}
+        {% if sched.every == "24" %}<option value="24" selected>24 h</option>{% endif %}
       </select></label>
   </div>
   <span class="hint">More frequent searches make LinkedIn blocks more likely.</span>

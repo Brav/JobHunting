@@ -191,3 +191,19 @@ def test_saving_the_default_moves_the_push(app_factory):
     with TestClient(app) as c:
         c.post("/settings/schedule", data={"schedule": "every", "start": "06:00", "every": "6"})
     assert calls == [1]
+
+
+def test_a_once_a_day_default_shows_as_24_hours(app_factory):
+    with TestClient(app_factory(env={"JOBHUNT_RUN_EVERY_HOURS": "24"})) as c:
+        html = c.get("/settings").text
+    assert '<option value="24" selected>' in html and '<option value="1" selected>' not in html
+
+
+def test_a_bad_saved_change_time_doesnt_break_pages(app_factory):
+    from dataclasses import replace
+    from jobhunt.preferences import load_preferences, save_preferences
+    app = app_factory()
+    with app.state.session_factory() as s:
+        save_preferences(s, replace(load_preferences(s), schedule_changed_at="yesterday"), utcnow())
+    with TestClient(app) as c:
+        assert c.get("/").status_code == 200 and c.get("/listings").status_code == 200
