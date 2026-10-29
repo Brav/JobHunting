@@ -46,10 +46,14 @@ def test_translator_choice(tmp_path):
     from jobhunt.config import load_settings
     from jobhunt.translate import DeepLTranslator, NoTranslator
     from jobhunt.web.app import create_app
+    from jobhunt.deepl_key import save_key
     base = {"JOBHUNT_DB_PATH": str(tmp_path / "t.db")}
-    assert isinstance(create_app(load_settings(base), start_scheduler=False).state.translator, NoTranslator)
+    assert isinstance(create_app(load_settings(base), start_scheduler=False).state.translator._inner, NoTranslator)
     app = create_app(load_settings({**base, "DEEPL_AUTH_KEY": "abc:fx"}), start_scheduler=False)
-    assert isinstance(app.state.translator, DeepLTranslator)
+    assert isinstance(app.state.translator._inner, DeepLTranslator)
+    save_key(tmp_path, "saved:fx")  # pasted in Settings, beside the database
+    app = create_app(load_settings(base), start_scheduler=False)
+    assert isinstance(app.state.translator._inner, DeepLTranslator)
 
 
 def test_status_poll_refreshes_the_page_when_the_run_has_finished(app_factory):
