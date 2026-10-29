@@ -103,3 +103,34 @@ def test_app_start_adopts_the_legacy_profile(tmp_path, app_factory):
         assert profile_saved(s) is True
         assert load_profile(s) == LEGACY_PROFILE
         assert len(s.exec(select(Job)).all()) == 1
+
+
+# --- final review fixes ---
+
+def test_skipping_then_adding_a_search_survives_a_restart(app_factory):
+    """A new user who skipped setup keeps their own (empty) profile after a restart, never the old built-in one."""
+    from fastapi.testclient import TestClient
+    app = app_factory(setup_done=False)
+    with TestClient(app) as c:
+        c.post("/setup/skip")
+    with app.state.session_factory() as s:
+        s.add(Listing(name="A", keywords="python", location="Berlin"))
+        s.commit()
+    restarted = app_factory(setup_done=False)
+    with restarted.state.session_factory() as s:
+        assert setup_state(s) == "skipped" and not profile_saved(s)
+    assert restarted.state.settings.tz.key == "UTC"
+
+
+def test_upgrade_rechecks_jobs_left_on_the_setup_reason(tmp_path, app_factory):
+    """Jobs re-checked at start (older rules) before the profile was adopted get the adopted profile's verdict."""
+    from jobhunt.eligibility import RULES_VERSION
+    engine = make_engine(tmp_path / "web.db")
+    init_db(engine)
+    with make_session_factory(engine)() as s:
+        add_job(s, location="London, England, UK", workplace="remote", eligibility_rules=RULES_VERSION - 1)
+    engine.dispose()
+    app = app_factory(setup_done=False)
+    with app.state.session_factory() as s:
+        job = s.exec(select(Job)).one()
+        assert job.eligibility == "not_eligible" and SETUP_REASON not in json.loads(job.eligibility_reasons)

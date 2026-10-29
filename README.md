@@ -42,25 +42,35 @@ The tracker runs inside Docker Desktop, a free app that runs small self-containe
 Open Docker Desktop and wait until it says the engine is running. In Docker Desktop's settings, turn on **Start Docker
 Desktop when you sign in**, so the tracker keeps running after a restart.
 
-### 2. Make a folder and download one file
+### 2. Make a folder and open a terminal in it
 
-1. Make a new folder, for example **Job tracker** in your Documents.
-2. Open this link: https://raw.githubusercontent.com/Brav/JobHunting/main/install/docker-compose.yml
-3. Save the page into your new folder as `docker-compose.yml` (in most browsers: right-click → **Save Page As…** or
-   press Ctrl+S, or ⌘S on a Mac). On Windows, check the name doesn't end in `.txt`.
-
-This file (`install/docker-compose.yml` in this project) tells Docker which program to run and where to keep its data.
-
-### 3. Open a terminal in that folder
+Make a new folder, for example **Job tracker** in your Documents. Then open a terminal in that folder:
 
 - **Windows:** open the folder in File Explorer, click the address bar, type `cmd` and press Enter.
 - **Mac:** in Finder, right-click the folder and choose **New Terminal at Folder**. (If you don't see it: open
   **Terminal**, type `cd ` with a space after it, drag the folder into the window and press Return.)
 - **Linux:** right-click inside the folder and choose **Open in Terminal**.
 
+### 3. Download the tracker's file
+
+Copy this line into the terminal and press Enter:
+
+```bash
+curl -L -o docker-compose.yml https://raw.githubusercontent.com/Brav/JobHunting/main/install/docker-compose.yml
+```
+
+On Linux without `curl`, use this instead:
+
+```bash
+wget -O docker-compose.yml https://raw.githubusercontent.com/Brav/JobHunting/main/install/docker-compose.yml
+```
+
+This saves `docker-compose.yml` (the file `install/docker-compose.yml` in this project) into your folder. It tells
+Docker which program to run and where to keep its data.
+
 ### 4. Start the tracker
 
-Type this in the terminal and press Enter:
+In the same terminal, type this and press Enter:
 
 ```bash
 docker compose up -d
@@ -121,7 +131,7 @@ at the top of each page links back to the setup page.
 
 ## Update to a new version
 
-Open a terminal in your **Job tracker** folder (as in step 3 above) and run these two commands:
+Open a terminal in your **Job tracker** folder (as in step 2 above) and run these two commands:
 
 ```bash
 docker compose pull
@@ -134,10 +144,25 @@ update.)
 ## Back up, or move to another computer
 
 The tracker backs itself up every night and keeps the last 14 copies. To keep a copy of your own, open **Settings →
-Backups and export** and download everything as a zip; the CSV files open in any spreadsheet.
+Backups and export** and download the zip. It holds `jobhunt.db` (your jobs, applications, searches and settings) and
+two CSV files that open in any spreadsheet. Your CV and your DeepL key are not in the zip: add them again in Settings
+after a move.
 
-To move to another computer, install the tracker there, then restore your copy with the commands in
-[docs/development.md](docs/development.md#backups-and-restore).
+To move to another computer:
+
+1. On the old computer, download the zip and unzip it.
+2. On the new computer, install the tracker (steps 1 to 4 above) and press **Skip for now** on the setup page.
+3. Copy `jobhunt.db` from the unzipped folder into the new **Job tracker** folder. Open a terminal in that folder (as
+   in step 2) and run these four commands, one after the other:
+
+   ```bash
+   docker compose cp jobhunt.db jobhunt:/app/data/import.db
+   docker compose stop
+   docker compose run --rm jobhunt /app/.venv/bin/python -m jobhunt.backup restore /app/data/import.db
+   docker compose start
+   ```
+
+4. Open http://localhost:8765. Your jobs are back; add your CV and DeepL key again in Settings.
 
 ## Stop it or remove it
 
@@ -149,6 +174,8 @@ To move to another computer, install the tracker there, then restore your copy w
 
 - **"Cannot connect to the Docker daemon", or `docker` isn't found:** Docker Desktop isn't running. Open it, wait
   until the engine is running, and try again.
+- **"no configuration file provided":** the terminal isn't in the folder with `docker-compose.yml`, or the download
+  didn't work. Open the terminal in your **Job tracker** folder (step 2) and run the download command again (step 3).
 - **The page doesn't open right after starting:** wait a minute and reload; the first start takes a moment.
 - **"Port 8765 is already allocated":** something else uses that port. Open `docker-compose.yml` in a text editor,
   change `127.0.0.1:8765:8000` to `127.0.0.1:8766:8000`, run `docker compose up -d` again, and open

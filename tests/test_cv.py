@@ -113,9 +113,11 @@ def test_wrong_files_refused(tmp_path, session_factory, name, content):
     assert not (tmp_path / "cv").exists() or not any((tmp_path / "cv").iterdir())
 
 
-def test_over_5_mb_refused(tmp_path, session_factory):
+@pytest.mark.parametrize("name, start", [("cv.pdf", PDF), ("cv.docx", b"PK\x03\x04")])
+def test_over_5_mb_refused(tmp_path, session_factory, name, start):
+    # The routes read 5 MB + 1 byte: a big Word file arrives cut off, no longer a readable zip.
     with session_factory() as s, pytest.raises(CVError, match="^The CV is larger than 5 MB$"):
-        store_upload(s, tmp_path, "cv.pdf", PDF + b"0" * MAX_CV_BYTES, NOW)
+        store_upload(s, tmp_path, name, start + b"0" * MAX_CV_BYTES, NOW)
 
 
 def test_replacing_a_pdf_with_a_docx_removes_the_pdf(tmp_path, session_factory):

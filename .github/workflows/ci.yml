@@ -39,6 +39,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/brav/jobhunting
+          flavor: latest=false  # only main moves latest: a tag on an older commit must not roll installs back
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}

@@ -139,11 +139,12 @@ def check_upload(filename: str, content: bytes) -> tuple[str, str]:
     """(the file's own name, its extension) when it is a PDF or .docx CV the app can keep; else CVError."""
     name = Path(filename.replace("\\", "/")).name  # the file's own name, whatever folders the browser sent
     ext = Path(name).suffix.lower()
-    if (ext not in (".pdf", ".docx") or (ext == ".pdf" and not content.startswith(b"%PDF"))
-            or (ext == ".docx" and not _is_docx(content))):
+    if ext not in (".pdf", ".docx"):
         raise CVError(_WRONG_FILE)
-    if len(content) > MAX_CV_BYTES:
+    if len(content) > MAX_CV_BYTES:  # before the content: a big Word file arrives cut off, no longer a zip
         raise CVError(_TOO_BIG)
+    if (ext == ".pdf" and not content.startswith(b"%PDF")) or (ext == ".docx" and not _is_docx(content)):
+        raise CVError(_WRONG_FILE)
     return name, ext
 
 

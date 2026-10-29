@@ -1,6 +1,9 @@
 # Job tracker. Put this file in a folder of its own, open a terminal in that folder and run:
 #   docker compose up -d
 # then open http://localhost:8765 in your browser. The guide: https://github.com/Brav/JobHunting#readme
+# A fixed name, so your data stays yours whatever this folder is called.
+name: jobhunt
+
 services:
   jobhunt:
     image: ghcr.io/brav/jobhunting:latest

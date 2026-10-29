@@ -11,6 +11,7 @@ from jobhunt.eligibility import LEGACY_PROFILE, load_profile, profile_saved, sav
 from jobhunt.models import Job, Listing, Setting
 
 SKIPPED_KEY = "setup_skipped"
+NEW_INSTALL_KEY = "new_install"  # set on a database's first start: it was never an install from before setup
 
 
 def setup_state(session: Session) -> str:
@@ -21,10 +22,16 @@ def setup_state(session: Session) -> str:
 
 
 def adopt_legacy_profile(session: Session, now: datetime) -> bool:
-    """A database from before setup (it has jobs or listings, no profile) keeps the old built-in profile as its own."""
-    if profile_saved(session):
+    """A database from before setup (it has jobs or listings, no profile) keeps the old built-in profile as its own.
+
+    A new install is marked on its first start, so its own jobs and listings (added after Skip for now) never make it
+    look like an old database later.
+    """
+    if profile_saved(session) or session.get(Setting, NEW_INSTALL_KEY) is not None:
         return False
     if session.exec(select(Job.id).limit(1)).first() is None and session.exec(select(Listing.id).limit(1)).first() is None:
+        session.add(Setting(key=NEW_INSTALL_KEY, value=now.isoformat(timespec="minutes"), updated_at=now))
+        session.commit()
         return False
     save_profile(session, LEGACY_PROFILE, now)
     return True

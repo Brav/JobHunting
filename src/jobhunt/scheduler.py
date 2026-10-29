@@ -96,8 +96,8 @@ class RunCoordinator:
         if trigger != "manual" and self._paused():
             logger.info("searches are paused; %s run skipped", trigger)
             return False
-        if trigger != "manual" and not self._has_listings():
-            logger.info("no active listings yet; %s run skipped", trigger)  # a new install: nothing to search
+        if not self._has_listings():  # a new install: nothing to search, and no empty "0 of 0" run on the report
+            logger.info("no active listings yet; %s run skipped", trigger)
             return False
         if not self._lock.acquire(blocking=False):
             logger.info("a run is already in progress; %s trigger ignored", trigger)

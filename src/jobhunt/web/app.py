@@ -29,7 +29,7 @@ from jobhunt.web import setup
 from jobhunt.web.common import render
 
 
-REDIRECT_EXEMPT = ("/setup", "/static/", "/capture", "/data/")  # reachable while setup is pending
+REDIRECT_EXEMPT = ("/setup", "/static/", "/capture", "/data/", "/runs/")  # reachable while setup is pending
 
 
 def make_translator(key: str) -> Translator:
@@ -59,7 +59,9 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     with session_factory() as s:
         from jobhunt.setup import adopt_legacy_profile, time_zone
         from jobhunt.timeutil import utcnow
-        adopt_legacy_profile(s, utcnow())
+        if adopt_legacy_profile(s, utcnow()):
+            from jobhunt import checks
+            checks.refresh_all(s)  # jobs re-checked at start before the profile existed got "Finish setup"
         settings = replace(settings, tz=time_zone(s, settings.tz))  # the user's zone; TZ only until setup
     _default_skills_from_cv(session_factory, settings)
     if source is None:
@@ -111,8 +113,8 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     @app.middleware("http")
     async def setup_first(request: Request, call_next):
         """A new install opens on the setup page until it's saved or skipped (the bookmarklet and downloads still work)."""
-        if (app.state.setup_pending and request.method == "GET"
-                and not request.url.path.startswith(REDIRECT_EXEMPT)):
+        if (app.state.setup_pending and request.method == "GET" and request.headers.get("HX-Request") != "true"
+                and not request.url.path.startswith(REDIRECT_EXEMPT)):  # htmx fetches parts of a page, never pages
             with session_factory() as s:
                 app.state.setup_pending = setup_state(s) == "pending"
             if app.state.setup_pending:

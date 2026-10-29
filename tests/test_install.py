@@ -28,3 +28,12 @@ def test_ci_tests_then_publishes_both_architectures():
     for needle in ("uv run pytest", "linux/amd64,linux/arm64", "ghcr.io/brav/jobhunting", "packages: write",
                    "tags:", "v*", "needs: test"):
         assert needle in text, needle
+
+
+def test_install_compose_has_a_fixed_project_name():
+    """The data volume must not depend on the folder's name: renaming the folder mustn't look like losing the data."""
+    assert "\nname: jobhunt\n" in "\n" + (ROOT / "install" / "docker-compose.yml").read_text()
+
+
+def test_version_tags_never_move_latest():
+    assert "latest=false" in (ROOT / ".github" / "workflows" / "ci.yml").read_text()

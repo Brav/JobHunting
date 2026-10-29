@@ -153,3 +153,15 @@ def test_duplicate_first_search_saves_nothing(app_factory):
     assert r.status_code == 422 and "A listing with this name already exists." in r.text
     with app.state.session_factory() as s:
         assert load_profile(s) == LEGACY_PROFILE
+
+
+def test_run_now_while_setup_is_pending_keeps_the_page_whole(app_factory):
+    """The header's Run now on the setup page: no empty run, and its status poll isn't redirected into the header."""
+    from jobhunt.models import Run
+    app = app_factory(setup_done=False)
+    with TestClient(app) as c:
+        assert c.post("/runs").status_code == 200
+        r = c.get("/runs/status", headers={"HX-Request": "true"}, follow_redirects=False)
+        assert r.status_code == 200 and "Welcome" not in r.text
+    with app.state.session_factory() as s:
+        assert s.exec(select(Run)).all() == []
