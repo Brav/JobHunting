@@ -135,8 +135,8 @@ def _is_docx(content: bytes) -> bool:
         return False
 
 
-def store_upload(session: Session, data_dir: Path, filename: str, content: bytes, now: datetime) -> Path:
-    """Keep an uploaded CV as data/cv/cv.pdf or cv.docx, byte for byte, replacing any earlier upload."""
+def check_upload(filename: str, content: bytes) -> tuple[str, str]:
+    """(the file's own name, its extension) when it is a PDF or .docx CV the app can keep; else CVError."""
     name = Path(filename.replace("\\", "/")).name  # the file's own name, whatever folders the browser sent
     ext = Path(name).suffix.lower()
     if (ext not in (".pdf", ".docx") or (ext == ".pdf" and not content.startswith(b"%PDF"))
@@ -144,6 +144,12 @@ def store_upload(session: Session, data_dir: Path, filename: str, content: bytes
         raise CVError(_WRONG_FILE)
     if len(content) > MAX_CV_BYTES:
         raise CVError(_TOO_BIG)
+    return name, ext
+
+
+def store_upload(session: Session, data_dir: Path, filename: str, content: bytes, now: datetime) -> Path:
+    """Keep an uploaded CV as data/cv/cv.pdf or cv.docx, byte for byte, replacing any earlier upload."""
+    name, ext = check_upload(filename, content)
     folder = data_dir / "cv"
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / f"cv{ext}"

@@ -22,6 +22,7 @@ from jobhunt.prompts import KINDS as PROMPT_KINDS
 from jobhunt.sources.feeds import SOURCE_LABELS
 from jobhunt.language import language_name
 from jobhunt.reports import run_summary
+from jobhunt.setup import setup_state
 from jobhunt.timeutil import local_date, to_local, utcnow
 from jobhunt.workplace import WORKPLACE_LABELS
 
@@ -127,13 +128,14 @@ def render(request: Request, name: str, status_code: int = 200, **ctx):
         prefs = load_preferences(s)
         feed_errors = {name: {**e, "since": datetime.fromisoformat(e["since"])}
                        for name, e in load_feed_errors(s).items() if name in prefs.sources}
+        setup_banner = request.url.path != "/setup" and setup_state(s) != "done"
     now = utcnow()
     paused = prefs.paused_until if is_paused(prefs, local_date(now, tz)) else ""
     base = {"tz": tz, "now": now, "today": local_date(now, tz), "summary": summary,
             "age": lambda job: job_age(job, now, tz),
             "running": coordinator.is_running, "next_run": coordinator.next_run_at(),
             "results_cap": request.app.state.settings.results_per_listing, "paused_until": paused,
-            "feed_errors": feed_errors}
+            "feed_errors": feed_errors, "setup_banner": setup_banner}
     return templates.TemplateResponse(request, name, {**base, **ctx}, status_code=status_code)
 
 

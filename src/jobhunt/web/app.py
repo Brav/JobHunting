@@ -11,20 +11,25 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from jobhunt.backup import ensure_recent_backup, hold_app_lock
 from jobhunt.config import Settings
 from jobhunt.db import init_db, make_engine, make_session_factory
 from jobhunt.scheduler import RunCoordinator
+from jobhunt.setup import setup_state
 from jobhunt.job_listing import clear_service_translation_errors
 from jobhunt.sources.base import JobPage, JobSource
 from jobhunt.deepl_key import load_key
 from jobhunt.translate import DeepLTranslator, NoTranslator, SwitchableTranslator, Translator
 from jobhunt.web import applications, blocks, capture, companies, contacts, cv, data, digest, eligibility, email_update, sent, focus, job, listings, report, stats, tracker
 from jobhunt.web import settings as settings_page  # `settings` is create_app's Settings
+from jobhunt.web import setup
 from jobhunt.web.common import render
+
+
+REDIRECT_EXEMPT = ("/setup", "/static/", "/capture", "/data/")  # reachable while setup is pending
 
 
 def make_translator(key: str) -> Translator:
@@ -100,6 +105,20 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
                 _app.state.app_lock.close()
 
     app = FastAPI(title="Job tracker", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    with session_factory() as s:
+        app.state.setup_pending = setup_state(s) == "pending"
+
+    @app.middleware("http")
+    async def setup_first(request: Request, call_next):
+        """A new install opens on the setup page until it's saved or skipped (the bookmarklet and downloads still work)."""
+        if (app.state.setup_pending and request.method == "GET"
+                and not request.url.path.startswith(REDIRECT_EXEMPT)):
+            with session_factory() as s:
+                app.state.setup_pending = setup_state(s) == "pending"
+            if app.state.setup_pending:
+                return RedirectResponse("/setup", status_code=303)
+        return await call_next(request)
+
     allowed_hosts = {"localhost", "127.0.0.1", "::1", "testserver", urlsplit(settings.public_url).hostname or ""}
 
     @app.middleware("http")
@@ -144,6 +163,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     app.include_router(capture.router)
     app.include_router(email_update.router)
     app.include_router(settings_page.router)
+    app.include_router(setup.router)
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
     @app.post("/runs", response_class=HTMLResponse)

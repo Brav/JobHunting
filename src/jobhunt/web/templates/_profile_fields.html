@@ -1,0 +1,31 @@
+{# The eligibility profile's fields: Settings and the setup page. #}
+<fieldset><legend>Where you live</legend>
+  <label>Country
+    <select name="home_country" required>
+      <option value=""{% if not profile.home_country %} selected{% endif %}>Choose your country</option>
+      {% for code, name in countries %}<option value="{{ code }}"{% if code == profile.home_country %} selected{% endif %}>{{ name }}</option>{% endfor %}
+    </select></label>
+  <label>Time zone
+    <input name="time_zone" list="zones" value="{{ '' if detect_zone else profile.time_zone }}"{% if detect_zone %} data-detect placeholder="{{ profile.time_zone }}"{% endif %} autocomplete="off" required>
+    <datalist id="zones">{% for z in zones %}<option value="{{ z }}">{% endfor %}</datalist></label>
+</fieldset>
+<fieldset><legend>Where you may work</legend>
+  {% for value, label in regions %}
+  <label class="check"><input type="checkbox" name="work_rights" value="{{ value }}"{% if value in profile.work_rights %} checked{% endif %}> {{ label }}</label>
+  {% endfor %}
+</fieldset>
+<fieldset><legend>Where you'd move for a job</legend>
+  {% for value, label in regions %}
+  <label class="check"><input type="checkbox" name="relocate_to" value="{{ value }}"{% if value in profile.relocate_to %} checked{% endif %}> {{ label }}</label>
+  {% endfor %}
+</fieldset>
+<fieldset><legend>Languages you work in</legend>
+  {% for value, label in language_choices %}
+  <label class="check"><input type="checkbox" name="languages" value="{{ value }}"{% if value in languages %} checked{% endif %}> {{ label }}</label>
+  {% endfor %}
+</fieldset>
+<fieldset><legend>Contracts you'd accept</legend>
+  {% for value, label in contract_choices %}
+  <label class="check"><input type="checkbox" name="contracts" value="{{ value }}"{% if value in profile.contracts %} checked{% endif %}> {{ label }}</label>
+  {% endfor %}
+</fieldset>

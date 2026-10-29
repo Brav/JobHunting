@@ -35,6 +35,7 @@
     <a class="settings-link" href="/settings" aria-label="Settings"{% if active == "settings" %} aria-current="page"{% endif %}>{{ icon("settings") }}</a>
   </header>
   {% if paused_until %}<p class="paused-banner" role="status">Searches paused until {{ paused_until }} — <a href="/settings#preferences">change</a></p>{% endif %}
+  {% if setup_banner %}<p class="paused-banner" role="status">Finish setup so the app can tell which jobs you can take — <a href="/setup">Finish setup</a></p>{% endif %}
   <main class="{% block main_class %}page{% endblock %}">
     {% block content %}{% endblock %}
   </main>

@@ -79,3 +79,10 @@ def test_listing_shows_when_its_search_hit_the_limit(app_factory):
         app.state.coordinator.run_blocking("manual")
         page = c.get("/listings").text
     assert page.count("hit the limit of 100 jobs") == 1
+
+
+def test_location_placeholder_is_neutral(app_factory):
+    from fastapi.testclient import TestClient
+    with TestClient(app_factory()) as c:
+        html = c.get("/listings").text
+    assert 'placeholder="City, Country"' in html and "Belgrade" not in html

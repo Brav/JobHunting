@@ -9,7 +9,7 @@
   <span class="hint">LinkedIn understands quotes and AND / OR / NOT, e.g. "data engineer" NOT senior</span>
   {% if errors.keywords %}<span class="field-error">{{ errors.keywords }}</span>{% endif %}
   <label>Location
-    <input name="location" value="{{ values.location }}" placeholder="Belgrade, Serbia" required>
+    <input name="location" value="{{ values.location }}" placeholder="City, Country" required>
   </label>
   {% if errors.location %}<span class="field-error">{{ errors.location }}</span>{% endif %}
   <label>Radius (km)

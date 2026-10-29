@@ -114,10 +114,9 @@ def upload_cv(request: Request, cv: UploadFile = File(...)):
     return RedirectResponse("/settings?cv=saved", status_code=303)
 
 
-@router.post("/settings", response_class=HTMLResponse)
-def save_settings(request: Request, work_rights: list[str] = Form([]), home_country: str = Form(""),
-                  time_zone: str = Form(""), relocate_to: list[str] = Form([]), languages: list[str] = Form([]),
-                  contracts: list[str] = Form([])):
+def profile_from_form(work_rights: list[str], home_country: str, time_zone: str, relocate_to: list[str],
+                      languages: list[str], contracts: list[str]) -> tuple[Profile, list[str]]:
+    """The profile the form describes, and what's wrong with it (Settings and the setup page share this)."""
     regions = dict(REGION_CHOICES)
     spoken = [code for choice in languages for code in (SR_GROUP if choice == "sr-group" else (choice,))]
     profile = Profile(
@@ -128,19 +127,34 @@ def save_settings(request: Request, work_rights: list[str] = Form([]), home_coun
     errors = []
     if not profile.languages:
         errors.append("Pick at least one language")
-    if profile.home_country not in COUNTRIES:
+    if not profile.home_country:
+        errors.append("Choose your country")
+    elif profile.home_country not in COUNTRIES:
         errors.append("Unknown country")
     try:
         ZoneInfo(profile.time_zone)
     except Exception:
         errors.append("Unknown time zone")
-    if errors:
-        return _page(request, profile, errors, status_code=422)
+    return profile, errors
+
+
+def apply_profile(request: Request, profile: Profile) -> int:
+    """Save the profile, check every job with it, and move to its time zone; returns how many jobs were checked."""
     with session(request) as s:
         save_profile(s, profile, utcnow())
         checked = refresh_all(s, profile)
     apply_time_zone(request.app, ZoneInfo(profile.time_zone))
-    return RedirectResponse(f"/settings?saved={checked}", status_code=303)
+    return checked
+
+
+@router.post("/settings", response_class=HTMLResponse)
+def save_settings(request: Request, work_rights: list[str] = Form([]), home_country: str = Form(""),
+                  time_zone: str = Form(""), relocate_to: list[str] = Form([]), languages: list[str] = Form([]),
+                  contracts: list[str] = Form([])):
+    profile, errors = profile_from_form(work_rights, home_country, time_zone, relocate_to, languages, contracts)
+    if errors:
+        return _page(request, profile, errors, status_code=422)
+    return RedirectResponse(f"/settings?saved={apply_profile(request, profile)}", status_code=303)
 
 
 def _int(value: str, low: int, high: int, message: str, errors: list[str], default: int) -> int:

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Set up{% endblock %}
+{% block content %}
+<h1>{% if done %}Your setup{% else %}Welcome — let's set up the tracker{% endif %}</h1>
+<p class="muted">The app uses this to tell which jobs you can take. Everything stays on this computer, and you can
+  change it later in Settings.</p>
+{% if errors %}<ul class="field-error" role="alert">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+
+<form class="stack settings-form setup-form" method="post" action="/setup" enctype="multipart/form-data">
+  <fieldset><legend>Your CV</legend>
+    {% if cv.origin == "env" %}
+    <p>Using the CV from your CV folder (set in .env): {{ cv.name }}</p>
+    {% else %}
+    {% if cv.path %}<p>Current CV: <strong>{{ cv.name }}</strong>. Choose a file only to replace it.</p>{% endif %}
+    <label>PDF or Word (.docx), up to 5 MB — optional, you can add it later
+      <input type="file" name="cv" accept=".pdf,.docx"></label>
+    {% if cv_error %}<span class="field-error" role="alert">{{ cv_error }}</span>{% endif %}
+    <span class="hint">The prompts for Claude and your skills list are built from it.</span>
+    {% endif %}
+  </fieldset>
+
+  {% include "_profile_fields.html" %}
+
+  <fieldset><legend>First search (optional)</legend>
+    <span class="hint">The app searches LinkedIn for these every few hours. You can add more searches later under Listings.</span>
+    <label>Keywords
+      <input name="keywords" value="{{ search.keywords }}" placeholder="data engineer"></label>
+    <span class="hint">LinkedIn understands quotes and AND / OR / NOT, e.g. "data engineer" NOT senior</span>
+    {% if search_errors.keywords %}<span class="field-error">{{ search_errors.keywords }}</span>{% endif %}
+    {% if search_errors.name %}<span class="field-error">{{ search_errors.name }}</span>{% endif %}
+    <label>Location
+      <input name="location" value="{{ search.location }}" placeholder="City, Country"></label>
+    {% if search_errors.location %}<span class="field-error">{{ search_errors.location }}</span>{% endif %}
+    <label>Radius (km)
+      <input name="radius_km" type="number" min="0" max="200" value="{{ search.radius_km }}"></label>
+    {% if search_errors.radius_km %}<span class="field-error">{{ search_errors.radius_km }}</span>{% endif %}
+  </fieldset>
+
+  <div><button class="btn primary" type="submit">Save and start</button></div>
+</form>
+{% if pending %}
+<form method="post" action="/setup/skip">
+  <button class="btn ghost" type="submit">Skip for now</button>
+  <span class="hint">Until you finish, every job is marked Check.</span>
+</form>
+{% endif %}
+{% if detect_zone %}
+<script>
+  (function () {
+    var input = document.querySelector("input[data-detect]");
+    try {
+      var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (input && !input.value && zone) input.value = zone;
+    } catch (e) { /* the placeholder (the server's zone) stays */ }
+  })();
+</script>
+{% endif %}
+{% endblock %}
