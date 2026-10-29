@@ -1,158 +1,168 @@
 # Job tracker
 
-Searches LinkedIn every 4 hours for each of your saved searches ("listings") and shows the new jobs in a local
-dashboard at http://localhost:8765. Each job appears once; you can mark jobs Interested, Applied or Hidden, and get a
-ready-made prompt for tailoring your CV to any job in Claude.ai.
+A job search assistant that runs on your own computer. Every few hours it searches LinkedIn (and a few remote-job
+sites) for the jobs you describe, shows each job once, and tells you which ones you can actually take: where you're
+allowed to work, the languages you speak and the contracts you accept. You save, hide and apply from one place, and
+it keeps track of your applications.
 
-## Prerequisites
+Nothing is uploaded anywhere: your jobs, your CV and your notes stay on your computer.
 
-- [uv](https://docs.astral.sh/uv/): `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- Docker with Compose v2 (`docker compose version` should print v2.x).
+![The day's new jobs](docs/images/report.png)
 
-## Run it (Docker)
+## What you get
 
-```bash
-cp .env.example .env    # then set JOBHUNT_CV_DIR and JOBHUNT_CV_NAME to your CV
-mkdir -p data
-docker compose up -d --build
-```
+- **A daily report** of the new jobs, each marked Eligible, Relocate, Check or Not eligible, with the sentence that
+  decided it.
+- **All jobs** with filters (remote, salary, eligibility, language and more), a reading pane and keyboard shortcuts.
+- **Applications**: mark a job Applied, record each step (HR interview, technical interview, offer…), get reminded to
+  follow up, and see your progress in Stats.
+- **Ready-made prompts for Claude** to tailor your CV, write a cover letter or a follow-up email, ask for a referral or
+  prepare for an interview.
+- **Translations** of non-English jobs (with a free DeepL key), salaries shown as yearly euros, warning signs for
+  ghost jobs and scams, and a short daily digest you can get on your phone.
 
-Open http://localhost:8765, add a listing on the **Listings** page, and press **Run now** to try it straight away.
-The container restarts on its own after reboots and crashes. The database lives in `data/jobhunt.db`.
+![A job open in All jobs](docs/images/jobs.png)
 
-Logs: `docker compose logs -f jobhunt`
+## Install
 
-After changing the code: `docker compose up -d --build`
+You install it once; after that it starts by itself whenever your computer and Docker Desktop are running. It takes
+about 15 minutes, most of it waiting for downloads.
 
-## How searches run
+### 1. Install Docker Desktop
 
-- Every 4 hours at 02:00, 06:00, 10:00, 14:00, 18:00 and 22:00 (Belgrade time), all active listings run one after
-  another. If a run time is missed (restart, sleep), the app catches up within 15 minutes.
-- A job is the same job when its title and company match, whatever listing or LinkedIn ID it came from. It shows up
-  once, under the listing that found it first, on the day it was first found.
-- Editing a listing's keywords, location or radius makes its next run look back 7 days again.
+The tracker runs inside Docker Desktop, a free app that runs small self-contained programs.
 
-## Job pages and translation
+- **Windows:** download Docker Desktop from https://www.docker.com/products/docker-desktop/ and run the installer.
+  Restart the computer if it asks you to.
+- **Mac:** download Docker Desktop from the same page. Pick **Apple chip** or **Intel chip** (Apple menu →
+  **About This Mac** shows which you have), open the downloaded file and drag Docker into **Applications**.
+- **Linux:** install Docker Desktop for Linux (https://docs.docker.com/desktop/setup/install/linux/) or Docker Engine
+  with the Compose plugin.
 
-Click a job's title to open its page in the app: the whole LinkedIn listing (details box and full description),
-your status buttons, **CV prompt** and **Open on LinkedIn**.
+Open Docker Desktop and wait until it says the engine is running. In Docker Desktop's settings, turn on **Start Docker
+Desktop when you sign in**, so the tracker keeps running after a restart.
 
-- Listings are downloaded in the background: every 5 minutes, up to 15 jobs, about 15 seconds apart, paused while
-  a search runs. If LinkedIn blocks a download, the app waits 30 minutes.
-- Each listing's language is detected on this computer. Non-English jobs show a tag such as `German`
-  (Serbian, Croatian and Bosnian show as `Serbian/Croatian`).
-- With a DeepL key, non-English titles are translated in the background and descriptions when you open the job
-  (with **Show original**). That keeps you within DeepL's free 500,000 characters a month.
+### 2. Make a folder and download one file
 
-To enable translation, create a free DeepL API account (https://www.deepl.com/pro-api), copy the key into `.env`,
-then restart:
+1. Make a new folder, for example **Job tracker** in your Documents.
+2. Open this link: https://raw.githubusercontent.com/Brav/JobHunting/main/install/docker-compose.yml
+3. Save the page into your new folder as `docker-compose.yml` (in most browsers: right-click → **Save Page As…** or
+   press Ctrl+S, or ⌘S on a Mac). On Windows, check the name doesn't end in `.txt`.
 
-```
-DEEPL_AUTH_KEY=your-key:fx
-```
+This file (`install/docker-compose.yml` in this project) tells Docker which program to run and where to keep its data.
+
+### 3. Open a terminal in that folder
+
+- **Windows:** open the folder in File Explorer, click the address bar, type `cmd` and press Enter.
+- **Mac:** in Finder, right-click the folder and choose **New Terminal at Folder**. (If you don't see it: open
+  **Terminal**, type `cd ` with a space after it, drag the folder into the window and press Return.)
+- **Linux:** right-click inside the folder and choose **Open in Terminal**.
+
+### 4. Start the tracker
+
+Type this in the terminal and press Enter:
 
 ```bash
 docker compose up -d
 ```
 
-## Tailor your CV
+The first time, Docker downloads the tracker (a few minutes). When it finishes, the terminal shows that the job
+tracker started. You can close the terminal.
 
-Every job has a **CV prompt** button. It opens a page with a prompt containing tailoring rules, the job's description
-(fetched from LinkedIn the first time) and the text of your CV. Press **Copy prompt**, open Claude.ai and paste it.
+### 5. Open it
 
-Your original CV is never modified: its folder is mounted into the container read-only, and the app only reads
-the file. Set its location in `.env`:
+Open http://localhost:8765 in your browser. Bookmark it: that's where the tracker lives from now on.
 
-```
-JOBHUNT_CV_DIR=/home/you/Documents/Job Hunting
-JOBHUNT_CV_NAME=CV.pdf
-```
+## First start: the setup page
 
-Replacing the CV with a newer version (same name) takes effect immediately; if the file is missing, the CV prompt
-page says where it looked, and the searches keep running.
+![The setup page](docs/images/setup.png)
 
-## Backups and restore
+The first time you open the tracker it shows a setup page. Fill it in once; you can change everything later in
+**Settings** (the gear icon, top right).
 
-The app copies its database to `data/backups` every night at 03:30 and when it starts after a day without one, keeping
-the newest 14; **Settings → Backups and export** makes one now and downloads everything as a zip or CSV.
+- **Your CV** (optional): a PDF or Word file. The tracker keeps a copy and never changes it. The prompts for Claude
+  and your skills list are made from it.
+- **Where you live:** your country, and your time zone (filled in from your computer; correct it if it's wrong).
+- **Where you may work:** the places where you're allowed to work, for example the EU if you're an EU citizen.
+- **Where you'd move for a job:** places you'd relocate to.
+- **Languages you work in** and **contracts you'd accept** (employment, contractor, employer of record).
+- **First search** (optional): what to search for and where, for example `data engineer` in `Berlin, Germany`. The
+  first search starts as soon as you press **Save and start**.
 
-To restore a backup (the current database is kept next to it as `jobhunt.db.before-restore-…`):
+**Skip for now** opens the tracker straight away. Until you finish setup, every job is marked Check, and a reminder
+at the top of each page links back to the setup page.
 
-```bash
-docker compose stop
-docker compose run --rm jobhunt /app/.venv/bin/python -m jobhunt.backup restore data/backups/<file>
-docker compose start
-```
+## Everyday use
 
-The restore refuses while the app is running.
+- **Report** shows the jobs found today. Click a job to read it on the right. **Save** keeps it for later, **Hide**
+  removes it and asks why; Stats sums up the reasons.
+- **All jobs** has every job, with filters. Press **?** for keyboard shortcuts, or **Focus mode** to go through new
+  jobs one at a time.
+- **Listings** are your searches. Add one per kind of job and place; each runs every few hours. LinkedIn understands
+  quotes and AND / OR / NOT, for example `"data engineer" NOT senior`.
+- **Applying:** press **Applied** on a job, then record each step as it happens. **Stats** lists your applications,
+  how long each has waited, and when to follow up. Got an email from an employer? Paste it into **Stats → Update from
+  an email** and the tracker suggests the next step.
+- **Prompts for Claude:** on a job, **CV prompt** (and the links next to it: interview preparation, follow-up email,
+  referral request, cover letter) opens a ready-made prompt with the job and your CV. Copy it and paste it into
+  Claude.ai.
+- **Jobs from other sites:** on **All jobs**, **+ Add a job** gives you a bookmark button. Drag it to your browser's
+  bookmarks bar; on any job page, click it and the job is added for you to check and save.
+- **More job sites:** Settings → Preferences turns on Remote OK, Himalayas and Hacker News "Who is hiring".
+  **Companies** lets you watch a company's own job board (Greenhouse, Lever or Ashby).
+- **On your phone:** Settings → Preferences takes an [ntfy](https://ntfy.sh) address; the tracker then sends a short
+  daily digest to the ntfy app.
+- **Translation:** Settings → Translation takes a free DeepL key (https://www.deepl.com/pro-api). Non-English job
+  titles are then translated, and descriptions when you open them.
+- **Goals and breaks:** Settings → Preferences sets weekly goals, and a date to pause the searches until (for a
+  holiday).
 
-## Use with Claude Desktop
+![Stats](docs/images/stats.png)
 
-The tracker is also an MCP server, so Claude can search your jobs and update applications in a chat ("which saved
-jobs fit best?", "I had the HR call with Acme today"). Its tools: `search_jobs`, `get_job`, `list_applications`,
-`stats_summary`, `add_application_step` and `set_job_status`. It uses the same database as the app, on your
-machine; nothing is uploaded except what Claude reads in the conversation.
+## Update to a new version
 
-Add this to Claude Desktop's config (`~/.config/Claude/claude_desktop_config.json` on Linux,
-`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS) and restart Claude Desktop:
-
-```json
-{
-  "mcpServers": {
-    "job-tracker": {
-      "command": "/home/you/.local/bin/uv",
-      "args": ["run", "--directory", "/home/you/job_hunting", "python", "-m", "jobhunt.mcp_server"],
-      "env": {"JOBHUNT_DB_PATH": "/home/you/job_hunting/data/jobhunt.db", "TZ": "Europe/Belgrade"}
-    }
-  }
-}
-```
-
-Start the web app once after each update first: it updates the database, and the MCP server refuses an older one.
-
-## Develop
-
-```bash
-uv run pytest
-JOBHUNT_DB_PATH=./data/dev/jobhunt.db JOBHUNT_CV_PATH="/path/to/CV.pdf" \
-  uv run uvicorn --factory jobhunt.main:build_app --reload --port 8766
-```
-
-Use a separate database in its own folder (as above) while the container is running: two schedulers on one database
-would run every search twice, and backups go to a `backups` folder beside the database.
-
-## Check the LinkedIn scraper
+Open a terminal in your **Job tracker** folder (as in step 3 above) and run these two commands:
 
 ```bash
-uv run python -m jobhunt.smoke "python developer" "Belgrade, Serbia" 25
+docker compose pull
+docker compose up -d
 ```
 
-Prints up to 25 jobs from the last 7 days. If it reports `rate limited by LinkedIn`, wait a few hours.
+Your jobs and settings are kept. (Docker Desktop's restart button restarts the version you already have; it doesn't
+update.)
 
-## When LinkedIn changes its pages
+## Back up, or move to another computer
 
-Runs will show as failed in the dashboard. Update the scraper library and rebuild:
+The tracker backs itself up every night and keeps the last 14 copies. To keep a copy of your own, open **Settings →
+Backups and export** and download everything as a zip; the CSV files open in any spreadsheet.
 
-```bash
-uv lock --upgrade-package python-jobspy
-docker compose up -d --build
-```
+To move to another computer, install the tracker there, then restore your copy with the commands in
+[docs/development.md](docs/development.md#backups-and-restore).
 
-## Configuration
+## Stop it or remove it
 
-Environment variables (set them in `docker-compose.yml`, except `JOBHUNT_CV_DIR`, `JOBHUNT_CV_NAME` and `DEEPL_AUTH_KEY`, which go in `.env`):
+- To pause it, stop the job tracker in Docker Desktop's **Containers** list; start it there again later.
+- To remove it but keep your data, run `docker compose down` in its folder.
+- `docker compose down -v` removes it **and deletes all your jobs and settings**. Download a backup first.
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `TZ` | `Europe/Belgrade` | Time zone for the schedule and the dashboard |
-| `JOBHUNT_RUN_AT` | `10:00` | Anchor time for the runs (HH:MM, local) |
-| `JOBHUNT_RUN_EVERY_HOURS` | `4` | Hours between runs; must divide 24 |
-| `JOBHUNT_DB_PATH` | `/app/data/jobhunt.db` | SQLite file |
-| `JOBHUNT_RESULTS_PER_LISTING` | `100` | Max jobs fetched per listing per run |
-| `JOBHUNT_CV_PATH` | `/app/cv/<JOBHUNT_CV_NAME>` | The CV inside the container (set by compose) |
-| `JOBHUNT_CV_DIR` | — | Folder holding your CV on this computer (in `.env`; mounted read-only) |
-| `JOBHUNT_CV_NAME` | — | The CV's file name in that folder (in `.env`) |
-| `DEEPL_AUTH_KEY` | empty | DeepL API key (in `.env`); empty means no translation |
+## Troubleshooting
+
+- **"Cannot connect to the Docker daemon", or `docker` isn't found:** Docker Desktop isn't running. Open it, wait
+  until the engine is running, and try again.
+- **The page doesn't open right after starting:** wait a minute and reload; the first start takes a moment.
+- **"Port 8765 is already allocated":** something else uses that port. Open `docker-compose.yml` in a text editor,
+  change `127.0.0.1:8765:8000` to `127.0.0.1:8766:8000`, run `docker compose up -d` again, and open
+  http://localhost:8766 instead.
+- **"Rate limited by LinkedIn" on the Report:** LinkedIn asked the tracker to slow down. It tries again on its own;
+  wait a few hours rather than pressing **Run now** again and again.
+- **You skipped setup by mistake:** open http://localhost:8765/setup.
+- **Translations don't appear:** check the key in Settings → Translation. The free plan allows 500,000 characters a
+  month; translations resume the next month.
+
+## For developers
+
+Running from the source, the tests, the environment variables, Claude Desktop (MCP) and releases are in
+[docs/development.md](docs/development.md).
 
 ## Licence and LinkedIn
 
