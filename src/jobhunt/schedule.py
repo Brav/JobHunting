@@ -127,3 +127,13 @@ def push_time(s: Schedule) -> time:
     anchor = s.start if s.kind == "every" else times_of_day(s)[0]
     total = (anchor.hour * 60 + anchor.minute + 30) % (24 * 60)
     return time(*divmod(total, 60))
+
+
+def form_values(stored: str | None) -> dict:
+    """What a schedule form shows for stored text: the choice, the times, the start and the interval."""
+    s = parse(stored)
+    if s is None:
+        return {"choice": "default", "times": [""], "start": "08:00", "every": "6"}
+    if s.kind == "times":
+        return {"choice": "times", "times": [_hhmm(t) for t in s.times], "start": "08:00", "every": "6"}
+    return {"choice": "every", "times": [""], "start": _hhmm(s.start), "every": str(s.every)}

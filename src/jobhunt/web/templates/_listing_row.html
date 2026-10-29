@@ -3,6 +3,7 @@
   <td>{{ row.listing.keywords }}</td>
   <td>{{ row.listing.location }}</td>
   <td class="nowrap">{{ row.listing.radius_km }} km</td>
+  <td>{{ schedule_text(row.listing.schedule, default_schedule) }}</td>
   <td>
     {% if not row.last %}<span class="muted">not run yet</span>
     {% elif row.last.error %}<span class="error">{{ row.last.error }}</span>

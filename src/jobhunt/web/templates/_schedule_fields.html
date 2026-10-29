@@ -1,0 +1,30 @@
+{# When searches run. sched: {choice, times, start, every}; allow_default: a listing (it may follow the default). #}
+<fieldset class="schedule-fields" x-data="{ choice: '{{ sched.choice }}', times: {{ sched.times | tojson | forceescape }} }">
+  <legend>{{ legend }}</legend>
+  {% if allow_default %}
+  <label class="check"><input type="radio" name="schedule" value="default" x-model="choice"{% if sched.choice == "default" %} checked{% endif %}>
+    Default schedule ({{ describe_schedule(default_schedule) }})</label>
+  {% endif %}
+  <label class="check"><input type="radio" name="schedule" value="times" x-model="choice"{% if sched.choice == "times" %} checked{% endif %}>
+    At these times</label>
+  <div class="schedule-times" x-show="choice === 'times'" x-cloak>
+    <template x-for="(t, i) in times" :key="i">
+      <span class="time-row">
+        <input type="time" name="times" x-model="times[i]" :aria-label="'Time ' + (i + 1)">
+        <button class="chip-x" type="button" x-show="times.length > 1" @click="times.splice(i, 1)" aria-label="Remove this time">×</button>
+      </span>
+    </template>
+    <button class="btn small ghost" type="button" @click="times.push('')">+ Add a time</button>
+  </div>
+  <label class="check"><input type="radio" name="schedule" value="every" x-model="choice"{% if sched.choice == "every" %} checked{% endif %}>
+    From a start time, every N hours</label>
+  <div class="schedule-every" x-show="choice === 'every'" x-cloak>
+    <label>Start <input type="time" name="start" value="{{ sched.start }}"></label>
+    <label>Every
+      <select name="every">
+        {% for n in every_choices %}<option value="{{ n }}"{% if sched.every == n | string %} selected{% endif %}>{{ n }} h</option>{% endfor %}
+      </select></label>
+  </div>
+  <span class="hint">More frequent searches make LinkedIn blocks more likely.</span>
+  {% if sched_error %}<span class="field-error" role="alert">{{ sched_error }}</span>{% endif %}
+</fieldset>

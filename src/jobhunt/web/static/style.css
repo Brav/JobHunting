@@ -99,6 +99,9 @@ kbd { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 0 5px;
 .confirm-dialog h2 { margin: 0 0 var(--s3); font-size: var(--t4); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: var(--s2); margin-top: var(--s4); }
 .btn.danger { background: var(--danger); border-color: var(--danger); color: var(--danger-fg); }
+.schedule-times, .schedule-every { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center;
+  padding-left: var(--s5); }
+.time-row { display: inline-flex; align-items: center; gap: 2px; }
 input, select, textarea { font: inherit; font-size: var(--t2); padding: 6px 8px; border-radius: var(--r1);
                           border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg); }
 label { display: grid; gap: 4px; font-size: var(--t2); color: var(--muted); }

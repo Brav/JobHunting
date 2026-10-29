@@ -22,6 +22,9 @@ from jobhunt.prompts import KINDS as PROMPT_KINDS
 from jobhunt.sources.feeds import SOURCE_LABELS
 from jobhunt.language import language_name
 from jobhunt.reports import run_summary
+from jobhunt.schedule import EVERY_CHOICES, Schedule, describe
+from jobhunt.scheduler import default_schedule
+from jobhunt.schedule import parse as parse_schedule
 from jobhunt.setup import setup_state
 from jobhunt.timeutil import local_date, to_local, utcnow
 from jobhunt.workplace import WORKPLACE_LABELS
@@ -131,12 +134,25 @@ def render(request: Request, name: str, status_code: int = 200, **ctx):
         setup_banner = request.url.path != "/setup" and setup_state(s) != "done"
     now = utcnow()
     paused = prefs.paused_until if is_paused(prefs, local_date(now, tz)) else ""
+    default = default_schedule(prefs, request.app.state.settings)
     base = {"tz": tz, "now": now, "today": local_date(now, tz), "summary": summary,
             "age": lambda job: job_age(job, now, tz),
             "running": coordinator.is_running, "next_run": coordinator.next_run_at(),
             "results_cap": request.app.state.settings.results_per_listing, "paused_until": paused,
-            "feed_errors": feed_errors, "setup_banner": setup_banner}
+            "feed_errors": feed_errors, "setup_banner": setup_banner, "default_schedule": default}
     return templates.TemplateResponse(request, name, {**base, **ctx}, status_code=status_code)
+
+
+def schedule_text(stored: str | None, default: Schedule) -> str:
+    """A listing's schedule in words: its own times, or "Default · every 4 h from 10:00"."""
+    own = parse_schedule(stored)
+    if own is not None:
+        return describe(own)
+    text = describe(default)
+    return "Default · " + text[0].lower() + text[1:]
+
+
+templates.env.globals.update(schedule_text=schedule_text, describe_schedule=describe, every_choices=EVERY_CHOICES)
 
 
 def apply_time_zone(app, tz: ZoneInfo) -> None:
