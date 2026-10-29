@@ -18,6 +18,7 @@ from jobhunt import actions, applications, salary, stats
 from jobhunt.eligibility import VERDICTS, effective
 from jobhunt.models import JOB_STATUSES, Job
 from jobhunt.preferences import load_preferences
+from jobhunt.setup import time_zone
 from jobhunt.timeutil import local_date, utcnow
 
 DESCRIPTION_MAX = 10_000
@@ -32,8 +33,13 @@ class Tools:
     def __init__(self, session_factory: Callable[[], Session], tz: ZoneInfo, public_url: str = ""):
         self.session_factory, self.tz, self.public_url = session_factory, tz, public_url.rstrip("/")
 
+    def _zone(self) -> ZoneInfo:
+        """The user's own time zone (their profile's), read on every call as the web app may change it."""
+        with self.session_factory() as s:
+            return time_zone(s, self.tz)
+
     def _today(self) -> dt.date:
-        return local_date(utcnow(), self.tz)
+        return local_date(utcnow(), self._zone())
 
     def _summary(self, job: Job) -> dict:
         return {"id": job.id, "title": job.title, "company": job.company, "location": job.location,
@@ -99,7 +105,7 @@ class Tools:
             counts = dict(s.exec(select(Job.status, func.count()).group_by(Job.status)).all())
             apps = stats.load_applications(s)
             _, app_counts = stats.application_rows(apps, today, "all", load_preferences(s))
-            goals = stats.weekly_goals(s, apps, load_preferences(s), today, self.tz)
+            goals = stats.weekly_goals(s, apps, load_preferences(s), today, self._zone())
         flow = stats.pipeline(apps)
         return {"jobs": {status: counts.get(status, 0) for status in JOB_STATUSES}, "applications": app_counts,
                 "reached": dict(flow.reached), "ended": dict(flow.ended), "reply_rate_percent": flow.reply_rate,
@@ -123,7 +129,7 @@ class Tools:
         with self.session_factory() as s:
             self._job(s, job_id)
             try:
-                job = actions.set_job_status(s, job_id, status, utcnow(), self.tz)
+                job = actions.set_job_status(s, job_id, status, utcnow(), self._zone())
             except ValueError:
                 raise ValueError(f"Unknown status {status!r}; use one of {', '.join(JOB_STATUSES)}") from None
             return self._summary(job)

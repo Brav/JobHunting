@@ -7,12 +7,12 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import select
 
-from jobhunt.eligibility import Profile, load_profile, refresh_all, save_profile
+from jobhunt.eligibility import DEFAULT_PROFILE, Profile, load_profile, profile_saved, refresh_all, save_profile
 from jobhunt.preferences import SOURCES, Preferences, load_preferences, save_preferences
 from jobhunt.models import BlockedCompany, NegativeRule
 from jobhunt.places import COUNTRIES
 from jobhunt.timeutil import utcnow
-from jobhunt.web.common import render, session
+from jobhunt.web.common import apply_time_zone, render, session
 
 router = APIRouter()
 
@@ -26,7 +26,7 @@ LANGUAGE_CHOICES = [("en", "English"), ("sr-group", "Serbian / Croatian / Bosnia
 CONTRACT_CHOICES = [("employment", "Employment"), ("b2b", "B2B / contractor"), ("eor", "Employer of record")]
 COUNTRY_CHOICES = sorted(((code, name.removeprefix("the ")) for code, (name, _) in COUNTRIES.items()),
                          key=lambda c: c[1])
-ZONES = sorted(z for z in available_timezones() if z.startswith("Europe/"))
+ZONES = sorted(z for z in available_timezones() if "/" in z) + ["UTC"]
 
 
 def _form_languages(languages: tuple[str, ...]) -> list[str]:
@@ -50,7 +50,9 @@ def _page(request: Request, profile: Profile, errors: list[str], saved: str = ""
 @router.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, saved: str = ""):
     with session(request) as s:
-        profile = load_profile(s)
+        # Nothing saved yet: the neutral profile, in the zone the app runs in (TZ, else UTC).
+        profile = load_profile(s) if profile_saved(s) else replace(DEFAULT_PROFILE,
+                                                                     time_zone=request.app.state.settings.tz.key)
     return _page(request, profile, [], saved if saved.isdecimal() else "")
 
 
@@ -79,6 +81,7 @@ def save_settings(request: Request, work_rights: list[str] = Form([]), home_coun
     with session(request) as s:
         save_profile(s, profile, utcnow())
         checked = refresh_all(s, profile)
+    apply_time_zone(request.app, ZoneInfo(profile.time_zone))
     return RedirectResponse(f"/settings?saved={checked}", status_code=303)
 
 

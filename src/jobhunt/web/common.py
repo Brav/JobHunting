@@ -2,6 +2,7 @@
 
 import re
 import secrets
+from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -134,6 +135,12 @@ def render(request: Request, name: str, status_code: int = 200, **ctx):
             "results_cap": request.app.state.settings.results_per_listing, "paused_until": paused,
             "feed_errors": feed_errors}
     return templates.TemplateResponse(request, name, {**base, **ctx}, status_code=status_code)
+
+
+def apply_time_zone(app, tz: ZoneInfo) -> None:
+    """The user's time zone changed: pages read it from app.state.settings, and the scheduler moves its jobs."""
+    app.state.settings = replace(app.state.settings, tz=tz)
+    app.state.coordinator.set_time_zone(tz)
 
 
 def check_token(request: Request, token: str) -> None:

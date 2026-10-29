@@ -12,8 +12,11 @@ TZ = ZoneInfo("Europe/Belgrade")
 
 def test_defaults():
     s = load_settings({})
-    assert (s.tz, s.run_at, s.db_path, s.results_per_listing) == (
-        TZ, time(10, 0), Path("/app/data/jobhunt.db"), 100)
+    assert (s.run_at, s.db_path, s.results_per_listing) == (time(10, 0), Path("/app/data/jobhunt.db"), 100)
+
+
+def test_default_time_zone_is_utc():
+    assert load_settings({}).tz == ZoneInfo("UTC")
 
 
 def test_overrides():

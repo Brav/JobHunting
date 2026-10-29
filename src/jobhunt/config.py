@@ -25,7 +25,7 @@ def load_settings(env: Mapping[str, str] = os.environ) -> Settings:
     if every <= 0 or 24 % every:
         raise ValueError(f"JOBHUNT_RUN_EVERY_HOURS must divide 24, got {every}")
     return Settings(
-        tz=ZoneInfo(env.get("TZ", "Europe/Belgrade")),
+        tz=ZoneInfo(env.get("TZ", "UTC")),
         run_at=datetime.strptime(env.get("JOBHUNT_RUN_AT", "10:00"), "%H:%M").time(),
         db_path=Path(env.get("JOBHUNT_DB_PATH", "/app/data/jobhunt.db")),
         results_per_listing=int(env.get("JOBHUNT_RESULTS_PER_LISTING", "100")),

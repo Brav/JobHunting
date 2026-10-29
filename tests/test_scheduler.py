@@ -168,3 +168,27 @@ def test_enrich_pauses_titles_after_quota(session_factory, settings):
     clock.now = datetime(2026, 11, 1, 0, 5)
     coord.enrich_if_idle()
     assert len(translator.calls) == 2
+
+
+CRON_JOBS = ("scheduled", "backup", "recheck", "digest_push", "auto_close", "closed")
+
+
+def test_set_time_zone_moves_every_cron_job(session_factory, settings):
+    clock = FakeClock(datetime(2026, 10, 28, 9, 30))
+    coord = RunCoordinator(session_factory, FakeSource({}), settings, clock=clock, sleep=clock.sleep,
+                           fetch_page=lambda external_id: JobPage("Job description.", []))
+    coord.start()
+    try:
+        new_york = ZoneInfo("America/New_York")
+        coord.set_time_zone(new_york)
+        for job_id in CRON_JOBS:
+            assert coord._scheduler.get_job(job_id).trigger.timezone == new_york, job_id
+        assert coord.settings.tz == new_york
+    finally:
+        coord.shutdown()
+
+
+def test_set_time_zone_without_a_running_scheduler(session_factory, settings):
+    coord = RunCoordinator(session_factory, FakeSource({}), settings)
+    coord.set_time_zone(ZoneInfo("Asia/Tokyo"))
+    assert coord.settings.tz.key == "Asia/Tokyo"

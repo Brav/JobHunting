@@ -59,9 +59,10 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     init_db(engine, settings.tz)
     session_factory = make_session_factory(engine)
     with session_factory() as s:
-        from jobhunt.setup import adopt_legacy_profile
+        from jobhunt.setup import adopt_legacy_profile, time_zone
         from jobhunt.timeutil import utcnow
         adopt_legacy_profile(s, utcnow())
+        settings = replace(settings, tz=time_zone(s, settings.tz))  # the user's zone; TZ only until setup
     _default_skills_from_cv(session_factory, settings)
     if source is None:
         import requests

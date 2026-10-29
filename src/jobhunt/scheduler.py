@@ -4,6 +4,7 @@ import logging
 import threading
 import time as _time
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -207,27 +208,43 @@ class RunCoordinator:
         except Exception:
             logger.exception("digest push failed")
 
+    def _cron_jobs(self) -> list[tuple[Callable, CronTrigger, str, dict]]:
+        """The jobs that run at local clock times, in the current time zone: (function, trigger, id, options)."""
+        s = self.settings
+        hours = run_hours(s.run_at, s.run_every_hours)
+        push_at = datetime.combine(datetime.now(s.tz).date(), s.run_at) + timedelta(minutes=30)
+        nightly = {"coalesce": True, "misfire_grace_time": 6 * 3600}
+        jobs = [
+            (self.trigger, CronTrigger(hour=",".join(map(str, hours)), minute=s.run_at.minute, timezone=s.tz),
+             "scheduled", {"args": ["scheduled"], "coalesce": True, "misfire_grace_time": 3600}),
+            (self.nightly_backup, CronTrigger(hour=3, minute=30, timezone=s.tz), "backup", nightly),
+            (self.nightly_recheck, CronTrigger(hour=4, minute=0, timezone=s.tz), "recheck", nightly),
+            (self.push_digest, CronTrigger(hour=push_at.hour, minute=push_at.minute, timezone=s.tz), "digest_push",
+             {"coalesce": True, "misfire_grace_time": 3600}),
+            (self.daily_auto_close, CronTrigger(hour=5, minute=15, timezone=s.tz), "auto_close", nightly),
+        ]
+        if self.fetch_page is not None:
+            jobs.append((self.closed_check, CronTrigger(hour=5, minute=0, timezone=s.tz), "closed", nightly))
+        return jobs
+
+    def _add_cron_jobs(self) -> None:
+        for func, trigger, job_id, options in self._cron_jobs():
+            self._scheduler.add_job(func, trigger, id=job_id, replace_existing=True, **options)
+
+    def set_time_zone(self, tz: ZoneInfo) -> None:
+        """The user changed their time zone: every clock-time job moves to it at once, without a restart."""
+        self.settings = replace(self.settings, tz=tz)
+        if self._scheduler is not None:
+            self._add_cron_jobs()
+            logger.info("time zone changed to %s; jobs rescheduled", tz.key)
+
     def start(self) -> None:
         s = self.settings
         hours = run_hours(s.run_at, s.run_every_hours)
         self._scheduler = BackgroundScheduler(timezone=s.tz)
-        self._scheduler.add_job(self.trigger, CronTrigger(hour=",".join(map(str, hours)), minute=s.run_at.minute,
-                                                          timezone=s.tz),
-                                args=["scheduled"], id="scheduled", coalesce=True, misfire_grace_time=3600)
+        self._add_cron_jobs()
         self._scheduler.add_job(self.catch_up_if_needed, "interval", minutes=CATCH_UP_CHECK_MINUTES,
                                 id="catch_up_check", coalesce=True)
-        self._scheduler.add_job(self.nightly_backup, CronTrigger(hour=3, minute=30, timezone=s.tz), id="backup",
-                                coalesce=True, misfire_grace_time=6 * 3600)
-        self._scheduler.add_job(self.nightly_recheck, CronTrigger(hour=4, minute=0, timezone=s.tz), id="recheck",
-                                coalesce=True, misfire_grace_time=6 * 3600)
-        push_at = datetime.combine(datetime.now(s.tz).date(), s.run_at) + timedelta(minutes=30)
-        self._scheduler.add_job(self.push_digest, CronTrigger(hour=push_at.hour, minute=push_at.minute, timezone=s.tz),
-                                id="digest_push", coalesce=True, misfire_grace_time=3600)
-        self._scheduler.add_job(self.daily_auto_close, CronTrigger(hour=5, minute=15, timezone=s.tz), id="auto_close",
-                                coalesce=True, misfire_grace_time=6 * 3600)
-        if self.fetch_page is not None:
-            self._scheduler.add_job(self.closed_check, CronTrigger(hour=5, minute=0, timezone=s.tz), id="closed",
-                                    coalesce=True, misfire_grace_time=6 * 3600)
         if self.fetch_page is not None:
             self._scheduler.add_job(self.enrich_if_idle, "interval", minutes=ENRICH_EVERY_MINUTES, id="enrich",
                                     coalesce=True, max_instances=1, next_run_time=datetime.now(s.tz))

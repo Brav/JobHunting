@@ -72,3 +72,13 @@ def test_old_database_is_refused(engine):
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE jobs DROP COLUMN auto_closed_on"))
     assert "Start the web app once" in mcp_server.schema_problem(engine)
+
+
+def test_today_uses_the_profile_zone(session_factory, monkeypatch):
+    from dataclasses import replace
+    from datetime import date, datetime
+    from jobhunt.eligibility import DEFAULT_PROFILE, save_profile
+    monkeypatch.setattr(mcp_server, "utcnow", lambda: datetime(2026, 10, 29, 12, 0))  # already the 30th at UTC+14
+    with session_factory() as s:
+        save_profile(s, replace(DEFAULT_PROFILE, time_zone="Pacific/Kiritimati"), datetime(2026, 10, 29))
+    assert mcp_server.Tools(session_factory, ZoneInfo("UTC"))._today() == date(2026, 10, 30)
