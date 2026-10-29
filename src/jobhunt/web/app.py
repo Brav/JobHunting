@@ -29,7 +29,7 @@ from jobhunt.web.common import render
 def _default_skills_from_cv(session_factory, settings: Settings) -> None:
     """First start: the user's skills are the stack terms in their CV (read only); they edit them in Settings."""
     from jobhunt import checks
-    from jobhunt.cv import read_cv_text
+    from jobhunt.cv import current_cv_text
     from jobhunt.fit import default_skills
     from jobhunt.preferences import load_preferences, save_preferences
     from jobhunt.timeutil import utcnow
@@ -38,7 +38,7 @@ def _default_skills_from_cv(session_factory, settings: Settings) -> None:
         if prefs.skills:
             return
         try:
-            skills = default_skills(read_cv_text(settings.cv_path))
+            skills = default_skills(current_cv_text(s, settings))
         except Exception:
             return  # no readable CV: fit stays empty until the user lists skills
         if skills:

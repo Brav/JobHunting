@@ -15,7 +15,7 @@ class Settings:
     db_path: Path
     results_per_listing: int
     run_every_hours: int = 4
-    cv_path: Path = Path("/app/cv/original.pdf")
+    cv_path: Path | None = None  # JOBHUNT_CV_PATH: a CV file outside the app; else the one uploaded in Settings
     deepl_auth_key: str = ""
     public_url: str = "http://127.0.0.1:8765"  # where the phone push links to
 
@@ -30,7 +30,7 @@ def load_settings(env: Mapping[str, str] = os.environ) -> Settings:
         db_path=Path(env.get("JOBHUNT_DB_PATH", "/app/data/jobhunt.db")),
         results_per_listing=int(env.get("JOBHUNT_RESULTS_PER_LISTING", "100")),
         run_every_hours=every,
-        cv_path=Path(env.get("JOBHUNT_CV_PATH", "/app/cv/original.pdf")),
+        cv_path=Path(env["JOBHUNT_CV_PATH"]) if env.get("JOBHUNT_CV_PATH", "").strip() else None,
         deepl_auth_key=env.get("DEEPL_AUTH_KEY", "").strip(),
         public_url=env.get("JOBHUNT_PUBLIC_URL", "http://127.0.0.1:8765").strip(),
     )

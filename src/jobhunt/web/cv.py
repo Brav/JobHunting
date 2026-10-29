@@ -4,7 +4,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, select
 
-from jobhunt.cv import CVError, build_cv_prompt, read_cv_text
+from jobhunt.cv import CVError, build_cv_prompt, current_cv_text
 from jobhunt.job_listing import download_listing
 from jobhunt.applications import steps_for
 from jobhunt.models import Contact, ContactJob, Job, Question
@@ -42,7 +42,8 @@ def cv_prompt(request: Request, job_id: int, error: str = ""):
     job, description_error = _with_description(request, job_id, error)
     prompt, cv_error = None, None
     try:
-        cv_text = read_cv_text(request.app.state.settings.cv_path)
+        with session(request) as s:
+            cv_text = current_cv_text(s, request.app.state.settings)
     except CVError as e:
         cv_error = str(e)
     else:
@@ -58,7 +59,8 @@ def other_prompt(request: Request, job_id: int, kind: str, error: str = ""):
     job, description_error = _with_description(request, job_id, error)
     prompt, cv_error = None, None
     try:
-        cv_text = read_cv_text(request.app.state.settings.cv_path)
+        with session(request) as s:
+            cv_text = current_cv_text(s, request.app.state.settings)
     except CVError as e:
         cv_error = str(e)
     else:

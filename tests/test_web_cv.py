@@ -64,12 +64,14 @@ def test_cv_prompt_when_description_fails_then_try_again(app_factory, tmp_path):
     assert len(attempts) == 2
 
 
-def test_cv_prompt_without_cv(app_factory):
+def test_prompt_page_without_a_cv_says_where_to_add_one(app_factory):
     app = app_factory()
     jid = seed_job(app)
     with TestClient(app) as c:
         page = c.get(f"/jobs/{jid}/cv-prompt").text
-    assert "CV not found at" in page and 'id="prompt"' not in page
+        other = c.get(f"/jobs/{jid}/prompts/cover_letter").text
+    assert "No CV yet — upload one in Settings" in page and 'id="prompt"' not in page
+    assert "No CV yet — upload one in Settings" in other
 
 
 def test_job_rows_link_to_cv_prompt_and_unknown_job_404(app_factory):

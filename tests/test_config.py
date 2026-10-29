@@ -43,7 +43,7 @@ def test_time_helpers():
 
 def test_schedule_and_cv_settings():
     s = load_settings({})
-    assert (s.run_every_hours, s.cv_path) == (4, Path("/app/cv/original.pdf"))
+    assert (s.run_every_hours, s.cv_path) == (4, None)
     s = load_settings({"JOBHUNT_RUN_EVERY_HOURS": "6", "JOBHUNT_CV_PATH": "/x/cv.pdf"})
     assert (s.run_every_hours, s.cv_path) == (6, Path("/x/cv.pdf"))
 
@@ -57,3 +57,8 @@ def test_bad_run_interval(bad):
 def test_deepl_key_setting():
     assert load_settings({}).deepl_auth_key == ""
     assert load_settings({"DEEPL_AUTH_KEY": "  abc:fx\n"}).deepl_auth_key == "abc:fx"
+
+
+def test_cv_path_is_none_unless_set():
+    assert load_settings({}).cv_path is None
+    assert load_settings({"JOBHUNT_CV_PATH": "/app/cv/CV.pdf"}).cv_path == Path("/app/cv/CV.pdf")
