@@ -6,7 +6,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, select
 
-from jobhunt.actions import delete_listing
+from jobhunt.actions import delete_listing, delete_listing_results
 from jobhunt.models import Listing
 from jobhunt.reports import listing_rows
 from jobhunt.timeutil import utcnow
@@ -112,3 +112,14 @@ def remove_listing(request: Request, listing_id: int):
         _get_listing(s, listing_id)
         delete_listing(s, listing_id)
     return RedirectResponse("/listings", status_code=303)
+
+
+@router.post("/listings/{listing_id}/results/delete")
+def delete_results(request: Request, listing_id: int, next: str = Form("/")):
+    """The × on a listing's tag in the report: its undecided results go, the listing stays."""
+    with session(request) as s:
+        _get_listing(s, listing_id)
+        deleted = delete_listing_results(s, listing_id)
+    # Back to the page it came from, never to another site ("//host" and "/\\host" lead elsewhere).
+    back = next if next.startswith("/") and not next.startswith("//") and "\\" not in next else "/"
+    return RedirectResponse(f"{back}{'&' if '?' in back else '?'}deleted={deleted}", status_code=303)

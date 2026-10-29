@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 
 from fastapi.testclient import TestClient
-from sqlmodel import update
+from sqlmodel import select, update
 
 from fakes import FakeClock, FakeSource, add_listing, job_id, make_posting as p
 from jobhunt.models import Job
@@ -111,3 +111,39 @@ def test_report_hides_not_eligible_jobs(app_factory):
         assert "1 hidden by your rules · Show" in html
         shown = c.get("/report/2026-10-28?eligibility=eligible&eligibility=relocate&eligibility=check&eligibility=not_eligible").text
         assert "Flask Dev" in shown
+
+
+def test_listing_tags_offer_deleting_their_results(app_factory):
+    app = app_factory()
+    py = two_days(app)
+    with TestClient(app) as c:
+        home = c.get("/").text
+    assert 'aria-label="Delete the results of Python BG"' in home and 'aria-label="Delete the results of All"' not in home
+    assert f'id="delete-results-{py}"' in home and f'action="/listings/{py}/results/delete"' in home
+    assert "3 undecided jobs that only this listing found will be deleted" in home and "Delete 3 jobs" in home
+
+
+def test_deleting_a_listings_results_from_the_report(app_factory):
+    app = app_factory()
+    py = two_days(app)
+    back = f"/report/2026-10-28?listing_id={py}"
+    with TestClient(app) as c:
+        r = c.post(f"/listings/{py}/results/delete", data={"next": back}, follow_redirects=False)
+        assert (r.status_code, r.headers["location"]) == (303, f"{back}&deleted=3")
+        assert "Deleted 3 jobs" in c.get(r.headers["location"]).text
+    with app.state.session_factory() as s:
+        assert s.exec(select(Job)).all() == []
+
+
+def test_deleting_results_returns_only_within_the_app(app_factory):
+    app = app_factory()
+    py = two_days(app)
+    with TestClient(app) as c:
+        for next_url in ("https://elsewhere.example/x", "//elsewhere.example/x", "/\\elsewhere.example/x", ""):
+            r = c.post(f"/listings/{py}/results/delete", data={"next": next_url}, follow_redirects=False)
+            assert r.headers["location"].startswith("/?deleted="), next_url
+
+
+def test_deleting_results_of_an_unknown_listing(app_factory):
+    with TestClient(app_factory()) as c:
+        assert c.post("/listings/999/results/delete", data={"next": "/"}).status_code == 404

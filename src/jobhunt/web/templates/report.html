@@ -32,12 +32,37 @@
 <nav class="toolbar chips listing-tabs" aria-label="Listings">
   {% for tab in tabs %}
   {% set tab_id = tab.listing.id if tab.listing else none %}
+  <span class="chip-group">
   <a class="chip{% if filters.listing_id == tab_id %} on{% endif %}" {% if filters.listing_id == tab_id %}aria-current="true"{% endif %}
      href="/report/{{ day.isoformat() }}?{{ filters.query(listing_id=tab_id) }}{% if unseen %}&unseen=1{% endif %}"
      {% if tab.error %}title="{{ tab.error }}"{% endif %}><span>{{ tab.listing.name if tab.listing else "All" }}</span> <span class="count">{{ tab.count }}</span>{% if tab.error %} <span class="error">!</span>{% endif %}</a>
+  {% if tab.listing %}<button class="chip-x" type="button" aria-label="Delete the results of {{ tab.listing.name }}"
+    title="Delete this listing's results" onclick="document.getElementById('delete-results-{{ tab_id }}').showModal()">×</button>{% endif %}
+  </span>
   {% endfor %}
   {% for tab in tabs if tab.error %}<span class="error small">{{ tab.listing.name }}: {{ tab.error }}</span>{% endfor %}
 </nav>
+{% if deleted is not none %}<p class="notice" role="status">Deleted {{ deleted }} job{{ "" if deleted == 1 else "s" }}</p>{% endif %}
+{% for tab in tabs if tab.listing %}
+{% set deletable, kept = results[tab.listing.id] %}
+<dialog class="confirm-dialog" id="delete-results-{{ tab.listing.id }}" aria-labelledby="delete-results-title-{{ tab.listing.id }}">
+  <form method="post" action="/listings/{{ tab.listing.id }}/results/delete">
+    <input type="hidden" name="next" value="{{ back_url }}">
+    <h2 id="delete-results-title-{{ tab.listing.id }}">Delete the results of “{{ tab.listing.name }}”?</h2>
+    {% if deletable %}
+    <p>{{ deletable }} undecided job{{ "" if deletable == 1 else "s" }} that only this listing found will be deleted.</p>
+    <p class="muted small">{% if kept %}Kept: {{ kept }} job{{ "" if kept == 1 else "s" }} you saved, applied to or hid, or that another listing also found. {% endif %}Jobs still posted may come back on the next search. The listing stays and keeps searching.</p>
+    <div class="dialog-actions">
+      <button class="btn ghost" type="button" onclick="this.closest('dialog').close()">Cancel</button>
+      <button class="btn danger" type="submit">Delete {{ deletable }} job{{ "" if deletable == 1 else "s" }}</button>
+    </div>
+    {% else %}
+    <p>Nothing to delete: {% if kept %}its {{ kept }} job{{ "" if kept == 1 else "s" }} you saved, applied to or hid, or another listing also found.{% else %}it has no results.{% endif %}</p>
+    <div class="dialog-actions"><button class="btn" type="button" onclick="this.closest('dialog').close()">Close</button></div>
+    {% endif %}
+  </form>
+</dialog>
+{% endfor %}
 {% for name, e in feed_errors.items() %}<p class="notice small">{{ source_labels[name] }} isn't answering: {{ e.error }} — <a href="/settings#preferences">job sources</a></p>{% endfor %}
 {% include "_split_view.html" %}
 {% endif %}

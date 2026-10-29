@@ -8,7 +8,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import select
 
-from jobhunt.actions import set_job_status
+from jobhunt.actions import listing_results, set_job_status
 from jobhunt.filters import (JobFilters, filter_options, report_hidden_count, report_jobs, report_tabs, reveal_all,
                              unseen_count)
 from jobhunt.models import Job, Listing
@@ -39,16 +39,21 @@ def _report(request: Request, day: date | None):
         unseen_n = unseen_count(s, day, tz) if day else 0
         hidden_n = report_hidden_count(s, day, tz, f, now) if day else 0
         options = filter_options(s)
+        results = {tab.listing.id: listing_results(s, tab.listing.id) for tab in tabs if tab.listing}
     empty = "No unseen jobs left" if unseen else "No new jobs on this day"
     if is_htmx(request):
         return render(request, "_job_items.html", jobs=jobs, empty_message=empty)
     selected = _selected(request)
     pane = prepare_job(request, selected) if selected and any(j.id == selected for j in jobs) else None
     day_query = urlencode({"day": day.isoformat()}) if day else ""
+    deleted = request.query_params.get("deleted", "")
+    query = urlencode([(k, v) for k, v in request.query_params.multi_items() if k not in ("deleted", "job")])
+    back_url = request.url.path + (f"?{query}" if query else "")
     return render(
         request, "report.html", day=day, ran=day in dates, has_listings=has_listings, tabs=tabs, jobs=jobs,
         filters=f, unseen=unseen, unseen_n=unseen_n, options=options, pane=pane, selected_id=selected,
-        hidden_n=hidden_n, show_url=f"?{reveal_all(f).query()}" + ("&unseen=1" if unseen else ""),
+        hidden_n=hidden_n, results=results, back_url=back_url, deleted=int(deleted) if deleted.isdecimal() else None,
+        show_url=f"?{reveal_all(f).query()}" + ("&unseen=1" if unseen else ""),
         empty_message=empty, hide_hidden=True,
         filter_action=f"/report/{day.isoformat()}" if day else "/", show_listing=False, show_sort=False, listings=[],
         filter_hidden=[(k, v) for k, v in (("listing", f.listing_id), ("unseen", "1" if unseen else None)) if v],

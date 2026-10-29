@@ -1,5 +1,6 @@
 // Job tracker front end: selection, keyboard shortcuts, toasts and undo (Alpine.js + htmx).
-const isTyping = (e) => ["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName) || e.target.isContentEditable;
+const isTyping = (e) => ["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName) || e.target.isContentEditable
+  || !!document.querySelector("dialog[open]");  // a popup is open: the shortcuts mustn't act on the list behind it
 const hasModifier = (e) => e.ctrlKey || e.metaKey || e.altKey;
 
 document.addEventListener("alpine:init", () => {

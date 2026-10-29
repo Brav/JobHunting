@@ -4,7 +4,7 @@
   --bg: #f7f7f5; --surface: #ffffff; --surface-2: #f1f1ee; --fg: #1c1c1a; --muted: #6b6b66; --line: #e4e4df;
   --line-strong: #cfcfc8; --accent: #2557d6; --accent-fg: #ffffff; --accent-tint: #e8eefc; --accent-wash: #f2f5fd;
   --success: #1d7a46; --success-tint: #e6f4ec; --violet: #6b46c1; --violet-tint: #efe9fb;
-  --danger: #b42318; --danger-tint: #fdecea; --warning: #8a5a00; --warning-tint: #fff6db;
+  --danger: #b42318; --danger-fg: #ffffff; --danger-tint: #fdecea; --warning: #8a5a00; --warning-tint: #fff6db;
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --r1: 6px; --r2: 10px;
   --t1: 12px; --t2: 13px; --t3: 14px; --t4: 16px; --t5: 20px; --topbar: 52px;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color-scheme: light dark;
@@ -14,14 +14,14 @@
     --bg: #151514; --surface: #1d1d1b; --surface-2: #262624; --fg: #ededea; --muted: #a3a39c; --line: #2f2f2c;
     --line-strong: #44443f; --accent: #7aa2ff; --accent-fg: #0d1426; --accent-tint: #1f2a44; --accent-wash: #1a2133;
     --success: #5ccf8e; --success-tint: #17301f; --violet: #b49bff; --violet-tint: #2a2140;
-    --danger: #ff8a80; --danger-tint: #3a1c19; --warning: #e3b341; --warning-tint: #3a3015;
+    --danger: #ff8a80; --danger-fg: #2a0f0c; --danger-tint: #3a1c19; --warning: #e3b341; --warning-tint: #3a3015;
   }
 }
 :root[data-theme="dark"] {
   --bg: #151514; --surface: #1d1d1b; --surface-2: #262624; --fg: #ededea; --muted: #a3a39c; --line: #2f2f2c;
   --line-strong: #44443f; --accent: #7aa2ff; --accent-fg: #0d1426; --accent-tint: #1f2a44; --accent-wash: #1a2133;
   --success: #5ccf8e; --success-tint: #17301f; --violet: #b49bff; --violet-tint: #2a2140;
-  --danger: #ff8a80; --danger-tint: #3a1c19; --warning: #e3b341; --warning-tint: #3a3015;
+  --danger: #ff8a80; --danger-fg: #2a0f0c; --danger-tint: #3a1c19; --warning: #e3b341; --warning-tint: #3a3015;
 }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
@@ -89,6 +89,16 @@ kbd { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 0 5px;
 .chip:hover { text-decoration: none; border-color: var(--muted); }
 .chip[aria-current="true"], .chip.on { background: var(--accent-tint); color: var(--accent); border-color: transparent; }
 .chip .count { color: var(--muted); }
+.chip-group { display: inline-flex; align-items: center; }
+.chip-x { margin-left: -2px; width: 22px; height: 22px; border: 0; border-radius: 999px; background: transparent;
+  color: var(--muted); font: inherit; font-size: var(--t3); line-height: 1; cursor: pointer; }
+.chip-x:hover, .chip-x:focus-visible { background: var(--danger-tint); color: var(--danger); }
+.confirm-dialog { width: min(440px, calc(100% - 32px)); padding: var(--s5); border: 1px solid var(--line);
+  border-radius: var(--r2); background: var(--surface); color: var(--fg); box-shadow: 0 12px 40px rgb(0 0 0 / .25); }
+.confirm-dialog::backdrop { background: rgb(0 0 0 / .4); }
+.confirm-dialog h2 { margin: 0 0 var(--s3); font-size: var(--t4); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: var(--s2); margin-top: var(--s4); }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: var(--danger-fg); }
 input, select, textarea { font: inherit; font-size: var(--t2); padding: 6px 8px; border-radius: var(--r1);
                           border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg); }
 label { display: grid; gap: 4px; font-size: var(--t2); color: var(--muted); }
