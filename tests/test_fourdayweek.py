@@ -37,6 +37,19 @@ def test_four_day_week_postings():
     assert gamma.location == "Remote: Europe" and gamma.posted_at is None
 
 
+def test_on_site_and_hybrid_only_when_the_job_says_so():
+    def job(n, arrangement, locations):
+        found = {"id": n, "title": "PHP Developer", "url": f"https://4dayweek.io/job/{n}", "company": {"name": "Acme"},
+                 "locations": locations}
+        return {**found, "work_arrangement": arrangement} if arrangement else found
+    berlin = [{"country": "Germany", "city": "Berlin"}]
+    data = {"data": [job(1, "onsite", berlin), job(2, "onsite", []), job(3, "hybrid", []), job(4, None, berlin),
+                     job(5, "flexible", berlin)]}
+    jobs = four_day_week("php", "", url_get({"https://4dayweek.io/api/v2/jobs": data}))
+    assert [j.posting.location for j in jobs] == ["Berlin, Germany (on-site)", "", "", "Berlin, Germany",
+                                                  "Berlin, Germany"]
+
+
 def test_no_home_country_leaves_the_parameter_out():
     calls = []
     four_day_week("php", "", url_get({"https://4dayweek.io/api/v2/jobs": FOURDAYWEEK}, calls))

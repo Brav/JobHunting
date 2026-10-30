@@ -7,6 +7,7 @@ from jobhunt.sources.base import JobPosting
 from jobhunt.sources.feeds import FeedPosting, _get_json, _markdown, pay_text, search_words
 
 _PERIODS = {"month": "a month", "hour": "an hour"}  # year, yearly, annual and anything else: a year
+_MODES = {"onsite": "on-site", "hybrid": "hybrid"}
 
 
 def _location(item: dict) -> str:
@@ -19,7 +20,8 @@ def _location(item: dict) -> str:
         return "Remote: " + ", ".join(names[:3]) + (f" +{len(names) - 3} more" if len(names) > 3 else "")
     first = spots[0] if spots else {}
     where = ", ".join(p for p in (first.get("city"), first.get("country")) if p)
-    return f"{where} ({'hybrid' if item.get('work_arrangement') == 'hybrid' else 'on-site'})".strip()
+    mode = _MODES.get(item.get("work_arrangement"))  # an unknown or missing arrangement isn't called on-site
+    return f"{where} ({mode})" if where and mode else where
 
 
 def four_day_week(keywords: str, home_country: str, get) -> list[FeedPosting]:
