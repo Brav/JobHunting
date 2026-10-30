@@ -114,6 +114,9 @@ def test_watch_from_the_company_page(app_factory):
     ("https://apply.workable.com/j/00C85BAC46", None),
     ("https://www.recruitee.com/", None),
     ("https://example.com/careers", None),
+    ("https://jobs.lever.co./acme-co", ("lever", "acme-co")),
+    ("https://acme.recruitee.com./", ("recruitee", "acme")),
+    ("https://[a-z]+", None),
 ])
 def test_board_from_url(url, expected):
     assert board_from_url(url) == expected
@@ -125,6 +128,7 @@ def test_board_in_page():
     assert board_in_page('<a href="https://jobs.lever.co/acme">Jobs</a>') == ("lever", "acme")
     assert board_in_page('<iframe src="//acme.recruitee.com/embed"></iframe>') == ("recruitee", "acme")
     assert board_in_page("<p>No jobs here</p>") is None
+    assert board_in_page('<script>var p = "//[a-z]+";</script><a href="https://jobs.lever.co/acme">') == ("lever", "acme")
 
 
 def test_new_parsers():

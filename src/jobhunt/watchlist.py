@@ -49,8 +49,11 @@ def board_page_url(ats: str, token: str) -> str:
 
 def board_from_url(url: str) -> tuple[str, str] | None:
     """(system, board name) for a careers-page address on one of the nine hiring systems, else None."""
-    parts = urlsplit(url.strip())
-    host = (parts.hostname or "").lower()
+    try:
+        parts = urlsplit(url.strip())
+        host = (parts.hostname or "").lower().removesuffix(".")  # "jobs.lever.co." is jobs.lever.co
+    except ValueError:  # not an address after all, e.g. "//[a-z]+" in a page's script
+        return None
     segments = [x for x in parts.path.split("/") if x]
     if host in _PATH_HOSTS:
         ats = _PATH_HOSTS[host]

@@ -55,6 +55,18 @@ def test_a_refusal_shows_its_reason_and_saves_nothing(app_factory):
         assert s.exec(select(CustomFeed)).all() == []
 
 
+def test_malformed_addresses_get_a_reason_not_an_error(app_factory):
+    page = FakeResponse(text='<html><script>var pattern = "//[a-z]+";</script></html>')
+    app, c = client(app_factory, {"https://example.com/robots.txt": OPEN, "https://example.com/careers": page})
+    r = c.post("/sites/preview", data={"url": "[::1/feed", "name": ""})
+    assert r.status_code == 200 and "Only http and https addresses can be added." in r.text
+    r = c.post("/sites/preview", data={"url": "https://example.com/careers", "name": ""})
+    assert r.status_code == 200 and "No feed or known hiring system found at this address." in r.text
+    form = {"kind": "feed", "url": "[::1/feed", "name": "X", "token": "", "terms": "on"}
+    r = c.post("/sites/add", data=form)
+    assert r.status_code == 400 and "Only http and https addresses can be added." in r.text
+
+
 def test_saving_a_careers_page_replaces_the_companys_old_board(app_factory):
     app, c = client(app_factory, {"https://jobs.lever.co/robots.txt": OPEN})
     with app.state.session_factory() as s:

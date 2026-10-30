@@ -24,6 +24,27 @@ def test_address_rules():
     assert refused("ftp://example.com/feed") == ADDRESS
     assert refused("https://intranet.example/feed", resolve=PRIVATE_NET) == PRIVATE
     assert normalise_url("  larajobs.com/feed ") == "https://larajobs.com/feed"  # Review Focus 1
+    assert normalise_url("example.com/go?to=https://x") == "https://example.com/go?to=https://x"
+    assert normalise_url("HTTP://example.com/feed") == "HTTP://example.com/feed"
+
+
+def test_a_malformed_address_is_refused_not_an_error():
+    assert refused("https://[::1/feed") == ADDRESS
+    with pytest.raises(Refused) as e:
+        check_saving("[::1/feed", url_get({}), PUBLIC)
+    assert str(e.value) == ADDRESS
+
+    def overlong(host, *a, **k):
+        raise UnicodeError("label empty or too long")  # what getaddrinfo raises for a DNS label over 63 characters
+    assert refused("https://" + "a" * 70 + ".example.com/feed", resolve=overlong) == NO_HOST
+
+
+def test_a_malformed_address_in_the_page_is_passed_over():
+    script = FakeResponse(text='<html><script>var pattern = "//[a-z]+";</script></html>')
+    link = FakeResponse(text='<link rel="alternate" type="application/rss+xml" href="http://[bad/feed">')
+    for page in (script, link):
+        assert refused("https://example.com/careers", url_get({"https://example.com/robots.txt": OPEN,
+                                                               "https://example.com/careers": page})) == NOTHING
 
 
 def test_an_unknown_host_is_not_found():
@@ -37,7 +58,7 @@ def test_an_unknown_host_is_not_found():
     "https://www.glassdoor.co.uk/Job/x", "https://www.jobs.bg/front_job_search.php", "https://karieri.bg/",
     "https://joberty.com/", "https://www.joberty.rs/", "https://remotive.com/remote-jobs/feed",
     "https://wellfound.com/jobs", "https://www.welcometothejungle.com/en/jobs", "https://jobgether.com/",
-    "https://vuejobs.com/feed"])
+    "https://vuejobs.com/feed", "https://www.jobs.bg./x", "https://linkedin.com./jobs"])
 def test_terms_refusal_list(url):
     assert refused(url) == TERMS
 

@@ -120,6 +120,9 @@ def test_advertised_feed_and_title_and_user_agent():
     atom = '<link rel="alternate" type="application/atom+xml" href="https://example.com/atom">'
     assert advertised_feed(atom, "https://example.com/") == "https://example.com/atom"
     assert advertised_feed("<html></html>", "https://example.com/") is None
+    bad = '<link rel="alternate" type="application/rss+xml" href="http://[bad/feed">'
+    assert advertised_feed(bad, "https://example.com/") is None
+    assert advertised_feed(bad + atom, "https://example.com/") == "https://example.com/atom"
     assert feed_title(WORDPRESS) == "Acme Jobs"
     calls = []
     fetch_feed(7, "https://example.com/feed", url_get({"https://example.com/feed": FakeResponse(content=WORDPRESS)}, calls))

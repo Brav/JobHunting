@@ -121,5 +121,8 @@ def advertised_feed(html: str, base_url: str) -> str | None:
         rel = link.get("rel") or []
         rel = rel.split() if isinstance(rel, str) else rel
         if "alternate" in [r.lower() for r in rel] and (link.get("type") or "").lower() in _FEED_TYPES:
-            return urljoin(base_url, link["href"])
+            try:
+                return urljoin(base_url, link["href"])
+            except ValueError:  # a malformed address, e.g. an unclosed "[": try the next link
+                continue
     return None

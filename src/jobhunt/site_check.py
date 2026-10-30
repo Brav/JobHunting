@@ -1,6 +1,7 @@
 """The checks before an own site is added: address, terms, robots.txt, one test fetch, recognition and jobs."""
 
 import ipaddress
+import re
 import socket
 from dataclasses import dataclass
 from urllib.parse import urlsplit
@@ -33,6 +34,7 @@ _FORBIDDEN_LABELS = ("indeed", "glassdoor")
 _BLOCKED_STATUSES = (401, 403, 429)
 _CHALLENGES = ("Just a moment", "cf-challenge", "cf_chl")
 _PREVIEW = 5
+_SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
 
 
 class Refused(Exception):
@@ -50,24 +52,27 @@ class Candidate:
 
 def normalise_url(url: str) -> str:
     url = url.strip()
-    return url if "://" in url else "https://" + url
+    return url if _SCHEME.match(url) else "https://" + url
 
 
 def _check_address(url: str, resolve) -> None:
-    parts = urlsplit(url)
-    host = parts.hostname
+    try:
+        parts = urlsplit(url)
+        host = parts.hostname
+    except ValueError:  # e.g. an unclosed "[" around an IPv6 host
+        raise Refused(ADDRESS) from None
     if parts.scheme not in ("http", "https") or not host:
         raise Refused(ADDRESS)
     try:
         found = resolve(host, None)
-    except socket.gaierror:
+    except (socket.gaierror, ValueError):  # ValueError: UnicodeError for a DNS label too long to encode
         raise Refused(NO_HOST) from None
     if not found or not all(ipaddress.ip_address(item[4][0]).is_global for item in found):
         raise Refused(PRIVATE)
 
 
 def _check_terms(url: str) -> None:
-    host = (urlsplit(url).hostname or "").lower()
+    host = (urlsplit(url).hostname or "").lower().removesuffix(".")  # "linkedin.com." is linkedin.com
     if (any(host == d or host.endswith("." + d) for d in _FORBIDDEN_HOSTS)
             or any(label in _FORBIDDEN_LABELS for label in host.split("."))):
         raise Refused(TERMS)
