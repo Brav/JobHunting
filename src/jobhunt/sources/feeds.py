@@ -92,10 +92,19 @@ def is_place_word(word: str) -> bool:
 
 
 def search_words(keywords: str) -> str:
-    """The keywords a search API is sent: no place words, "remote" or operators."""
-    words = [w for w in re.findall(r'"[^"]+"|\S+', keywords)
-             if w.lower() not in ("remote", "and", "or", "not") and not is_place_word(w)]
-    return " ".join(w.strip('"') for w in words)
+    """The keywords a search API is sent: no place words, "remote", operators or the word after NOT."""
+    words, negate = [], False
+    for token in re.findall(r'"[^"]+"|\S+', keywords):
+        word = token.strip('"').lower()
+        if word == "not":
+            negate = True
+            continue
+        if word in ("remote", "and", "or"):
+            continue
+        if not negate and not is_place_word(token):  # as matches_keywords: NOT drops the next word
+            words.append(token.strip('"'))
+        negate = False
+    return " ".join(words)
 
 
 def himalayas(keywords: str, get) -> list[FeedPosting]:

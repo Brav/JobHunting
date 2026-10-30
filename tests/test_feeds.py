@@ -180,6 +180,8 @@ def test_search_words_leave_out_places_remote_and_operators():
     assert search_words("php remote serbia srbija") == "php"
     assert search_words('fullstack developer remote "Novi Sad"') == "fullstack developer"
     assert search_words("serbia srbija remote") == ""
+    assert search_words("php NOT wordpress") == "php"  # an excluded word is never searched for
+    assert search_words('php not "word press" laravel') == "php laravel"
 
 
 def test_place_words_are_not_required_but_not_still_excludes():
