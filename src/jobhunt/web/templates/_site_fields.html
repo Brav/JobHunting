@@ -1,0 +1,21 @@
+{# Which sites a listing searches. values: {site_mode, sites}; site_choices: the built-in and own sites. #}
+<fieldset class="site-fields" x-data="{ mode: '{{ values.site_mode }}' }">
+  <legend>Sites</legend>
+  <label class="check"><input type="radio" name="site_mode" value="default" x-model="mode"{% if values.site_mode == "default" %} checked{% endif %}>
+    Default sites: {{ site_choices.default_text }}</label>
+  <label class="check"><input type="radio" name="site_mode" value="choose" x-model="mode"{% if values.site_mode == "choose" %} checked{% endif %}>
+    Choose</label>
+  <div class="site-boxes" x-show="mode === 'choose'" x-cloak>
+    <strong>Built-in</strong>
+    {% for key, label in site_choices.builtin %}
+    <label class="check"><input type="checkbox" name="sites" value="{{ key }}"{% if key in values.sites %} checked{% endif %}> {{ label }}</label>
+    {% endfor %}
+    <strong>Your sites</strong>
+    {% for key, label in site_choices.own %}
+    <label class="check"><input type="checkbox" name="sites" value="{{ key }}"{% if key in values.sites %} checked{% endif %}> {{ label }}</label>
+    {% endfor %}
+    <span class="hint">Add your own on the <a href="/sites">Sites page</a>.</span>
+  </div>
+  <span class="hint">LinkedIn uses your keywords and location. The other sites match your keywords, ignoring place names, and cover the whole site.</span>
+  {% if errors.sites %}<span class="field-error" role="alert">{{ errors.sites }}</span>{% endif %}
+</fieldset>

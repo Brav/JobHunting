@@ -10,6 +10,7 @@ from jobhunt.actions import delete_listing, delete_listing_results
 from jobhunt.models import Listing
 from jobhunt.reports import listing_rows
 from jobhunt.schedule import form_values, from_form
+from jobhunt.sites import site_choices, site_form_values, sites_from_form
 from jobhunt.timeutil import utcnow
 from jobhunt.web.common import render, session
 
@@ -51,7 +52,9 @@ def _get_listing(s: Session, listing_id: int) -> Listing:
 def listings_page(request: Request):
     with session(request) as s:
         rows = listing_rows(s)
-    return render(request, "listings.html", rows=rows, values=EMPTY_FORM, errors={})
+        values = {**EMPTY_FORM, **site_form_values(s, None)}
+        choices = site_choices(s)
+    return render(request, "listings.html", rows=rows, values=values, errors={}, site_choices=choices)
 
 
 def _schedule(choice: str, times: list[str], start: str, every: str, values: dict, errors: dict) -> str | None:
@@ -63,18 +66,30 @@ def _schedule(choice: str, times: list[str], start: str, every: str, values: dic
     return text
 
 
+def _sites(s: Session, mode: str, chosen: list[str], values: dict, errors: dict) -> str | None:
+    """The sites the form describes (None = the default ones); its choices go back into the form, its error too."""
+    text, problem = sites_from_form(s, mode, chosen)
+    values.update(site_mode=mode, sites=chosen)
+    if problem:
+        errors["sites"] = problem
+    return text
+
+
 @router.post("/listings", response_class=HTMLResponse)
 def create_listing(request: Request, name: str = Form(""), keywords: str = Form(""),
                    location: str = Form(""), radius_km: str = Form(""), schedule: str = Form("default"),
-                   times: list[str] = Form([]), start: str = Form(""), every: str = Form("")):
+                   times: list[str] = Form([]), start: str = Form(""), every: str = Form(""),
+                   site_mode: str = Form("default"), sites: list[str] = Form([])):
     form = {"name": name, "keywords": keywords, "location": location, "radius_km": radius_km}
     with session(request) as s:
         values, errors = validate_listing_form(s, form)
         text = _schedule(schedule, times, start, every, values, errors)
+        site_text = _sites(s, site_mode, sites, values, errors)
         if errors:
             rows = listing_rows(s)
-            return render(request, "listings.html", status_code=400, rows=rows, values=values, errors=errors)
-        s.add(Listing(**{k: values[k] for k in ("name", "keywords", "location", "radius_km")}, schedule=text))
+            return render(request, "listings.html", status_code=400, rows=rows, values=values, errors=errors,
+                          site_choices=site_choices(s))
+        s.add(Listing(**{k: values[k] for k in ("name", "keywords", "location", "radius_km")}, schedule=text, sites=site_text))
         s.commit()
     return RedirectResponse("/listings", status_code=303)
 
@@ -83,27 +98,33 @@ def create_listing(request: Request, name: str = Form(""), keywords: str = Form(
 def edit_listing_page(request: Request, listing_id: int):
     with session(request) as s:
         listing = _get_listing(s, listing_id)
-    values = {"name": listing.name, "keywords": listing.keywords, "location": listing.location,
-              "radius_km": listing.radius_km, **form_values(listing.schedule)}
-    return render(request, "listing_form.html", listing=listing, values=values, errors={})
+        values = {"name": listing.name, "keywords": listing.keywords, "location": listing.location,
+                  "radius_km": listing.radius_km, **form_values(listing.schedule),
+                  **site_form_values(s, listing.sites)}
+        choices = site_choices(s)
+    return render(request, "listing_form.html", listing=listing, values=values, errors={}, site_choices=choices)
 
 
 @router.post("/listings/{listing_id}", response_class=HTMLResponse)
 def update_listing(request: Request, listing_id: int, name: str = Form(""), keywords: str = Form(""),
                    location: str = Form(""), radius_km: str = Form(""), schedule: str = Form("default"),
-                   times: list[str] = Form([]), start: str = Form(""), every: str = Form("")):
+                   times: list[str] = Form([]), start: str = Form(""), every: str = Form(""),
+                   site_mode: str = Form("default"), sites: list[str] = Form([])):
     form = {"name": name, "keywords": keywords, "location": location, "radius_km": radius_km}
     with session(request) as s:
         listing = _get_listing(s, listing_id)
         values, errors = validate_listing_form(s, form, listing_id)
         text = _schedule(schedule, times, start, every, values, errors)
+        site_text = _sites(s, site_mode, sites, values, errors)
         if errors:
             return render(request, "listing_form.html", status_code=400, listing=listing,
-                          values=values, errors=errors)
-        if any(getattr(listing, key) != values[key] for key in ("keywords", "location", "radius_km")):
+                          values=values, errors=errors, site_choices=site_choices(s))
+        if (site_text != listing.sites
+                or any(getattr(listing, key) != values[key] for key in ("keywords", "location", "radius_km"))):
             listing.search_changed_at = utcnow()
         if text != listing.schedule:  # new times: wait for the next one, don't run for one that just passed
             listing.schedule, listing.schedule_changed_at = text, utcnow()
+        listing.sites = site_text
         for key in ("name", "keywords", "location", "radius_km"):
             setattr(listing, key, values[key])
         s.add(listing)

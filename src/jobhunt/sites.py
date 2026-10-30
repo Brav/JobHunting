@@ -110,3 +110,52 @@ def remove_site(session: Session, key: str) -> int:
         session.delete(row)
     session.commit()
     return reset
+
+
+@dataclass(frozen=True)
+class SiteChoices:
+    builtin: list[tuple[str, str]]  # (key, label)
+    own: list[tuple[str, str]]
+    default_text: str
+
+
+def default_sites_text(session: Session) -> str:
+    """What "Default sites" means now, e.g. "LinkedIn, Remote OK and your 2 sites"."""
+    labels = [BUILTIN[k].label for k in load_preferences(session).sites if k in BUILTIN]
+    own = len(own_sites(session))
+    if own:
+        return f"{', '.join(labels)} and your {own} site{'s' if own != 1 else ''}"
+    return f"{', '.join(labels[:-1])} and {labels[-1]}" if len(labels) > 1 else "".join(labels)
+
+
+def site_choices(session: Session) -> SiteChoices:
+    return SiteChoices([(k, s.label) for k, s in BUILTIN.items()],
+                       [(o.key, o.name) for o in own_sites(session)], default_sites_text(session))
+
+
+def sites_text(stored: str | None, labels: dict[str, str]) -> str:
+    """A listing's sites for the table: "Default", or the first two names plus " +N"."""
+    keys = parse_sites(stored, labels)
+    if not keys:
+        return "Default"
+    text = ", ".join(labels[k] for k in keys[:2])
+    return f"{text} +{len(keys) - 2}" if len(keys) > 2 else text
+
+
+def site_form_values(session: Session, stored: str | None) -> dict:
+    """The form's site mode and ticked boxes; Default shows the default sites ticked."""
+    chosen = parse_sites(stored, [*BUILTIN, *(o.key for o in own_sites(session))])
+    if chosen:
+        return {"site_mode": "choose", "sites": list(chosen)}
+    default = Listing(name="", keywords="", location="", radius_km=0)
+    return {"site_mode": "default", "sites": list(sites_for(session, default))}
+
+
+def sites_from_form(session: Session, mode: str, chosen: list[str]) -> tuple[str | None, str | None]:
+    """(stored list, error) for the form's choice; keys come out in registry-then-own order."""
+    if mode != "choose":
+        return None, None
+    keys = [k for k in (*BUILTIN, *(o.key for o in own_sites(session))) if k in chosen]
+    if not keys:
+        return None, "Tick at least one site."
+    return json.dumps(keys), None

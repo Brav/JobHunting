@@ -21,7 +21,7 @@ from jobhunt.eligibility import VERDICT_LABELS, VERDICT_SYMBOLS, VERDICTS, effec
 from jobhunt import salary
 from jobhunt.preferences import is_paused, load_feed_errors, load_preferences
 from jobhunt.prompts import KINDS as PROMPT_KINDS
-from jobhunt.sites import SOURCE_LABELS, searched_sites, site_labels
+from jobhunt.sites import SOURCE_LABELS, searched_sites, site_labels, sites_text
 from jobhunt.language import language_name
 from jobhunt.reports import run_summary
 from jobhunt.schedule import EVERY_CHOICES, Schedule, describe
@@ -169,7 +169,7 @@ def schedule_text(stored: str | None, default: Schedule) -> str:
     return "Default · " + text[0].lower() + text[1:]
 
 
-templates.env.globals.update(schedule_text=schedule_text, describe_schedule=describe, every_choices=EVERY_CHOICES)
+templates.env.globals.update(schedule_text=schedule_text, sites_text=sites_text, describe_schedule=describe, every_choices=EVERY_CHOICES)
 
 
 def apply_time_zone(app, tz: ZoneInfo) -> None:

@@ -16,6 +16,7 @@
     <input name="radius_km" type="number" min="0" max="200" value="{{ values.radius_km }}" required>
   </label>
   {% if errors.radius_km %}<span class="field-error">{{ errors.radius_km }}</span>{% endif %}
+  {% include "_site_fields.html" %}
   {% with sched = values, sched_error = errors.schedule, allow_default = true, legend = "When it runs" %}
   {% include "_schedule_fields.html" %}
   {% endwith %}
