@@ -100,3 +100,10 @@ def test_odd_schedule_choice_is_read_as_default_and_never_echoed(app_factory):
         r = c.post(f"/listings/{listing_id}", data=odd)
         assert r.status_code == 400 and "alert(1)" not in r.text
         assert re.search(r'name="schedule" value="default"[^>]*checked', r.text)
+
+
+def test_listings_page_is_not_linkedin_only(app_factory):
+    with TestClient(app_factory()) as c:
+        text = c.get("/listings").text
+        assert "Your saved searches." in text
+        assert "saved LinkedIn searches" not in text

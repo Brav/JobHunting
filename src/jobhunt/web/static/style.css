@@ -100,11 +100,14 @@ kbd { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 0 5px;
 .confirm-dialog h2 { margin: 0 0 var(--s3); font-size: var(--t4); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: var(--s2); margin-top: var(--s4); }
 .btn.danger { background: var(--danger); border-color: var(--danger); color: var(--danger-fg); }
-.schedule-fields { border: 1px solid var(--line); border-radius: var(--r2); padding: var(--s3) var(--s4);
+.schedule-fields, .site-fields { border: 1px solid var(--line); border-radius: var(--r2); padding: var(--s3) var(--s4);
   display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); margin: 0; min-width: 0; }
-.schedule-fields legend { font-weight: 600; padding: 0 var(--s1); }
+.schedule-fields legend, .site-fields legend { font-weight: 600; padding: 0 var(--s1); }
 .schedule-times, .schedule-every { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center;
   padding-left: var(--s5); }
+.site-boxes { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center;
+  padding-left: var(--s5); }
+.site-boxes strong, .site-boxes .hint { flex-basis: 100%; }
 .time-row { display: inline-flex; align-items: center; gap: 2px; }
 input, select, textarea { font: inherit; font-size: var(--t2); padding: 6px 8px; border-radius: var(--r1);
                           border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg); }
