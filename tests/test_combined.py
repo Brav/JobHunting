@@ -72,6 +72,32 @@ def test_errors_per_site_and_dropped_for_removed_sites():
     assert "feed:1" not in combined.errors and saved[-1] == {}
 
 
+def test_a_failing_site_is_asked_once_per_run_and_fails_every_listing():
+    calls = []
+    combined = CombinedSource(FakeSource({}), get=url_get({"https://remoteok.com/api": RuntimeError("down")}, calls),
+                              clock=lambda: NOW)
+    for keywords in ("php", "laravel"):
+        combined.search(keywords, "X", 25, 168, 100, sites=("remoteok",))
+        assert combined.errors["remoteok"] == "down"
+    assert [c[0] for c in calls] == ["https://remoteok.com/api"]
+
+
+def test_an_unreadable_robots_txt_is_asked_again_after_an_hour_not_a_day():
+    clock = FakeClock(NOW)
+    calls = []
+    own = [OwnSite("feed:1", "Mine", "feed", "https://example.com/feed"),
+           OwnSite("feed:2", "Other", "feed", "https://example.com/other")]
+    combined = CombinedSource(FakeSource({}), get=url_get({"https://example.com/robots.txt": FakeResponse(status=503)},
+                                                          calls), own=lambda: own, clock=clock)
+    for _ in range(2):
+        combined.search("php", "X", 25, 168, 100, sites=("feed:1", "feed:2"))
+    assert [c[0] for c in calls] == ["https://example.com/robots.txt"]
+    assert combined.errors == {"feed:1": "couldn't read its robots.txt", "feed:2": "couldn't read its robots.txt"}
+    clock.now += timedelta(hours=1, minutes=1)
+    combined.search("php", "X", 25, 168, 100, sites=("feed:1",))
+    assert [c[0] for c in calls] == ["https://example.com/robots.txt"] * 2
+
+
 def test_own_feed_follows_robots_read_at_most_once_a_day():
     clock = FakeClock(NOW)
     answers = {"https://example.com/robots.txt": FakeResponse(text="User-agent: *\nDisallow:\n"),

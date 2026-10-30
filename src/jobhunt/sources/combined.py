@@ -1,8 +1,8 @@
 """The search every listing runs: LinkedIn plus the other sites the listing chose.
 
 `CombinedSource` wraps the LinkedIn search. A listing's `sites` say which others it reads: built-in feeds, the user's
-own feeds and their watched companies' boards. Each site is fetched once per run (cached for an hour); a site that
-fails is logged and skipped, never failing the listing.
+own feeds and their watched companies' boards. Each site is fetched once per run (cached for an hour, a failure too);
+a site that fails is logged and skipped, never failing the listing.
 """
 
 import logging
@@ -43,23 +43,24 @@ class CombinedSource:
                  ttl: timedelta = timedelta(hours=1), robots_ttl: timedelta = timedelta(days=1)):
         self.primary, self.get, self.own, self.home_country = primary, get, own, home_country
         self.clock, self.ttl, self.robots_ttl = clock, ttl, robots_ttl
-        self._cache: dict[tuple, tuple[datetime, list[FeedPosting]]] = {}
-        self._robots: dict[str, tuple[datetime, RobotFileParser]] = {}  # per host; only successful reads
+        self._cache: dict[tuple, tuple[datetime, list[FeedPosting] | Exception]] = {}
+        self._robots: dict[str, tuple[datetime, RobotFileParser | None]] = {}  # per host; None: couldn't be read
         self.errors: dict[str, str] = {}  # site key -> what went wrong
         self.on_errors: Callable[[dict[str, str]], None] | None = None  # told whenever the failing sites change
 
     def _check_robots(self, url: str) -> None:
         host = urlsplit(url).netloc
         hit = self._robots.get(host)
-        if hit and self.clock() - hit[0] < self.robots_ttl:
-            rules = hit[1]
-        else:
+        # Rules read are kept a day; a robots.txt that couldn't be read is asked again after the feed's hour.
+        if not hit or self.clock() - hit[0] >= (self.robots_ttl if hit[1] is not None else self.ttl):
             try:
                 rules = site_check.robots_rules(url, self.get)
             except site_check.Refused:
-                raise SourceError("couldn't read its robots.txt") from None
-            self._robots[host] = (self.clock(), rules)
-        if not rules.can_fetch("jobhunt", url):
+                rules = None
+            hit = self._robots[host] = (self.clock(), rules)
+        if hit[1] is None:
+            raise SourceError("couldn't read its robots.txt")
+        if not hit[1].can_fetch("jobhunt", url):
             raise SourceError("robots.txt now disallows it")
 
     def _site(self, key: str, keywords: str, own: dict[str, OwnSite]) -> list[FeedPosting]:
@@ -72,14 +73,20 @@ class CombinedSource:
             cache_key = (key,)
         hit = self._cache.get(cache_key)
         if hit and self.clock() - hit[0] < self.ttl:
+            if isinstance(hit[1], Exception):  # failed earlier this run: every listing searching it fails, unasked
+                raise hit[1].with_traceback(None)
             return hit[1]
-        if site and site.kind == "feed":
-            self._check_robots(site.url)
-            fetched = rss.fetch_feed(int(key.partition(":")[2]), site.url, self.get)
-        elif site:
-            fetched = watchlist.fetch_board(site.kind, site.token, site.name, self.get)
-        else:
-            fetched = FETCHERS[key](keywords, self.get, self.home_country())
+        try:
+            if site and site.kind == "feed":
+                self._check_robots(site.url)
+                fetched = rss.fetch_feed(int(key.partition(":")[2]), site.url, self.get)
+            elif site:
+                fetched = watchlist.fetch_board(site.kind, site.token, site.name, self.get)
+            else:
+                fetched = FETCHERS[key](keywords, self.get, self.home_country())
+        except Exception as error:
+            self._cache[cache_key] = (self.clock(), error)
+            raise
         self._cache[cache_key] = (self.clock(), fetched)
         return fetched
 
