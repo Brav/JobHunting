@@ -78,6 +78,15 @@ def load_feed_errors(session: Session) -> dict[str, dict]:
     return data if isinstance(data, dict) else {}
 
 
+def drop_feed_error(session: Session, name: str, now: datetime) -> None:
+    """Forget one source's stored failure (an own site that was removed); the caller commits."""
+    errors = load_feed_errors(session)
+    if errors.pop(name, None) is not None:
+        row = session.get(Setting, FEED_ERRORS_KEY)
+        row.value, row.updated_at = json.dumps(errors), now
+        session.add(row)
+
+
 def save_feed_errors(session: Session, errors: dict[str, str], now: datetime) -> None:
     before = load_feed_errors(session)
     data = {name: {"error": message, "since": before.get(name, {}).get("since") or now.isoformat(timespec="minutes")}

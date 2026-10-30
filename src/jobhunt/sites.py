@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from sqlmodel import Session, select
 
 from jobhunt.models import CustomFeed, Listing, WatchedCompany
-from jobhunt.preferences import load_preferences
+from jobhunt.preferences import drop_feed_error, load_preferences
 from jobhunt.timeutil import utcnow
 from jobhunt.watchlist import ATS, board_page_url
 
@@ -86,7 +86,7 @@ def site_labels(session: Session) -> dict[str, str]:
 
 
 def remove_site(session: Session, key: str) -> int:
-    """Delete an own site and drop it from every listing; returns how many listings went back to Default."""
+    """Delete an own site and its stored error, and drop it from every listing; returns how many went back to Default."""
     kind, _, raw = key.partition(":")
     table = {"feed": CustomFeed, "board": WatchedCompany}.get(kind)
     if table is None:  # only own sites can be removed
@@ -108,6 +108,7 @@ def remove_site(session: Session, key: str) -> int:
         session.add(listing)
     if row is not None:
         session.delete(row)
+    drop_feed_error(session, key, utcnow())
     session.commit()
     return reset
 

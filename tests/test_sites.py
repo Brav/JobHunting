@@ -3,7 +3,8 @@ import json
 from sqlmodel import select
 
 from jobhunt.models import CustomFeed, Job, Listing, Setting, WatchedCompany
-from jobhunt.preferences import Preferences, load_preferences, save_preferences
+from jobhunt.preferences import (Preferences, load_feed_errors, load_preferences, save_feed_errors,
+                                 save_preferences)
 from jobhunt.sites import (BUILTIN, SOURCE_LABELS, OwnSite, own_sites, parse_sites, remove_site, site_labels,
                            sites_for)
 from jobhunt.timeutil import utcnow
@@ -84,6 +85,22 @@ def test_remove_site_drops_its_key_and_sends_empty_listings_back_to_default(sess
         assert only.sites is None and only.search_changed_at is not None
         assert json.loads(mixed.sites) == ["hn"] and default.sites is None
         assert s.exec(select(CustomFeed)).all() == [] and len(s.exec(select(Job)).all()) == 1
+
+
+def test_removing_a_feed_drops_its_stored_error_and_its_id_is_not_reused(session_factory):
+    with session_factory() as s:
+        feed = CustomFeed(name="LaraJobs", url="https://larajobs.com/feed")
+        s.add(feed)
+        s.commit()
+        old_id = feed.id
+        save_feed_errors(s, {f"feed:{old_id}": "down", "hn": "slow"}, utcnow())
+        since = load_feed_errors(s)["hn"]["since"]
+        remove_site(s, f"feed:{old_id}")
+        assert load_feed_errors(s) == {"hn": {"error": "slow", "since": since}}
+        again = CustomFeed(name="Acme jobs", url="https://example.com/feed")
+        s.add(again)
+        s.commit()
+        assert again.id != old_id  # a new feed never inherits the old one's key, nor its error
 
 
 def test_labels_for_job_sources():

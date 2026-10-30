@@ -223,6 +223,7 @@ class CustomFeed(SQLModel, table=True):
     """An RSS or Atom feed the user added as a job site."""
 
     __tablename__ = "custom_feeds"
+    __table_args__ = {"sqlite_autoincrement": True}  # a removed feed's id, and so its key, is never handed out again
 
     id: int | None = Field(default=None, primary_key=True)
     name: str
