@@ -59,6 +59,7 @@ def listings_page(request: Request):
 
 def _schedule(choice: str, times: list[str], start: str, every: str, values: dict, errors: dict) -> str | None:
     """The schedule the form describes (None = the default); its choices go back into the form, its errors too."""
+    choice = choice if choice in ("times", "every") else "default"  # never echo an odd one into the form's script
     text, problems = from_form(choice, times, start, every)
     values.update(choice=choice, times=times or [""], start=start, every=every)
     if problems:

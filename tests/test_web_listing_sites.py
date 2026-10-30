@@ -87,3 +87,16 @@ def test_odd_site_mode_is_read_as_default_and_never_echoed(app_factory):
         assert "alert(1)" not in r.text
         assert re.search(r'name="site_mode" value="default"[^>]*checked', r.text)
         assert not re.search(r'name="site_mode" value="choose"[^>]*checked', r.text)
+
+
+def test_odd_schedule_choice_is_read_as_default_and_never_echoed(app_factory):
+    app = app_factory()
+    with TestClient(app) as c:
+        odd = {**FORM, "name": "", "schedule": "default'};alert(1);//"}
+        r = c.post("/listings", data=odd)
+        assert r.status_code == 400 and "alert(1)" not in r.text
+        assert re.search(r'name="schedule" value="default"[^>]*checked', r.text)
+        listing_id = add_listing(app.state.session_factory, "A")
+        r = c.post(f"/listings/{listing_id}", data=odd)
+        assert r.status_code == 400 and "alert(1)" not in r.text
+        assert re.search(r'name="schedule" value="default"[^>]*checked', r.text)

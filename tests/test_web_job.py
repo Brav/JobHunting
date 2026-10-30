@@ -47,6 +47,19 @@ def test_job_page_shows_whole_listing(app_factory):
     assert f'href="/jobs/{jid}/cv-prompt"' in page and 'data-action="save"' in page and 'id="job-pane"' in page
 
 
+def test_an_own_feed_job_opens_on_the_original_site(app_factory):
+    app = app_factory()
+    with app.state.session_factory() as s:
+        job = Job(external_id="feed:1:https://example.com/jobs/1", source="feed", title="PHP Developer",
+                  company="Acme", location="", url="https://example.com/jobs/1")
+        s.add(job)
+        s.commit()
+        jid = job.id
+    with TestClient(app) as c:
+        page = c.get(f"/jobs/{jid}").text
+    assert "Open on the original site" in page and "Open on Your feeds" not in page
+
+
 def test_job_page_translates_non_english(app_factory):
     app = app_factory(fetch_page=Pages(JobPage(GERMAN, [])), translator=FakeTranslator())
     jid = seed_job(app, title="Backend-Entwickler")
