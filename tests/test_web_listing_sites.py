@@ -77,3 +77,13 @@ def test_form_names_default_and_own_sites_and_the_table_shows_them(app_factory):
         assert ("LinkedIn uses your keywords and location. The other sites match your keywords, ignoring place "
                 "names, and cover the whole site.") in page
     assert sites_text(None, {}) == "Default" and sites_text('["devbg"]', {"devbg": "DEV.BG"}) == "DEV.BG"
+
+
+def test_odd_site_mode_is_read_as_default_and_never_echoed(app_factory):
+    app = app_factory()
+    with TestClient(app) as c:
+        r = c.post("/listings", data={**FORM, "name": "", "site_mode": "default'};alert(1);//"})
+        assert r.status_code == 400
+        assert "alert(1)" not in r.text
+        assert re.search(r'name="site_mode" value="default"[^>]*checked', r.text)
+        assert not re.search(r'name="site_mode" value="choose"[^>]*checked', r.text)

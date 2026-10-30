@@ -69,7 +69,7 @@ def _schedule(choice: str, times: list[str], start: str, every: str, values: dic
 def _sites(s: Session, mode: str, chosen: list[str], values: dict, errors: dict) -> str | None:
     """The sites the form describes (None = the default ones); its choices go back into the form, its error too."""
     text, problem = sites_from_form(s, mode, chosen)
-    values.update(site_mode=mode, sites=chosen)
+    values.update(site_mode="choose" if mode == "choose" else "default", sites=chosen)
     if problem:
         errors["sites"] = problem
     return text
