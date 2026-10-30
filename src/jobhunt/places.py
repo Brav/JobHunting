@@ -111,3 +111,11 @@ def place_name(code: str) -> str:
     if code in REGION_NAMES:
         return REGION_NAMES[code]
     return COUNTRIES[code][0] if code in COUNTRIES else code
+
+
+def country_name(code: str) -> str:
+    """The country's English name ("United Kingdom", not "the UK"); empty for an unknown code."""
+    if code not in COUNTRIES:
+        return ""
+    label, others = COUNTRIES[code]
+    return others[0] if label.startswith("the ") and others else label
