@@ -3,7 +3,7 @@ import socket
 import pytest
 from fakes import FakeResponse, url_get
 from test_rss import WORDPRESS
-from test_watchlist import GREENHOUSE
+from test_watchlist import GREENHOUSE, LEVER
 
 from jobhunt.site_check import (ADDRESS, BLOCKED, NO_HOST, NO_JOBS, NOTHING, PRIVATE, ROBOTS_DISALLOWED,
                                 ROBOTS_UNREADABLE, TERMS, Refused, check_saving, check_site, normalise_url)
@@ -138,6 +138,35 @@ def test_careers_pages():
     found = check_site("https://acme.example/careers", "", url_get(routes), PUBLIC)
     assert (found.kind, found.token, found.name, found.url) == ("greenhouse", "acme", "Acme", "https://acme.example/careers")
     assert check_site("https://acme.example/careers", "Acme Corp", url_get(routes), PUBLIC).name == "Acme Corp"
+
+
+def _careers(links: str) -> dict:
+    """A careers page that advertises its blog feed in its head, plus links to boards."""
+    page = FakeResponse(text='<html><head><title>Acme</title><link rel="alternate" type="application/rss+xml" '
+                             f'href="/feed/"></head><body>{links}</body></html>')
+    return {"https://acme.example/robots.txt": OPEN, "https://acme.example/careers": page,
+            "https://acme.example/feed/": FakeResponse(content=WORDPRESS),
+            "https://boards-api.greenhouse.io/v1/boards/acme/jobs": GREENHOUSE,
+            "https://api.lever.co/v0/postings/acme-co": LEVER}
+
+
+def test_one_embedded_board_wins_over_the_advertised_feed():
+    one = '<script src="https://boards.greenhouse.io/embed/job_board/js?for=acme"></script>'
+    found = check_site("https://acme.example/careers", "", url_get(_careers(one + one)), PUBLIC)
+    assert (found.kind, found.token, found.name) == ("greenhouse", "acme", "Acme")
+
+
+def test_links_to_two_boards_leave_the_advertised_feed():
+    two = '<a href="https://boards.greenhouse.io/acme">Jobs</a><a href="https://jobs.lever.co/acme-co">More</a>'
+    found = check_site("https://acme.example/careers", "", url_get(_careers(two)), PUBLIC)
+    assert (found.kind, found.url) == ("feed", "https://acme.example/feed/")
+
+
+def test_without_a_feed_the_first_of_two_boards_is_used():
+    two = '<a href="https://jobs.lever.co/acme-co">Jobs</a><a href="https://boards.greenhouse.io/acme">More</a>'
+    routes = {**_careers(""), "https://acme.example/careers": FakeResponse(text=f"<title>Acme</title>{two}")}
+    found = check_site("https://acme.example/careers", "", url_get(routes), PUBLIC)
+    assert (found.kind, found.token) == ("lever", "acme-co")
 
 
 def test_saving_repeats_only_the_first_three_checks():

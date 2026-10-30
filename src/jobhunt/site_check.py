@@ -162,11 +162,14 @@ def check_site(url: str, name: str, get, resolve) -> Candidate:
         return _board_candidate(board, url, name, get)
     if rss.is_feed(response.content):
         return _feed_candidate(url, name, response.content)
+    boards = watchlist.boards_in_page(response.text)
+    if len(boards) == 1:  # a careers page embedding its hiring system: the feed in its head is likely the blog's
+        return _board_candidate(boards[0], url, name or _page_title(response.text), get)
     if advertised := rss.advertised_feed(response.text, url):
         _check_saving(advertised, get, resolve)
         feed = _test_fetch(advertised, get, resolve)
         if rss.is_feed(feed.content):
             return _feed_candidate(advertised, name, feed.content)
-    if board := watchlist.board_in_page(response.text):
-        return _board_candidate(board, url, name or _page_title(response.text), get)
+    if boards:
+        return _board_candidate(boards[0], url, name or _page_title(response.text), get)
     raise Refused(NOTHING)

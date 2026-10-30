@@ -69,12 +69,16 @@ def board_from_url(url: str) -> tuple[str, str] | None:
     return None
 
 
+def boards_in_page(html: str) -> list[tuple[str, str]]:
+    """The distinct boards on the nine hiring systems that a page's HTML links to, in page order."""
+    found = (board_from_url("https:" + a if a.startswith("//") else a) for a in _ADDRESS.findall(html))
+    return list(dict.fromkeys(board for board in found if board))
+
+
 def board_in_page(html: str) -> tuple[str, str] | None:
     """The first careers-page address in a page's HTML that belongs to one of the nine hiring systems."""
-    for found in _ADDRESS.findall(html):
-        if board := board_from_url("https:" + found if found.startswith("//") else found):
-            return board
-    return None
+    boards = boards_in_page(html)
+    return boards[0] if boards else None
 
 
 def slug_candidates(name: str) -> list[str]:

@@ -11,7 +11,8 @@ from jobhunt.runner import run_daily
 from jobhunt.sites import OwnSite
 from jobhunt.sources.combined import CombinedSource
 from jobhunt.timeutil import utcnow
-from jobhunt.watchlist import board_from_url, board_in_page, detect_board, fetch_board, slug_candidates
+from jobhunt.watchlist import (board_from_url, board_in_page, boards_in_page, detect_board, fetch_board,
+                               slug_candidates)
 
 NOW = datetime(2026, 10, 28, 9, 0)
 GREENHOUSE = {"jobs": [{"id": 42, "title": "Senior PHP Engineer", "location": {"name": "Remote, Europe"},
@@ -129,6 +130,13 @@ def test_board_in_page():
     assert board_in_page('<iframe src="//acme.recruitee.com/embed"></iframe>') == ("recruitee", "acme")
     assert board_in_page("<p>No jobs here</p>") is None
     assert board_in_page('<script>var p = "//[a-z]+";</script><a href="https://jobs.lever.co/acme">') == ("lever", "acme")
+
+
+def test_boards_in_page_are_distinct_and_in_page_order():
+    page = ('<a href="https://jobs.lever.co/acme/1">One</a><a href="https://boards.greenhouse.io/acme">'
+            '<a href="https://jobs.lever.co/acme/2">Two</a>')
+    assert boards_in_page(page) == [("lever", "acme"), ("greenhouse", "acme")]
+    assert board_in_page(page) == ("lever", "acme") and boards_in_page("<p>None</p>") == []
 
 
 def test_new_parsers():
