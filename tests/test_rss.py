@@ -3,6 +3,7 @@ from datetime import date
 import pytest
 from fakes import FakeResponse, url_get
 
+from jobhunt.sources import rss
 from jobhunt.sources.base import SourceError
 from jobhunt.sources.feeds import USER_AGENT
 from jobhunt.sources.rss import advertised_feed, feed_postings, feed_title, fetch_feed, is_feed, parse, split_title
@@ -93,7 +94,24 @@ def test_not_a_feed_and_no_entities_from_a_doctype():
     evil = (b'<?xml version="1.0"?><!DOCTYPE rss [<!ENTITY x SYSTEM "file:///etc/passwd">]>'
             b'<rss version="2.0"><channel><title>J</title><item><title>A &x;</title>'
             b"<link>https://example.com/a</link></item></channel></rss>")
-    assert all("root:" not in j.posting.title for j in feed_postings(1, evil))
+    (job,) = feed_postings(1, evil)
+    assert "root:" not in job.posting.title
+    bracket = (b'<?xml version="1.0"?><!DOCTYPE rss [<!ENTITY x "a]b">]>'
+               b'<rss version="2.0"><channel><title>J</title><item><title>PHP Dev</title>'
+               b"<link>https://example.com/a</link></item></channel></rss>")
+    (job,) = feed_postings(1, bracket)
+    assert job.posting.title == "PHP Dev" and feed_title(bracket) == "J"
+
+
+def test_the_doctype_is_removed_before_feedparser_sees_the_bytes(monkeypatch):
+    seen = []
+    real = rss.feedparser.parse
+    monkeypatch.setattr(rss.feedparser, "parse", lambda content: seen.append(content) or real(content))
+    for subset in (b'SYSTEM "file:///etc/passwd"', b'[<!ENTITY x SYSTEM "file:///etc/passwd">]',
+                   b'[<!ENTITY x "a]b">]'):
+        parse(b'<?xml version="1.0"?><!DOCTYPE rss ' + subset + b'><rss version="2.0"><channel>'
+              b"<title>J</title></channel></rss>")
+    assert len(seen) == 3 and all(b"DOCTYPE" not in content and b"ENTITY" not in content for content in seen)
 
 
 def test_advertised_feed_and_title_and_user_agent():
