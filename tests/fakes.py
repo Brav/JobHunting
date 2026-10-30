@@ -41,9 +41,9 @@ class FakeSource:
         self.outcomes = {k: list(v) for k, v in outcomes.items()}
         self.calls: list[dict] = []
 
-    def search(self, keywords, location, radius_km, window_hours, limit):
+    def search(self, keywords, location, radius_km, window_hours, limit, sites=None):
         self.calls.append(dict(keywords=keywords, location=location, radius_km=radius_km,
-                               window_hours=window_hours, limit=limit))
+                               window_hours=window_hours, limit=limit, sites=sites))
         queue = self.outcomes.get(keywords, [[]])
         outcome = queue.pop(0) if len(queue) > 1 else queue[0]
         if isinstance(outcome, Exception):

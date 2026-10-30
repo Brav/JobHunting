@@ -7,7 +7,8 @@ from jobhunt.models import Job, Match
 from jobhunt.preferences import load_feed_errors
 from jobhunt.runner import run_daily
 from jobhunt.sources.base import JobPosting, SourceError
-from jobhunt.sources.feeds import (CombinedSource, FeedPosting, hn_whos_hiring, himalayas, is_place_word, matches_keywords,
+from jobhunt.sources.combined import CombinedSource
+from jobhunt.sources.feeds import (FeedPosting, hn_whos_hiring, himalayas, is_place_word, matches_keywords,
                                    remoteok, search_words)
 
 NOW = datetime(2026, 10, 28, 9, 0)
@@ -93,28 +94,11 @@ def test_keyword_matching():
     assert not matches_keywords(php, '"data engineer" NOT senior')
 
 
-def test_combined_source_adds_matches_and_survives_feed_errors():
-    calls = []
-    primary = FakeSource({"php remote": [[p("1", title="LinkedIn PHP Dev")]]})
-    combined = CombinedSource(primary, get=fake_get(calls), enabled=lambda: ("remoteok", "himalayas"), clock=lambda: NOW)
-    found = combined.search("php remote", "europe", 200, 168, 100)
-    assert {x.source for x in found} == {"linkedin", "remoteok", "himalayas"} and len(found) == 4
-    combined.search("php remote", "europe", 200, 168, 100)
-    assert calls.count("https://remoteok.com/api") == 1  # fetched once, then cached
-
-    def broken(url, **kw):
-        raise SourceError("down")
-    failing = CombinedSource(FakeSource({"php remote": [[p("1")]]}), get=broken, enabled=lambda: ("remoteok",),
-                             clock=lambda: NOW)
-    assert [x.external_id for x in failing.search("php remote", "europe", 200, 168, 100)] == ["1"]
-    assert "remoteok" in failing.errors
-
-
 def test_feed_jobs_are_stored_with_description_and_not_duplicated(session_factory):
     sf = session_factory
-    add_listing(sf, "A", keywords="php remote")
+    add_listing(sf, "A", keywords="php remote", sites='["linkedin", "remoteok", "himalayas"]')
     primary = FakeSource({"php remote": [[p("1", title="Senior PHP Developer", company="Huzzle")]]})
-    combined = CombinedSource(primary, get=fake_get(), enabled=lambda: ("remoteok", "himalayas"), clock=lambda: NOW)
+    combined = CombinedSource(primary, get=fake_get(), clock=lambda: NOW)
     clock = FakeClock(NOW)
     run_daily(sf, combined, trigger="manual", clock=clock, sleep=clock.sleep)
     with sf() as s:
@@ -147,8 +131,7 @@ def test_feed_failures_are_kept_and_shown(app_factory):
         if state["down"]:
             raise SourceError("Remote OK answered 503")
         return fake_get()(url, **kw)
-    combined = CombinedSource(FakeSource({"php remote": [[p("1")]]}), get=flaky, enabled=lambda: ("remoteok",),
-                              clock=lambda: NOW, ttl=timedelta(0))
+    combined = CombinedSource(FakeSource({"php remote": [[p("1")]]}), get=flaky, clock=lambda: NOW, ttl=timedelta(0))
     app = app_factory(source=combined)
     with TestClient(app) as c:
         sf = app.state.session_factory

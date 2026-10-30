@@ -21,7 +21,7 @@ from jobhunt.eligibility import VERDICT_LABELS, VERDICT_SYMBOLS, VERDICTS, effec
 from jobhunt import salary
 from jobhunt.preferences import is_paused, load_feed_errors, load_preferences
 from jobhunt.prompts import KINDS as PROMPT_KINDS
-from jobhunt.sites import SOURCE_LABELS
+from jobhunt.sites import SOURCE_LABELS, searched_sites, site_labels
 from jobhunt.language import language_name
 from jobhunt.reports import run_summary
 from jobhunt.schedule import EVERY_CHOICES, Schedule, describe
@@ -144,8 +144,10 @@ def render(request: Request, name: str, status_code: int = 200, **ctx):
     with session(request) as s:
         summary = run_summary(s)
         prefs = load_preferences(s)
-        feed_errors = {name: {**e, "since": datetime.fromisoformat(e["since"])}
-                       for name, e in load_feed_errors(s).items() if name in prefs.sites}
+        labels = site_labels(s)
+        searched = searched_sites(s)
+        feed_errors = {name: {**e, "since": datetime.fromisoformat(e["since"]), "label": labels.get(name, name)}
+                       for name, e in load_feed_errors(s).items() if name in searched}
         setup_banner = request.url.path != "/setup" and setup_state(s) != "done"
     now = utcnow()
     paused = prefs.paused_until if is_paused(prefs, local_date(now, tz)) else ""
@@ -154,7 +156,7 @@ def render(request: Request, name: str, status_code: int = 200, **ctx):
             "age": lambda job: job_age(job, now, tz),
             "running": coordinator.is_running, "next_run": coordinator.next_run_at(),
             "results_cap": request.app.state.settings.results_per_listing, "paused_until": paused,
-            "feed_errors": feed_errors, "setup_banner": setup_banner, "default_schedule": default}
+            "feed_errors": feed_errors, "site_labels": labels, "setup_banner": setup_banner, "default_schedule": default}
     return templates.TemplateResponse(request, name, {**base, **ctx}, status_code=status_code)
 
 

@@ -91,8 +91,8 @@ class LinkedInSource:
             from jobspy import scrape_jobs as scrape
         self._scrape = scrape
 
-    def search(self, keywords: str, location: str, radius_km: int,
-               window_hours: int, limit: int) -> list[JobPosting]:
+    def search(self, keywords: str, location: str, radius_km: int, window_hours: int, limit: int,
+               sites: tuple[str, ...] | None = None) -> list[JobPosting]:  # sites: for the combined source
         try:
             df = self._scrape(
                 site_name=["linkedin"],

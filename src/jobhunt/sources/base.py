@@ -44,5 +44,5 @@ class SourceUnavailable(SourceError):
 
 
 class JobSource(Protocol):
-    def search(self, keywords: str, location: str, radius_km: int,
-               window_hours: int, limit: int) -> list[JobPosting]: ...
+    def search(self, keywords: str, location: str, radius_km: int, window_hours: int, limit: int,
+               sites: tuple[str, ...] | None = None) -> list[JobPosting]: ...

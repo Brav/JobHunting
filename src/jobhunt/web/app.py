@@ -66,19 +66,18 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     _default_skills_from_cv(session_factory, settings)
     if source is None:
         import requests
-        from jobhunt.preferences import load_preferences
-        from jobhunt.sources.feeds import CombinedSource
+        from jobhunt.eligibility import load_profile
+        from jobhunt.sites import own_sites
+        from jobhunt.sources.combined import CombinedSource
         from jobhunt.sources.linkedin import LinkedInSource
 
-        def enabled_feeds() -> tuple[str, ...]:
+        def own() -> list:
             with session_factory() as s:
-                return tuple(k for k in load_preferences(s).sites if k != "linkedin")
-        def watched_boards() -> list[tuple[str, str, str]]:
-            from sqlmodel import select
-            from jobhunt.models import WatchedCompany
+                return own_sites(s)
+        def home_country() -> str:
             with session_factory() as s:
-                return [(w.ats, w.token, w.name) for w in s.exec(select(WatchedCompany)).all()]
-        source = CombinedSource(LinkedInSource(), get=requests.get, enabled=enabled_feeds, watched=watched_boards)
+                return load_profile(s).home_country
+        source = CombinedSource(LinkedInSource(), get=requests.get, own=own, home_country=home_country)
     if hasattr(source, "on_errors"):  # the extra feeds: keep their failures for Settings and the report
         def keep_feed_errors(errors: dict[str, str]) -> None:
             from jobhunt.preferences import save_feed_errors

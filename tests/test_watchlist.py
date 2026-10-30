@@ -8,7 +8,8 @@ import pytest
 from fakes import FakeClock, FakeResponse, FakeSource, add_listing, make_posting as p, url_get
 from jobhunt.blocks import company_key
 from jobhunt.runner import run_daily
-from jobhunt.sources.feeds import CombinedSource
+from jobhunt.sites import OwnSite
+from jobhunt.sources.combined import CombinedSource
 from jobhunt.timeutil import utcnow
 from jobhunt.watchlist import board_from_url, board_in_page, detect_board, fetch_board, slug_candidates
 
@@ -73,8 +74,9 @@ def test_watched_boards_join_the_search(session_factory):
     sf = session_factory
     add_listing(sf, "A", keywords="php remote")
     combined = CombinedSource(FakeSource({"php remote": [[]]}), get=board_get({("greenhouse", "acme"): GREENHOUSE}),
-                              enabled=lambda: (), watched=lambda: [("greenhouse", "acme", "Acme")], clock=lambda: NOW)
-    found = combined.search("php remote", "europe", 200, 168, 100)
+                              own=lambda: [OwnSite("board:1", "Acme", "greenhouse", "https://job-boards.greenhouse.io/acme", "acme")],
+                              clock=lambda: NOW)
+    found = combined.search("php remote", "europe", 200, 168, 100, sites=("linkedin", "board:1"))
     assert [x.external_id for x in found] == ["greenhouse:acme:42"]
 
 

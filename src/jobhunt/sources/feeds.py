@@ -1,21 +1,18 @@
 """Job feeds besides LinkedIn: Remote OK, Himalayas and Hacker News "Who is hiring?", read through their public APIs.
 
-`CombinedSource` wraps the LinkedIn search: each listing's search also returns the feed jobs matching its keywords.
-Each feed is fetched once per run (cached for an hour); a feed that fails is logged and skipped, never failing a run.
+`jobhunt.sources.combined.CombinedSource` runs them for each listing's chosen sites.
 """
 
 import html
 import logging
 import re
-from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 
 from markdownify import markdownify
 
 from jobhunt import places as place_names
 from jobhunt.sources.base import JobPosting
-from jobhunt.timeutil import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -197,60 +194,3 @@ def matches_keywords(feed: FeedPosting, keywords: str) -> bool:
     def has(word):
         return re.search(r"(?<!\w)" + re.escape(word) + r"(?!\w)", text) is not None
     return bool(wanted) and all(has(w) for w in wanted) and not any(has(w) for w in unwanted)
-
-
-FETCHERS: dict[str, Callable] = {"remoteok": lambda keywords, get: remoteok(get),
-                                 "himalayas": himalayas,
-                                 "hn": lambda keywords, get: hn_whos_hiring(get)}
-_PER_KEYWORDS = {"himalayas"}  # searched per listing; the others are one feed for every listing
-
-
-class CombinedSource:
-    """The LinkedIn search plus the enabled feeds' jobs matching the same keywords."""
-
-    def __init__(self, primary, *, get, enabled: Callable[[], tuple[str, ...]],
-                 watched: Callable[[], list[tuple[str, str, str]]] = lambda: [],
-                 clock: Callable[[], datetime] = utcnow, ttl: timedelta = timedelta(hours=1)):
-        self.primary, self.get, self.enabled, self.clock, self.ttl = primary, get, enabled, clock, ttl
-        self.watched = watched  # (ats, board token, company name) of each watched company
-        self._cache: dict[tuple, tuple[datetime, list[FeedPosting]]] = {}
-        self.errors: dict[str, str] = {}
-        self.on_errors: Callable[[dict[str, str]], None] | None = None  # told whenever the failing feeds change
-
-    def _feed(self, name: str, keywords: str) -> list[FeedPosting]:
-        key = (name, keywords) if name in _PER_KEYWORDS else (name,)
-        hit = self._cache.get(key)
-        if hit and self.clock() - hit[0] < self.ttl:
-            return hit[1]
-        if ":" in name:  # a watched company's board: "greenhouse:acme:Acme"
-            from jobhunt.watchlist import fetch_board
-            ats, token, company = name.split(":", 2)
-            fetched = fetch_board(ats, token, company, self.get)
-        else:
-            fetched = FETCHERS[name](keywords, self.get)
-        self._cache[key] = (self.clock(), fetched)
-        return fetched
-
-    def search(self, keywords: str, location: str, radius_km: int, window_hours: int, limit: int) -> list[JobPosting]:
-        postings = list(self.primary.search(keywords, location, radius_km, window_hours, limit))
-        oldest = (self.clock() - timedelta(days=MAX_AGE_DAYS)).date()
-        boards = [f"{ats}:{token}:{company}" for ats, token, company in self.watched()]
-        before = dict(self.errors)
-        for name in [*self.enabled(), *boards]:
-            if name not in FETCHERS and ":" not in name:
-                continue
-            try:
-                feed = self._feed(name, keywords)
-                self.errors.pop(name, None)
-            except Exception as e:  # a feed's trouble never fails the LinkedIn search
-                logger.warning("%s feed failed: %s", name, e)
-                self.errors[name] = str(e)[:200]
-                continue
-            postings += [f.posting for f in feed if matches_keywords(f, keywords)
-                         and (f.posting.posted_at is None or f.posting.posted_at >= oldest)]
-        if self.errors != before and self.on_errors:
-            try:
-                self.on_errors(dict(self.errors))
-            except Exception:
-                logger.exception("couldn't save the feed errors")
-        return postings

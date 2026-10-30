@@ -75,6 +75,12 @@ def sites_for(session: Session, listing: Listing) -> tuple[str, ...]:
     return (*(k for k in load_preferences(session).sites if k in BUILTIN), *own)
 
 
+def searched_sites(session: Session) -> set[str]:
+    """The site keys any active listing searches."""
+    return {k for listing in session.exec(select(Listing).where(Listing.active == True)).all()  # noqa: E712
+            for k in sites_for(session, listing)}
+
+
 def site_labels(session: Session) -> dict[str, str]:
     return {**{k: s.label for k, s in BUILTIN.items()}, **{o.key: o.name for o in own_sites(session)}}
 

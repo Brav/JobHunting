@@ -63,7 +63,7 @@
   </form>
 </dialog>
 {% endfor %}
-{% for name, e in feed_errors.items() %}<p class="notice small">{{ source_labels[name] }} isn't answering: {{ e.error }} — <a href="/settings#preferences">job sources</a></p>{% endfor %}
+{% for name, e in feed_errors.items() %}<p class="notice small">{{ e.label }} isn't answering: {{ e.error }} — <a href="/sites">sites</a></p>{% endfor %}
 {% include "_split_view.html" %}
 {% endif %}
 {% endblock %}

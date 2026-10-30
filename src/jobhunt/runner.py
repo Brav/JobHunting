@@ -18,6 +18,7 @@ from jobhunt.language import detect_language
 from jobhunt.signals import record_sighting
 from jobhunt.workplace import details_text, workplace_from
 from jobhunt.models import Job, Listing, Match, Run, RunListing
+from jobhunt.sites import sites_for
 from jobhunt.sources.base import JobPosting, JobSource, SourceError
 from jobhunt.timeutil import utcnow
 
@@ -141,13 +142,15 @@ def _attempt(session_factory, source: JobSource, run_id: int, listing: Listing,
     """Search one listing. Returns "ok", "failed", or "skipped" (deleted or switched off meanwhile)."""
     with session_factory() as s:
         current = s.get(Listing, listing.id)
+        sites = sites_for(s, current) if current is not None else None
     if current is None or not current.active:
         logger.info("listing %r was deleted or switched off; skipping", listing.name)
         return "skipped"
     try:
         try:
             postings = source.search(keywords=current.keywords, location=current.location,
-                                     radius_km=current.radius_km, window_hours=window, limit=limit)
+                                     radius_km=current.radius_km, window_hours=window, limit=limit,
+                                     sites=sites)
         except SourceError as e:
             logger.warning("listing %r failed: %s", current.name, e)
             with session_factory() as s:

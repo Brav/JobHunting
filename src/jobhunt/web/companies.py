@@ -59,7 +59,7 @@ def company_page(request: Request, key: str, watch_message: str = ""):
                   reposts=sum(j.reposts or 0 for j in jobs), sightings=sightings, is_blocked=is_blocked, links=links,
                   people=people, watch=watch, ats_names=ATS, guessed_names={k: ATS[k] for k in GUESSED}, watch_message=watch_message,
                   board_error=getattr(request.app.state.source, "errors", {}).get(
-                      f"{watch.ats}:{watch.token}:{watch.name}") if watch else None)
+                      f"board:{watch.id}") if watch else None)
 
 
 @router.post("/companies/{key}/watch", response_class=HTMLResponse)
