@@ -9,7 +9,7 @@ from sqlmodel import func, select
 
 from jobhunt.blocks import blocked_keys, company_key
 from jobhunt.models import Contact, Job, Sighting, WatchedCompany
-from jobhunt.watchlist import ATS, board_exists, detect_board
+from jobhunt.watchlist import ATS, GUESSED, board_exists, detect_board
 from jobhunt.stats import load_applications
 from jobhunt.web.common import render, session
 
@@ -57,7 +57,7 @@ def company_page(request: Request, key: str, watch_message: str = ""):
              ("Web search", f"https://duckduckgo.com/?q={quote_plus(name + ' careers')}")]
     return render(request, "company.html", active="companies", key=key, company_name=name, jobs=jobs, outcome=_outcome(apps),
                   reposts=sum(j.reposts or 0 for j in jobs), sightings=sightings, is_blocked=is_blocked, links=links,
-                  people=people, watch=watch, ats_names=ATS, watch_message=watch_message,
+                  people=people, watch=watch, ats_names=ATS, guessed_names={k: ATS[k] for k in GUESSED}, watch_message=watch_message,
                   board_error=getattr(request.app.state.source, "errors", {}).get(
                       f"{watch.ats}:{watch.token}:{watch.name}") if watch else None)
 
@@ -67,7 +67,7 @@ def watch_company(request: Request, key: str, name: str = Form(""), ats: str = F
     """Find the company's job board (or check the one the user named) and read it on every run."""
     get = request.app.state.http_get
     token = token.strip().lower()
-    if ats in ATS and token:
+    if ats in GUESSED and token:
         found = (ats, token) if board_exists(ats, token, get) else None
     else:
         found = detect_board(name or key, get)

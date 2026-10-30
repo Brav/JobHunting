@@ -3,12 +3,14 @@ from urllib.parse import quote
 
 from fastapi.testclient import TestClient
 
-from fakes import FakeClock, FakeSource, add_listing, make_posting as p
+import pytest
+
+from fakes import FakeClock, FakeResponse, FakeSource, add_listing, make_posting as p, url_get
 from jobhunt.blocks import company_key
 from jobhunt.runner import run_daily
 from jobhunt.sources.feeds import CombinedSource
 from jobhunt.timeutil import utcnow
-from jobhunt.watchlist import detect_board, fetch_board, slug_candidates
+from jobhunt.watchlist import board_from_url, board_in_page, detect_board, fetch_board, slug_candidates
 
 NOW = datetime(2026, 10, 28, 9, 0)
 GREENHOUSE = {"jobs": [{"id": 42, "title": "Senior PHP Engineer", "location": {"name": "Remote, Europe"},
@@ -20,6 +22,13 @@ LEVER = [{"id": "ab-1", "text": "PHP Developer", "categories": {"location": "Bel
 ASHBY = {"jobs": [{"id": "x-1", "title": "Backend Engineer (PHP)", "location": "Remote - European Union", "isRemote": True,
                    "jobUrl": "https://jobs.ashbyhq.com/acme/x-1", "publishedAt": "2026-10-21T14:29:08.532+00:00",
                    "descriptionPlain": "PHP 8.", "compensation": {"compensationTierSummary": "€60K – €80K"}}]}
+
+TEAMTAILOR_RSS = b"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:tt="https://teamtailor.com/locations"><channel><title>Acme jobs</title>
+<item><title>Node Developer</title><link>https://acme.teamtailor.com/jobs/1-node-developer</link>
+<pubDate>Fri, 23 Oct 2026 10:00:00 +0000</pubDate><description>Node.</description>
+<tt:locations><tt:location><tt:city>Belgrade</tt:city><tt:country>Serbia</tt:country></tt:location></tt:locations>
+<remoteStatus>fully</remoteStatus></item></channel></rss>"""
 
 
 class Response:
@@ -85,3 +94,72 @@ def test_watch_from_the_company_page(app_factory):
         assert "Watch for new jobs" in c.get(url).text
         r = c.post(f"{url}/watch", data={"name": "Acme", "ats": "lever", "token": "nope"})
         assert "find a Greenhouse, Lever or Ashby board" in r.text
+
+
+@pytest.mark.parametrize("url, expected", [
+    ("https://boards.greenhouse.io/acme", ("greenhouse", "acme")),
+    ("https://job-boards.greenhouse.io/acme/jobs/42", ("greenhouse", "acme")),
+    ("https://jobs.lever.co/acme-co", ("lever", "acme-co")),
+    ("https://jobs.ashbyhq.com/acme", ("ashby", "acme")),
+    ("https://apply.workable.com/acme/", ("workable", "acme")),
+    ("https://jobs.smartrecruiters.com/AcmeGroup", ("smartrecruiters", "AcmeGroup")),
+    ("https://careers.smartrecruiters.com/AcmeGroup/", ("smartrecruiters", "AcmeGroup")),
+    ("https://acme.recruitee.com/", ("recruitee", "acme")),
+    ("https://acme.jobs.personio.de/", ("personio", "acme")),
+    ("https://acme.jobs.personio.com/job/1", ("personio", "acme")),
+    ("https://acme.teamtailor.com/jobs", ("teamtailor", "acme")),
+    ("https://acme.breezy.hr/", ("breezy", "acme")),
+    ("https://apply.workable.com/j/00C85BAC46", None),
+    ("https://www.recruitee.com/", None),
+    ("https://example.com/careers", None),
+])
+def test_board_from_url(url, expected):
+    assert board_from_url(url) == expected
+
+
+def test_board_in_page():
+    assert board_in_page('<script src="https://boards.greenhouse.io/embed/job_board/js?for=acme"></script>') == (
+        "greenhouse", "acme")
+    assert board_in_page('<a href="https://jobs.lever.co/acme">Jobs</a>') == ("lever", "acme")
+    assert board_in_page('<iframe src="//acme.recruitee.com/embed"></iframe>') == ("recruitee", "acme")
+    assert board_in_page("<p>No jobs here</p>") is None
+
+
+def test_new_parsers():
+    workable = {"name": "Acme", "jobs": [{"title": "PHP Developer", "shortcode": "AB12", "city": "Belgrade",
+                "country": "Serbia", "telecommuting": True, "url": "https://apply.workable.com/j/AB12",
+                "published_on": "2026-10-20", "description": "<p>Laravel.</p>"}]}
+    (w,) = fetch_board("workable", "acme", "Acme", url_get({"https://apply.workable.com/api/v1/widget/accounts/acme": workable}))
+    assert (w.posting.external_id, w.posting.location, w.posting.source) == (
+        "workable:acme:AB12", "Belgrade, Serbia (remote)", "workable")
+    assert w.posting.posted_at == date(2026, 10, 20) and "Laravel" in w.posting.description
+    smart = {"content": [{"id": "744000158334825", "name": "Backend Developer", "releasedDate": "2026-10-21T09:00:00.000Z",
+             "location": {"city": "Belgrade", "country": "rs", "remote": False, "hybrid": True,
+                          "fullLocation": "Belgrade, Serbia"}}]}
+    (sr,) = fetch_board("smartrecruiters", "AcmeGroup", "Acme",
+                        url_get({"https://api.smartrecruiters.com/v1/companies/AcmeGroup/postings": smart}))
+    assert sr.posting.url == "https://jobs.smartrecruiters.com/AcmeGroup/744000158334825"
+    assert sr.posting.location == "Belgrade, Serbia (hybrid)"
+    recruitee = {"offers": [{"id": 7, "title": "Vue Developer", "careers_url": "https://acme.recruitee.com/o/vue-developer",
+                 "city": "Novi Sad", "country": "Serbia", "remote": True, "hybrid": False,
+                 "published_at": "2026-10-22 08:00:00 UTC", "description": "<p>Nuxt.</p>"}]}
+    (rc,) = fetch_board("recruitee", "acme", "Acme", url_get({"https://acme.recruitee.com/api/offers/": recruitee}))
+    assert (rc.posting.location, rc.posting.posted_at) == ("Novi Sad, Serbia (remote)", date(2026, 10, 22))
+    personio = [{"id": 1234, "name": "Fullstack Developer", "office": "Belgrade", "employment_type": "permanent"}]
+    (pe,) = fetch_board("personio", "acme", "Acme", url_get({"https://acme.jobs.personio.com/search.json": personio}))
+    assert (pe.posting.url, pe.posting.location, pe.posting.posted_at) == (
+        "https://acme.jobs.personio.com/job/1234", "Belgrade", None)
+    (tt,) = fetch_board("teamtailor", "acme", "Acme",
+                        url_get({"https://acme.teamtailor.com/jobs.rss": FakeResponse(content=TEAMTAILOR_RSS)}))
+    assert tt.posting.location == "Belgrade, Serbia (remote)" and tt.posting.source == "teamtailor"
+    breezy = [{"id": "x1", "name": "Node Developer", "url": "https://acme.breezy.hr/p/x1-node-developer",
+               "published_date": "2026-10-23T10:00:00.000Z",
+               "location": {"city": "Belgrade", "country": {"name": "Serbia"}, "is_remote": False}}]
+    (br,) = fetch_board("breezy", "acme", "Acme", url_get({"https://acme.breezy.hr/json": breezy}))
+    assert (br.posting.external_id, br.posting.location) == ("breezy:acme:x1", "Belgrade, Serbia")
+
+
+def test_detect_board_guesses_only_greenhouse_lever_and_ashby():
+    calls = []
+    detect_board("Acme", url_get({}, calls))
+    assert calls and all(any(h in url for h in ("greenhouse", "lever", "ashby")) for url, _, _ in calls)

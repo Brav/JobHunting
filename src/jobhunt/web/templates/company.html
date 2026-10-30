@@ -20,7 +20,7 @@
       <input type="hidden" name="name" value="{{ company_name }}">
       <button class="btn small" type="submit">Watch for new jobs</button>
       <span class="muted small">or name the board:</span>
-      <select name="ats" aria-label="Job board system"><option value="">Find it</option>{% for value, label in ats_names.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+      <select name="ats" aria-label="Job board system"><option value="">Find it</option>{% for value, label in guessed_names.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
       <input name="token" placeholder="board name, e.g. acme" aria-label="Board name">
     </form>
   {% endif %}
