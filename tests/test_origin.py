@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from jobhunt.preferences import load_preferences
 
 PREFS = {"skills": "PHP", "follow_up_days": "7", "auto_close_days": "30", "goal_applications_per_week": "5",
-         "goal_reviews_per_week": "50", "ntfy_url": "https://ntfy.sh/attacker"}
+         "goal_reviews_per_week": "50", "sites": ["linkedin"], "ntfy_url": "https://ntfy.sh/attacker"}
 
 
 def test_other_sites_cannot_change_or_read_anything(app_factory):

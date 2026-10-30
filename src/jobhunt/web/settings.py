@@ -10,11 +10,12 @@ from sqlmodel import select
 from jobhunt.cv import MAX_CV_BYTES, CVError, current_cv, store_upload
 from jobhunt.deepl_key import load_key, mask, remove_key, save_key
 from jobhunt.eligibility import DEFAULT_PROFILE, Profile, load_profile, profile_saved, refresh_all, save_profile
-from jobhunt.preferences import SOURCES, Preferences, load_preferences, save_preferences
+from jobhunt.preferences import Preferences, load_preferences, save_preferences
 from jobhunt.models import BlockedCompany, NegativeRule
 from jobhunt.places import COUNTRIES
 from jobhunt.schedule import form_values, from_form, to_text
 from jobhunt.scheduler import default_schedule
+from jobhunt.sites import BUILTIN
 from jobhunt.setup import fill_skills_from_cv
 from jobhunt.timeutil import utcnow
 from jobhunt.web.common import apply_time_zone, render, session
@@ -54,7 +55,7 @@ def _page(request: Request, profile: Profile, errors: list[str], saved: str = ""
                   sched=sched or form_values(to_text(default)), sched_error=sched_error,
                   schedule_notice=schedule_notice,
                   translation_notice=translation_notice, translation_error=translation_error,
-                  blocked=blocked, rules=rules, prefs=prefs, pref_errors=pref_errors or [], sources=SOURCES,
+                  blocked=blocked, rules=rules, prefs=prefs, pref_errors=pref_errors or [], builtin_sites=list(BUILTIN.values()),
                   languages=_form_languages(profile.languages), errors=errors, saved=saved,
                   regions=REGION_CHOICES, language_choices=LANGUAGE_CHOICES, contract_choices=CONTRACT_CHOICES,
                   countries=COUNTRY_CHOICES, zones=ZONES)
@@ -192,7 +193,7 @@ def _int(value: str, low: int, high: int, message: str, errors: list[str], defau
 def save_preferences_form(request: Request, skills: str = Form(""), follow_up_days: str = Form("7"),
                           auto_close_days: str = Form("30"), goal_applications_per_week: str = Form("5"),
                           goal_reviews_per_week: str = Form("50"), paused_until: str = Form(""),
-                          sources: list[str] = Form([]), ntfy_url: str = Form("")):
+                          sites: list[str] = Form([]), ntfy_url: str = Form("")):
     from datetime import date
     errors: list[str] = []
     with session(request) as s:
@@ -207,6 +208,9 @@ def save_preferences_form(request: Request, skills: str = Form(""), follow_up_da
     url = ntfy_url.strip()
     if url and not url.startswith(("https://", "http://")):
         errors.append("The push address must start with https://")
+    chosen = tuple(key for key in BUILTIN if key in sites)
+    if not chosen:
+        errors.append("Tick at least one default site.")
     prefs = replace(
         current, skills=tuple(dict.fromkeys(s.strip() for s in skills.split(",") if s.strip()))[:100],
         follow_up_days=_int(follow_up_days, 1, 90, "Follow-up days must be between 1 and 90", errors, current.follow_up_days),
@@ -216,7 +220,7 @@ def save_preferences_form(request: Request, skills: str = Form(""), follow_up_da
                                         current.goal_applications_per_week),
         goal_reviews_per_week=_int(goal_reviews_per_week, 0, 5000, "Goals must be between 0 and 5000", errors,
                                    current.goal_reviews_per_week),
-        paused_until=paused, sources=tuple(x for x in SOURCES if x in sources), ntfy_url=url)
+        paused_until=paused, sites=chosen or current.sites, ntfy_url=url)
     if errors:
         return _page(request, profile, [], status_code=422, prefs=prefs, pref_errors=errors)
     with session(request) as s:

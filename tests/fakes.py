@@ -50,9 +50,10 @@ class FakeSource:
 
 
 def add_listing(sf, name: str, keywords: str = "python", location: str = "Belgrade, Serbia",
-                radius_km: int = 25, active: bool = True) -> int:
+                radius_km: int = 25, active: bool = True, sites: str | None = None) -> int:
     with sf() as s:
-        listing = Listing(name=name, keywords=keywords, location=location, radius_km=radius_km, active=active)
+        listing = Listing(name=name, keywords=keywords, location=location, radius_km=radius_km, active=active,
+                          sites=sites)
         s.add(listing)
         s.commit()
         return listing.id

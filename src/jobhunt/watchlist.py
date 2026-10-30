@@ -14,6 +14,15 @@ _URLS = {"greenhouse": "https://boards-api.greenhouse.io/v1/boards/{token}/jobs"
 _PARAMS = {"greenhouse": {"content": "true"}, "lever": {"mode": "json"}, "ashby": {"includeCompensation": "true"}}
 
 
+_PAGES = {"greenhouse": "https://job-boards.greenhouse.io/{t}", "lever": "https://jobs.lever.co/{t}",
+          "ashby": "https://jobs.ashbyhq.com/{t}"}
+
+
+def board_page_url(ats: str, token: str) -> str:
+    """The company's public careers page on its hiring system."""
+    return _PAGES[ats].format(t=token)
+
+
 def slug_candidates(name: str) -> list[str]:
     """Board names to try for a company: "Acme & Co" → acmeco, acme-co, acme."""
     words = re.findall(r"[a-z0-9]+", name.casefold())

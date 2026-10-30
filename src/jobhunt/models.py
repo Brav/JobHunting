@@ -25,6 +25,7 @@ class Listing(SQLModel, table=True):
     search_changed_at: NaiveDatetime | None = None
     schedule: str | None = None  # its own times (jobhunt.schedule text); None = the default from Settings
     schedule_changed_at: NaiveDatetime | None = None  # its times changed or it was switched on: wait for the next one
+    sites: str | None = None  # JSON list of site keys (jobhunt.sites); None = the Default sites from Settings
 
 
 class Job(SQLModel, table=True):
@@ -215,6 +216,17 @@ class Question(SQLModel, table=True):
     text: str
     company: str = ""
     tags: str = ""
+    created_at: NaiveDatetime = Field(default_factory=utcnow)
+
+
+class CustomFeed(SQLModel, table=True):
+    """An RSS or Atom feed the user added as a job site."""
+
+    __tablename__ = "custom_feeds"
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    url: str = Field(unique=True)
     created_at: NaiveDatetime = Field(default_factory=utcnow)
 
 

@@ -21,7 +21,7 @@ from jobhunt.eligibility import VERDICT_LABELS, VERDICT_SYMBOLS, VERDICTS, effec
 from jobhunt import salary
 from jobhunt.preferences import is_paused, load_feed_errors, load_preferences
 from jobhunt.prompts import KINDS as PROMPT_KINDS
-from jobhunt.sources.feeds import SOURCE_LABELS
+from jobhunt.sites import SOURCE_LABELS
 from jobhunt.language import language_name
 from jobhunt.reports import run_summary
 from jobhunt.schedule import EVERY_CHOICES, Schedule, describe
@@ -145,7 +145,7 @@ def render(request: Request, name: str, status_code: int = 200, **ctx):
         summary = run_summary(s)
         prefs = load_preferences(s)
         feed_errors = {name: {**e, "since": datetime.fromisoformat(e["since"])}
-                       for name, e in load_feed_errors(s).items() if name in prefs.sources}
+                       for name, e in load_feed_errors(s).items() if name in prefs.sites}
         setup_banner = request.url.path != "/setup" and setup_state(s) != "done"
     now = utcnow()
     paused = prefs.paused_until if is_paused(prefs, local_date(now, tz)) else ""

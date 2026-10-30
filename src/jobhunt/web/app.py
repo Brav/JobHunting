@@ -72,7 +72,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
 
         def enabled_feeds() -> tuple[str, ...]:
             with session_factory() as s:
-                return load_preferences(s).sources
+                return tuple(k for k in load_preferences(s).sites if k != "linkedin")
         def watched_boards() -> list[tuple[str, str, str]]:
             from sqlmodel import select
             from jobhunt.models import WatchedCompany

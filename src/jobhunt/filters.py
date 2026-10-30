@@ -11,7 +11,7 @@ from sqlmodel import Session, select
 from jobhunt.eligibility import VERDICT_LABELS, VERDICTS
 from jobhunt.language import language_name
 from jobhunt.signals import LIKELY_GHOST
-from jobhunt.sources.feeds import SOURCE_LABELS
+from jobhunt.sites import SOURCE_LABELS
 from jobhunt.models import Job, Listing, Match, Run, RunListing
 from jobhunt.timeutil import local_day_bounds_utc
 from jobhunt.workplace import WORKPLACES
@@ -61,7 +61,7 @@ class JobFilters:
     seniority: str = ""
     employment_type: str = ""
     company: str = ""
-    source: str = ""  # jobhunt.sources.feeds.SOURCE_LABELS key; "linkedin" includes older rows without one
+    source: str = ""  # jobhunt.sites.SOURCE_LABELS key; "linkedin" includes older rows without one
     found_within: str = ""
     posted_within: str = ""
     q: str = ""

@@ -22,8 +22,6 @@ logger = logging.getLogger(__name__)
 USER_AGENT = "jobhunt (personal job tracker; one request per run)"
 MAX_AGE_DAYS = 30  # older postings are left out
 LEDE_CHARS = 400  # how much of a description counts when matching a listing's keywords
-SOURCE_LABELS = {"linkedin": "LinkedIn", "remoteok": "Remote OK", "himalayas": "Himalayas", "hn": "Hacker News",
-                 "greenhouse": "Greenhouse", "lever": "Lever", "ashby": "Ashby", "capture": "the original site"}
 _SYMBOL = {"USD": "$", "EUR": "€", "GBP": "£"}
 
 

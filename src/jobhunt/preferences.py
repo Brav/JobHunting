@@ -1,4 +1,4 @@
-"""The user's working preferences (skills, follow-ups, goals, pause, sources, push, default schedule), stored as JSON
+"""The user's working preferences (skills, follow-ups, goals, pause, default sites, push, default schedule), stored as JSON
 in settings."""
 
 import json
@@ -11,7 +11,7 @@ from jobhunt.models import Setting
 
 PREFERENCES_KEY = "preferences"
 FEED_ERRORS_KEY = "feed_errors"
-SOURCES = {"remoteok": "Remote OK", "himalayas": "Himalayas", "hn": "Hacker News “Who is hiring”"}
+DEFAULT_SITES = ("linkedin", "remoteok", "himalayas", "hn")  # jobhunt.sites.BUILTIN keys; kept here to avoid a cycle
 
 
 @dataclass(frozen=True)
@@ -22,7 +22,7 @@ class Preferences:
     goal_applications_per_week: int = 5
     goal_reviews_per_week: int = 50
     paused_until: str = ""  # ISO date; scheduled searches and pushes wait until after it
-    sources: tuple[str, ...] = tuple(SOURCES)
+    sites: tuple[str, ...] = DEFAULT_SITES  # the sites a listing without its own list searches
     ntfy_url: str = ""  # phone push for the daily digest; empty = nothing is sent
     last_digest_at: str = ""  # ISO datetime (naive UTC) the digest was last marked read
     schedule: str = ""  # the default search schedule (jobhunt.schedule text); empty = JOBHUNT_RUN_AT every N hours
@@ -46,6 +46,10 @@ def load_preferences(session: Session) -> Preferences:
         elif not isinstance(value, type(default)):
             value = default
         values[f.name] = value
+    if not data.get("sites") or not isinstance(data["sites"], list):  # saved before sites: LinkedIn plus the old sources
+        old = data.get("sources")
+        old = tuple(x for x in old if isinstance(x, str)) if isinstance(old, list) else ("remoteok", "himalayas", "hn")
+        values["sites"] = ("linkedin", *old)
     return Preferences(**values)
 
 

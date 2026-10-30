@@ -72,7 +72,7 @@ def test_changing_skills_rechecks_only_the_fit(app_factory, monkeypatch):
             raise AssertionError("a skills change ran the full check")
         monkeypatch.setattr(checks, "refresh", full_check)
         form = {"skills": "PHP, Laravel", "follow_up_days": "7", "auto_close_days": "30",
-                "goal_applications_per_week": "5", "goal_reviews_per_week": "50"}
+                "goal_applications_per_week": "5", "goal_reviews_per_week": "50", "sites": ["linkedin"]}
         assert c.post("/settings/preferences", data=form, follow_redirects=False).status_code == 303
         with sf() as s:
             job = s.exec(select(Job)).one()
