@@ -1,9 +1,11 @@
 """Test doubles and data helpers shared by the test suite."""
 
+import json
 import time
 from collections.abc import Callable
 from datetime import date, datetime, timedelta
 
+import requests
 from sqlmodel import select
 
 from jobhunt.models import Job, Listing, Run
@@ -119,3 +121,40 @@ class FakeTranslator:
         if self.fail:
             raise self.fail
         return f"EN:{text}"
+
+
+class FakeResponse:
+    """A stand-in for requests.Response. `text` and `content` fill each other in; with only `data`, text is its JSON."""
+
+    def __init__(self, data=None, status: int = 200, text: str | None = None, url: str = "",
+                 content: bytes | None = None):
+        self.data, self.status_code, self.url, self.headers = data, status, url, {}
+        if content is None:
+            text = json.dumps(data) if text is None else text
+            content = text.encode("utf-8")
+        elif text is None:
+            text = content.decode("utf-8", errors="replace")
+        self.text, self.content = text, content
+
+    def json(self):
+        return self.data
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"{self.status_code} for {self.url}")
+
+
+def url_get(routes: dict, calls: list | None = None):
+    """A fake requests.get: the first route the URL starts with answers (FakeResponse, exception, or JSON data)."""
+
+    def get(url, params=None, headers=None, timeout=None, **kwargs):
+        if calls is not None:
+            calls.append((url, params, headers))
+        for prefix, answer in routes.items():
+            if url.startswith(prefix):
+                if isinstance(answer, Exception):
+                    raise answer
+                return answer if isinstance(answer, FakeResponse) else FakeResponse(answer, url=url)
+        return FakeResponse(status=404, url=url)
+
+    return get

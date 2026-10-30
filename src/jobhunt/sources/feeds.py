@@ -37,6 +37,12 @@ def _get_json(get, url: str, **params):
     return response.json()
 
 
+def _get_bytes(get, url: str) -> bytes:
+    response = get(url, headers={"User-Agent": USER_AGENT}, timeout=20)
+    response.raise_for_status()
+    return response.content
+
+
 def _markdown(text: str | None) -> str:
     return re.sub(r"\n{3,}", "\n\n", markdownify(text or "")).strip()
 
