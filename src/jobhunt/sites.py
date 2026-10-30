@@ -82,7 +82,10 @@ def site_labels(session: Session) -> dict[str, str]:
 def remove_site(session: Session, key: str) -> int:
     """Delete an own site and drop it from every listing; returns how many listings went back to Default."""
     kind, _, raw = key.partition(":")
-    row = session.get(CustomFeed if kind == "feed" else WatchedCompany, int(raw)) if raw.isdecimal() else None
+    table = {"feed": CustomFeed, "board": WatchedCompany}.get(kind)
+    if table is None:  # only own sites can be removed
+        return 0
+    row = session.get(table, int(raw)) if raw.isdecimal() else None
     reset = 0
     for listing in session.exec(select(Listing).where(Listing.sites.is_not(None))).all():
         try:

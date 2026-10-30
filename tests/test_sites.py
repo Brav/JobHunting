@@ -91,3 +91,18 @@ def test_labels_for_job_sources():
     assert SOURCE_LABELS["devbg"] == "DEV.BG" and SOURCE_LABELS["infostud"] == "HelloWorld/Infostud"
     assert SOURCE_LABELS["4dayweek"] == "4 Day Week" and SOURCE_LABELS["feed"] == "Your feeds"
     assert SOURCE_LABELS["lever"] == "Lever"
+
+
+def test_remove_site_ignores_keys_that_are_not_own_sites(session_factory):
+    with session_factory() as s:
+        feed = CustomFeed(name="LaraJobs", url="https://larajobs.com/feed")
+        board = WatchedCompany(company_key="acme", name="Acme", ats="lever", token="acme")
+        s.add_all([feed, board])
+        s.commit()
+        stored = json.dumps(["hn", "devbg"])
+        s.add(Listing(name="A", keywords="php", location="X", sites=stored))
+        s.commit()
+        for key in ("hn", f"devbg:{board.id}", f"linkedin:{feed.id}", f"hn:{board.id}", "nonsense"):
+            assert remove_site(s, key) == 0
+        assert len(s.exec(select(CustomFeed)).all()) == 1 and len(s.exec(select(WatchedCompany)).all()) == 1
+        assert s.exec(select(Listing)).one().sites == stored
