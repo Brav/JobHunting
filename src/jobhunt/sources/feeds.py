@@ -13,6 +13,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from markdownify import markdownify
 
+from jobhunt import places as place_names
 from jobhunt.sources.base import JobPosting
 from jobhunt.timeutil import utcnow
 
@@ -68,13 +69,36 @@ def remoteok(get) -> list[FeedPosting]:
     return found
 
 
-def _search_words(keywords: str) -> str:
-    words = [w for w in re.findall(r'"[^"]+"|\S+', keywords) if w.lower() not in ("remote", "and", "or", "not")]
+# Places the places module doesn't know, mostly local spellings: a listing's place words say where the owner looks,
+# not what the job is, so a feed job that never names the place still counts.
+LOCAL_PLACE_NAMES = frozenset({
+    "srbija", "србија", "beograd", "београд", "niš", "nis", "novi sad", "kragujevac",
+    "българия", "sofia", "sofiya", "софия", "plovdiv", "пловдив", "varna", "варна", "burgas", "бургас"})
+
+
+def is_place_word(word: str) -> bool:
+    """A country, city, region or local place name, and nothing else (`EU` counts, `us` doesn't)."""
+    word = word.strip().strip('"').strip()
+    if word.casefold() in LOCAL_PLACE_NAMES:
+        return True
+    if word.upper() in place_names.ABBREVIATIONS and word not in place_names.ABBREVIATIONS:
+        return False  # short forms only count in capitals: "US", not the pronoun "us"
+    if not place_names.places_in(word):
+        return False
+    for pattern in (place_names._COUNTRY, place_names._ABBREVIATION, place_names._CITY, place_names._REGION):
+        word = pattern.sub(" ", word)
+    return not re.sub(r"[\s\W_]+", "", word)
+
+
+def search_words(keywords: str) -> str:
+    """The keywords a search API is sent: no place words, "remote" or operators."""
+    words = [w for w in re.findall(r'"[^"]+"|\S+', keywords)
+             if w.lower() not in ("remote", "and", "or", "not") and not is_place_word(w)]
     return " ".join(w.strip('"') for w in words)
 
 
 def himalayas(keywords: str, get) -> list[FeedPosting]:
-    data = _get_json(get, "https://himalayas.app/jobs/api/search", q=_search_words(keywords), limit=20)
+    data = _get_json(get, "https://himalayas.app/jobs/api/search", q=search_words(keywords), limit=20)
     found = []
     for item in data.get("jobs", []):
         places = [p for p in item.get("locationRestrictions") or [] if p]
@@ -160,7 +184,10 @@ def matches_keywords(feed: FeedPosting, keywords: str) -> bool:
             continue
         if word in ("remote", "and", "or"):
             continue
-        (unwanted if negate else wanted).append(_normalise(word))
+        if negate:
+            unwanted.append(_normalise(word))
+        elif not is_place_word(token):  # where the owner looks, not what the job is
+            wanted.append(_normalise(word))
         negate = False
 
     def has(word):

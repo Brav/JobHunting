@@ -6,8 +6,9 @@ from fakes import FakeClock, FakeSource, add_listing, make_posting as p
 from jobhunt.models import Job, Match
 from jobhunt.preferences import load_feed_errors
 from jobhunt.runner import run_daily
-from jobhunt.sources.base import SourceError
-from jobhunt.sources.feeds import CombinedSource, hn_whos_hiring, himalayas, matches_keywords, remoteok
+from jobhunt.sources.base import JobPosting, SourceError
+from jobhunt.sources.feeds import (CombinedSource, FeedPosting, hn_whos_hiring, himalayas, is_place_word, matches_keywords,
+                                   remoteok, search_words)
 
 NOW = datetime(2026, 10, 28, 9, 0)
 
@@ -183,3 +184,35 @@ def test_source_filter_and_page(app_factory):
         page = c.get("/jobs?source=remoteok&eligibility=check").text
         assert '<option value="remoteok" selected>Remote OK</option>' in page and "Source: Remote OK" in page
         assert "Old LinkedIn job" not in page and "Feed job" in page
+
+
+def test_place_words():
+    for word in ("serbia", "Srbija", "SOFIA", "Novi Sad", "софия", "EU", "Europe", "Niš", "nis", "Plovdiv"):
+        assert is_place_word(word), word
+    for word in ("php", "fullstack", "remote", "us", "developer", "laravel"):
+        assert not is_place_word(word), word
+
+
+def test_search_words_leave_out_places_remote_and_operators():
+    assert search_words("php remote serbia srbija") == "php"
+    assert search_words('fullstack developer remote "Novi Sad"') == "fullstack developer"
+    assert search_words("serbia srbija remote") == ""
+
+
+def test_place_words_are_not_required_but_not_still_excludes():
+    def feed(title):
+        return FeedPosting(JobPosting("x", title, "Acme", "", "u", None, description=""), ())
+    assert matches_keywords(feed("Senior PHP Developer"), "php remote serbia srbija")
+    assert matches_keywords(feed("PHP Developer"), '"Novi Sad" php')
+    assert not matches_keywords(feed("PHP Developer in Bulgaria"), "php NOT bulgaria")
+    assert not matches_keywords(feed("Sofia office manager"), "sofia remote")  # only place words: nothing
+
+
+def test_himalayas_is_searched_without_place_words():
+    seen = {}
+
+    def get(url, params=None, **kw):
+        seen.update(params or {})
+        return FakeResponse(HIMALAYAS)
+    himalayas("php remote serbia srbija", get)
+    assert seen["q"] == "php"
