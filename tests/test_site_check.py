@@ -77,6 +77,16 @@ def test_a_redirect_is_checked_like_the_address():  # Review Focus 2
                                                         "https://example.com/feed": inside}), resolve) == PRIVATE
 
 
+def test_a_redirect_is_judged_before_the_status_and_challenge_are_read():
+    def fetch(answer, resolve=PUBLIC):
+        return refused("https://example.com/feed", url_get({"https://example.com/robots.txt": OPEN,
+                                                            "https://example.com/feed": answer}), resolve)
+    assert fetch(FakeResponse(status=503, text="<title>Just a moment...</title>")) == BLOCKED
+    assert fetch(FakeResponse(status=999, url="https://www.linkedin.com/jobs")) == TERMS
+    resolve = lambda host, *a, **k: PRIVATE_NET(host) if host == "intranet.example" else PUBLIC(host)
+    assert fetch(FakeResponse(status=404, url="https://intranet.example/feed"), resolve) == PRIVATE
+
+
 def test_a_feed_is_previewed_with_five_jobs_and_its_title():
     items = "".join(f"<item><title>PHP Dev {n}</title><link>https://example.com/{n}</link></item>" for n in range(7))
     content = f'<rss version="2.0"><channel><title>Example jobs</title>{items}</channel></rss>'.encode()

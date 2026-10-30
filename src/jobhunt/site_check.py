@@ -109,15 +109,13 @@ def _test_fetch(url: str, get, resolve):
         response = get(url, headers={"User-Agent": USER_AGENT}, timeout=20)
     except OSError as error:
         raise Refused(UNREACHABLE.format(error=error)) from None
-    if response.status_code in _BLOCKED_STATUSES:
-        raise Refused(BLOCKED)
-    if response.status_code != 200:
-        raise Refused(STATUS.format(status=response.status_code))
-    if any(marker in response.text[:20000] for marker in _CHALLENGES):
-        raise Refused(BLOCKED)
     if response.url and response.url != url:  # a redirect must not lead somewhere we would have refused
         _check_address(response.url, resolve)
         _check_terms(response.url)
+    if response.status_code in _BLOCKED_STATUSES or any(marker in response.text[:20000] for marker in _CHALLENGES):
+        raise Refused(BLOCKED)
+    if response.status_code != 200:
+        raise Refused(STATUS.format(status=response.status_code))
     return response
 
 
