@@ -2,6 +2,7 @@
 
 import logging
 import secrets
+import socket
 import time
 from dataclasses import replace
 from datetime import datetime
@@ -23,7 +24,7 @@ from jobhunt.job_listing import clear_service_translation_errors
 from jobhunt.sources.base import JobPage, JobSource
 from jobhunt.deepl_key import load_key
 from jobhunt.translate import DeepLTranslator, NoTranslator, SwitchableTranslator, Translator
-from jobhunt.web import applications, blocks, capture, companies, contacts, cv, data, digest, eligibility, email_update, sent, focus, job, listings, report, stats, tracker
+from jobhunt.web import applications, blocks, capture, companies, contacts, cv, data, digest, eligibility, email_update, sent, focus, job, listings, report, sites, stats, tracker
 from jobhunt.web import settings as settings_page  # `settings` is create_app's Settings
 from jobhunt.web import setup
 from jobhunt.web.common import render
@@ -142,6 +143,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     app.state.source = source
     import requests as _requests
     app.state.http_get = _requests.get  # board detection; tests swap in a fake
+    app.state.resolve = socket.getaddrinfo  # the checks before a site is added; tests swap it
     app.state.fetch_page = fetch_page
     app.state.form_token = secrets.token_urlsafe(24)  # forms that write what another site sent (capture, email)
     app.state.translator = translator
@@ -159,6 +161,7 @@ def create_app(settings: Settings, *, source: JobSource | None = None,
     app.include_router(blocks.router)
     app.include_router(sent.router)
     app.include_router(companies.router)
+    app.include_router(sites.router)
     app.include_router(contacts.router)
     app.include_router(digest.router)
     app.include_router(capture.router)

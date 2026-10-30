@@ -9,6 +9,7 @@ from sqlmodel import func, select
 
 from jobhunt.blocks import blocked_keys, company_key
 from jobhunt.models import Contact, Job, Sighting, WatchedCompany
+from jobhunt.sites import remove_site
 from jobhunt.watchlist import ATS, GUESSED, board_exists, detect_board
 from jobhunt.stats import load_applications
 from jobhunt.web.common import render, session
@@ -84,6 +85,5 @@ def watch_company(request: Request, key: str, name: str = Form(""), ats: str = F
 def unwatch_company(request: Request, key: str):
     with session(request) as s:
         for watch in s.exec(select(WatchedCompany).where(WatchedCompany.company_key == key)).all():
-            s.delete(watch)
-        s.commit()
+            remove_site(s, f"board:{watch.id}")
     return RedirectResponse(f"/companies/{quote_plus(key)}", status_code=303)

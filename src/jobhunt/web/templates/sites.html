@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Sites{% endblock %}
+{% block content %}
+<h1>Sites</h1>
+<p class="muted">The sites listings can search. A listing uses the default sites (Settings) unless you choose its own on its form.</p>
+{% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+
+<section class="settings-section" id="builtin" aria-labelledby="h-builtin">
+  <h2 id="h-builtin">Built-in sites</h2>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Site</th><th>What it reads</th><th>Status</th></tr></thead>
+      <tbody>{% for site in builtin %}
+        <tr><td>{{ site.label }}</td><td>{{ site.description }}</td>
+          <td>{% if feed_errors[site.key] %}<span class="field-error">Failing since {{ feed_errors[site.key].since | local_dt(tz) }}: {{ feed_errors[site.key].error }}</span>{% endif %}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="settings-section" id="own" aria-labelledby="h-own">
+  <h2 id="h-own">Your sites</h2>
+  {% if own %}
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Name</th><th>Address</th><th>Kind</th><th>Status</th><th><span class="sr-only">Remove</span></th></tr></thead>
+      <tbody>{% for site in own %}
+        <tr><td>{{ site.name }}</td>
+          <td><a href="{{ site.url | web_url }}" target="_blank" rel="noopener">{{ site.url }}</a></td>
+          <td>{% if site.kind == "feed" %}Feed{% else %}{{ ats_names[site.kind] }} careers page{% endif %}</td>
+          <td>{% if feed_errors[site.key] %}<span class="field-error">Failing since {{ feed_errors[site.key].since | local_dt(tz) }}: {{ feed_errors[site.key].error }}</span>{% endif %}</td>
+          <td><form class="inline" method="post" action="/sites/{{ 'feeds' if site.kind == 'feed' else 'boards' }}/{{ site.key.partition(':')[2] }}/remove"
+                onsubmit="return confirm('Remove this site? Listings that only search it go back to Default sites; jobs already found stay.')">
+            <button class="btn ghost small" type="submit" aria-label="Remove {{ site.name }}">Remove</button></form></td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<p class="empty">None yet. Add an RSS or Atom feed, or a company's careers page, below.</p>{% endif %}
+</section>
+
+<section class="settings-section" id="add" aria-labelledby="h-add">
+  <h2 id="h-add">Add a site</h2>
+  <p class="muted">Paste the address of an RSS or Atom feed, or of a company's careers page on Greenhouse, Lever, Ashby,
+    Workable, SmartRecruiters, Recruitee, Personio, Teamtailor or Breezy. You see what it would add before anything is saved.</p>
+  {% if add_error %}<p class="field-error" role="alert">{{ add_error }}</p>{% endif %}
+  <form class="stack settings-form" method="post" action="/sites/preview">
+    <label>Address <input name="url" value="{{ form_url or '' }}" placeholder="https://example.com/jobs/feed" required></label>
+    <label>Name (optional) <input name="name" value="{{ form_name or '' }}"></label>
+    <div><button class="btn" type="submit">Check this site</button></div>
+  </form>
+  {% if preview %}
+  <h3>{{ preview.name }}</h3>
+  <p>{% if preview.kind == "feed" %}Feed{% else %}{{ ats_names[preview.kind] }} careers page{% endif %}. These are the first jobs it shows:</p>
+  <ul class="plain-list">{% for job in preview.jobs %}
+    <li><strong>{{ job.title }}</strong> · {{ job.company or "—" }} · {{ job.location or "—" }}{% if job.posted_at %} · {{ job.posted_at.isoformat() }}{% endif %}</li>{% endfor %}
+  </ul>
+  <form class="stack settings-form" method="post" action="/sites/add">
+    <input type="hidden" name="kind" value="{{ preview.kind }}">
+    <input type="hidden" name="url" value="{{ preview.url }}">
+    <input type="hidden" name="token" value="{{ preview.token }}">
+    <label>Name <input name="name" value="{{ preview.name }}" required></label>
+    <label class="check"><input type="checkbox" name="terms"> I've checked this site's terms allow reading it</label>
+    <div><button class="btn primary" type="submit">Add this site</button></div>
+  </form>
+  {% endif %}
+</section>
+
+<section class="settings-section" id="limits" aria-labelledby="h-limits">
+  <h2 id="h-limits">What can't be added</h2>
+  <p class="muted">Sites that only show jobs in a browser, pages behind a login or a bot check, search pages robots.txt blocks, and sites whose terms forbid bots can't be added. Copying a search page and picking parts of it with CSS selectors isn't offered: it breaks easily and is often not allowed. For boards that forbid bots, reading their alert emails is the allowed route, as a later feature.</p>
+</section>
+{% endblock %}

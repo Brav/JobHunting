@@ -119,8 +119,10 @@ at the top of each page links back to the setup page.
   Claude.ai.
 - **Jobs from other sites:** on **All jobs**, **+ Add a job** gives you a bookmark button. Drag it to your browser's
   bookmarks bar; on any job page, click it and the job is added for you to check and save.
-- **More job sites:** Settings → Preferences turns on Remote OK, Himalayas and Hacker News "Who is hiring".
-  **Companies** lets you watch a company's own job board (Greenhouse, Lever or Ashby).
+- **Sites:** each listing searches the default sites (Settings) or its own choice: LinkedIn, Remote OK, Himalayas,
+  Hacker News "Who is hiring", DEV.BG, HelloWorld/Infostud and 4 Day Week. The Sites page adds your own RSS/Atom feeds
+  and careers pages on Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee, Personio, Teamtailor and Breezy,
+  after checking robots.txt and the site's terms.
 - **On your phone:** Settings → Preferences takes an [ntfy](https://ntfy.sh) address; the tracker then sends a short
   daily digest to the ntfy app.
 - **Translation:** Settings → Translation takes a free DeepL key (https://www.deepl.com/pro-api). Non-English job
