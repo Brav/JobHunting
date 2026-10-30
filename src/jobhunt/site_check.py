@@ -32,7 +32,8 @@ _FORBIDDEN_HOSTS = ("jobs.bg", "karieri.bg", "joberty.com", "joberty.rs", "remot
                     "welcometothejungle.com", "jobgether.com", "vuejobs.com", "linkedin.com")
 _FORBIDDEN_LABELS = ("indeed", "glassdoor")
 _BLOCKED_STATUSES = (401, 403, 429)
-_CHALLENGES = ("Just a moment", "cf-challenge", "cf_chl")
+_CHALLENGE_TITLE = re.compile(r"<title>Just a moment", re.IGNORECASE)  # Cloudflare's; the words alone may be a job's
+_CHALLENGES = ("cf-challenge", "cf_chl")
 _PREVIEW = 5
 _SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
 
@@ -48,6 +49,11 @@ class Candidate:
     name: str
     token: str = ""
     jobs: tuple[JobPosting, ...] = ()
+
+    @property
+    def saved_url(self) -> str:
+        """The address kept and shown under Your sites: the feed, or the board's page on its hiring system."""
+        return self.url if self.kind == "feed" else watchlist.board_page_url(self.kind, self.token)
 
 
 def normalise_url(url: str) -> str:
@@ -117,7 +123,9 @@ def _test_fetch(url: str, get, resolve):
     if response.url and response.url != url:  # a redirect must not lead somewhere we would have refused
         _check_address(response.url, resolve)
         _check_terms(response.url)
-    if response.status_code in _BLOCKED_STATUSES or any(marker in response.text[:20000] for marker in _CHALLENGES):
+    head = response.text[:20000]
+    if (response.status_code in _BLOCKED_STATUSES or _CHALLENGE_TITLE.search(head)
+            or any(marker in head for marker in _CHALLENGES)):
         raise Refused(BLOCKED)
     if response.status_code != 200:
         raise Refused(STATUS.format(status=response.status_code))

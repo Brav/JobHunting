@@ -88,6 +88,19 @@ def test_test_fetch_and_recognition(answer, reason):
                                                         "https://example.com/page": answer})) == reason
 
 
+def test_just_a_moment_in_a_feed_is_not_a_challenge():
+    content = (b'<rss version="2.0"><channel><title>Acme jobs</title><item><title>PHP Developer</title>'
+               b"<link>https://example.com/1</link><description>Just a moment of your time: we are hiring.</description>"
+               b"</item></channel></rss>")
+    found = check_site("https://example.com/feed", "", url_get({"https://example.com/robots.txt": OPEN,
+                                                                "https://example.com/feed": FakeResponse(content=content)}),
+                       PUBLIC)
+    assert found.kind == "feed"
+    assert refused("https://example.com/page", url_get({"https://example.com/robots.txt": OPEN,
+                                                        "https://example.com/page": FakeResponse(
+                                                            text="<TITLE>Just a moment...</TITLE>")})) == BLOCKED
+
+
 def test_a_redirect_is_checked_like_the_address():  # Review Focus 2
     moved = FakeResponse(content=WORDPRESS, url="https://www.linkedin.com/jobs/feed")
     assert refused("https://example.com/feed", url_get({"https://example.com/robots.txt": OPEN,

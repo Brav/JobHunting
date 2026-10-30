@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import select
 from test_rss import WORDPRESS
 from test_site_check import OPEN, PUBLIC
+from test_watchlist import GREENHOUSE
 
 from jobhunt.blocks import company_key
 from jobhunt.models import CustomFeed, Listing, WatchedCompany
@@ -42,6 +43,19 @@ def test_preview_then_save_a_feed(app_factory):
         assert [(f.name, f.url) for f in s.exec(select(CustomFeed))] == [("Example jobs", "https://example.com/feed")]
     r = c.post("/sites/add", data={**form, "terms": "on"})
     assert r.status_code == 400 and "You've already added this site." in r.text
+
+
+def test_the_preview_shows_the_address_it_will_save(app_factory):
+    page = FakeResponse(text='<link rel="alternate" type="application/rss+xml" href="/feed/?q=&lt;b&gt;">')
+    embed = FakeResponse(text='<title>Acme</title><script src="https://boards.greenhouse.io/embed/job_board/js?for=acme">')
+    app, c = client(app_factory, {"https://example.com/robots.txt": OPEN, "https://example.com/jobs": page,
+                                  "https://example.com/feed/": FakeResponse(content=WORDPRESS),
+                                  "https://example.com/careers": embed,
+                                  "https://boards-api.greenhouse.io/v1/boards/acme/jobs": GREENHOUSE})
+    r = c.post("/sites/preview", data={"url": "https://example.com/jobs", "name": ""})
+    assert "Address: https://example.com/feed/?q=&lt;b&gt;</p>" in r.text and "q=<b>" not in r.text
+    r = c.post("/sites/preview", data={"url": "https://example.com/careers", "name": ""})
+    assert "Address: https://job-boards.greenhouse.io/acme</p>" in r.text  # as Your sites will show it
 
 
 def test_a_refusal_shows_its_reason_and_saves_nothing(app_factory):

@@ -33,6 +33,7 @@ a:hover { text-decoration: underline; }
 h1 { font-size: var(--t5); font-weight: 600; margin: var(--s4) 0 var(--s2); }
 h2 { font-size: var(--t4); font-weight: 600; margin: var(--s5) 0 var(--s2); }
 .muted { color: var(--muted); } .small { font-size: var(--t2); } .error { color: var(--danger); }
+.break-anywhere { overflow-wrap: anywhere; }  /* long addresses wrap instead of widening the page */
 .icon { width: 16px; height: 16px; vertical-align: -3px; flex: none; }
 kbd { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 0 5px; border: 1px solid var(--line-strong);
       border-bottom-width: 2px; border-radius: 4px; color: var(--muted); background: var(--surface); }

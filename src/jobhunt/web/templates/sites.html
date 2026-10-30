@@ -50,6 +50,7 @@
   </form>
   {% if preview %}
   <h3>{{ preview.name }}</h3>
+  <p class="muted break-anywhere">Address: {{ preview.saved_url }}</p>
   <p>{% if preview.kind == "feed" %}Feed{% else %}{{ ats_names[preview.kind] }} careers page{% endif %}. These are the first jobs it shows:</p>
   <ul class="plain-list">{% for job in preview.jobs %}
     <li><strong>{{ job.title }}</strong> · {{ job.company or "—" }} · {{ job.location or "—" }}{% if job.posted_at %} · {{ job.posted_at.isoformat() }}{% endif %}</li>{% endfor %}
